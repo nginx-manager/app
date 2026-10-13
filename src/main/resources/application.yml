@@ -1,0 +1,49 @@
+server:
+  port: 9000
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        same-site: lax
+
+nginx-manager:
+  data-dir: /data
+
+spring:
+  application:
+    name: nginx-manager
+  datasource:
+    url: jdbc:sqlite:${nginx-manager.data-dir}/nginx-manager.db?journal_mode=WAL&foreign_keys=on&busy_timeout=5000
+    hikari:
+      # SQLite는 WAL 모드에서 읽기는 동시에, 쓰기는 하나씩 처리한다. 쓰기 경합은 busy_timeout으로 기다린다
+      maximum-pool-size: 4
+  jpa:
+    open-in-view: false
+    database-platform: org.hibernate.community.dialect.SQLiteDialect
+    hibernate:
+      # 스키마는 Flyway가 관리한다. SQLite는 타입 이름이 느슨해 Hibernate의 validate와 맞지 않는다
+      ddl-auto: none
+    properties:
+      hibernate:
+        default_batch_fetch_size: 100
+  flyway:
+    enabled: true
+  thymeleaf:
+    cache: true
+
+nginx:
+  runtime:
+    binary: /usr/sbin/nginx
+    config-root: /etc/nginx
+    pid-file: /run/nginx/nginx.pid
+    status-url: http://127.0.0.1:8081/nginx_status
+    command-timeout: 30s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never

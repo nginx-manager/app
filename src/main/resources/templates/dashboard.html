@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('대시보드')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<main class="page">
+    <h1>대시보드</h1>
+    <section class="card">
+        <h2>nginx</h2>
+        <dl class="facts">
+            <dt>상태</dt>
+            <dd>
+                <span th:if="${status.state.name() == 'RUNNING'}" class="badge ok">실행 중</span>
+                <span th:unless="${status.state.name() == 'RUNNING'}" class="badge bad">중지됨</span>
+            </dd>
+            <dt>버전</dt>
+            <dd th:text="${status.version} ?: '알 수 없음'">1.31.6</dd>
+            <dt>마스터 PID</dt>
+            <dd th:text="${status.masterPid} ?: '-'">1</dd>
+        </dl>
+    </section>
+    <section class="card">
+        <h2>설치된 모듈 <small th:text="${#lists.size(status.modules)}">0</small></h2>
+        <ul class="tags">
+            <li th:each="m : ${status.modules}" th:text="${m.dynamic} ? ${m.name} + ' (동적)' : ${m.name}">http_ssl_module</li>
+        </ul>
+    </section>
+</main>
+</body>
+</html>

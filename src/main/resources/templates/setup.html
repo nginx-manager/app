@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('최초 설정')}"></head>
+<body class="centered">
+<main class="card narrow">
+    <h1>관리자 계정 만들기</h1>
+    <p>처음 실행했습니다. 이 계정으로 다른 사용자를 초대하고 권한을 줄 수 있습니다.</p>
+    <form th:action="@{/setup}" th:object="${form}" method="post">
+        <label>아이디
+            <input type="text" th:field="*{username}" autocomplete="username" required autofocus>
+            <span class="error" th:errors="*{username}"></span>
+        </label>
+        <label>비밀번호 (10자 이상)
+            <input type="password" th:field="*{password}" autocomplete="new-password" required>
+            <span class="error" th:errors="*{password}"></span>
+        </label>
+        <label>비밀번호 확인
+            <input type="password" th:field="*{passwordConfirm}" autocomplete="new-password" required>
+            <span class="error" th:errors="*{passwordConfirm}"></span>
+        </label>
+        <button type="submit">만들기</button>
+    </form>
+</main>
+</body>
+</html>

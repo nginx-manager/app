@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('로그인')}"></head>
+<body class="centered">
+<main class="card narrow">
+    <h1>nginx manager</h1>
+    <p class="notice" th:if="${param.setup}">관리자 계정을 만들었습니다. 로그인해 주세요.</p>
+    <p class="notice" th:if="${param.logout}">로그아웃했습니다.</p>
+    <p class="error" th:if="${param.error}">아이디나 비밀번호가 맞지 않거나, 계정이 잠겨 있습니다.</p>
+    <form th:action="@{/login}" method="post">
+        <label>아이디 <input type="text" name="username" autocomplete="username" required autofocus></label>
+        <label>비밀번호 <input type="password" name="password" autocomplete="current-password" required></label>
+        <button type="submit">로그인</button>
+    </form>
+</main>
+</body>
+</html>

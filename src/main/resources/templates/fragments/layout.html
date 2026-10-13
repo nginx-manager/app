@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:fragment="head(title)">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${title} + ' · nginx manager'">nginx manager</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+    <script th:src="@{/webjars/htmx.org/2.0.5/dist/htmx.min.js}" defer></script>
+</head>
+<body>
+<nav th:fragment="nav" class="nav">
+    <a class="brand" th:href="@{/}">nginx manager</a>
+    <a th:href="@{/}">대시보드</a>
+    <span class="spacer"></span>
+    <span class="who" th:if="${currentUser}" th:text="${currentUser.username}">admin</span>
+    <form th:if="${currentUser}" th:action="@{/logout}" method="post" class="inline">
+        <button type="submit" class="link">로그아웃</button>
+    </form>
+</nav>
+</body>
+</html>
