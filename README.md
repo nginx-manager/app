@@ -22,6 +22,8 @@ docker run -d --name nginx-manager \
   ghcr.io/nginx-manager/app:latest
 ```
 
+Compose로 띄우려면 [docker/docker-compose.yml](docker/docker-compose.yml)을 씁니다.
+
 `http://<호스트>:9000`에 접속하면 최초 관리자 계정을 만드는 화면이 나옵니다. 관리 화면은 인터넷에 그대로 열지 말고 사내망·VPN에서 쓰거나 HTTPS 프록시 뒤에 두세요([보안 점검](docs/security.md)).
 
 | 볼륨 | 내용 |
