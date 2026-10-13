@@ -11,6 +11,8 @@ spring:
 
 nginx:
   runtime:
+    config-root: ${java.io.tmpdir}/nm-test-no-config-root
+    health-timeout: 200ms
     binary: /nonexistent/nginx
     pid-file: ${java.io.tmpdir}/nginx-manager-test-missing.pid
     status-url: http://127.0.0.1:1/nginx_status

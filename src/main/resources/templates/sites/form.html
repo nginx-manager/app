@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('사이트 추가')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<main class="page">
+    <h1>사이트 추가</h1>
+    <div class="columns">
+        <section class="card">
+            <form th:action="@{/sites/new}" th:object="${form}" method="post" id="site-form">
+                <label>도메인
+                    <input type="text" th:field="*{primaryDomain}" placeholder="app.example.com" required>
+                    <span class="error" th:errors="*{primaryDomain}"></span>
+                </label>
+                <label>추가 도메인 (공백이나 쉼표로 구분, 선택)
+                    <input type="text" th:field="*{extraDomains}" placeholder="www.app.example.com">
+                    <span class="error" th:errors="*{extraDomainsValid}"></span>
+                </label>
+                <fieldset>
+                    <legend>유형</legend>
+                    <label class="inline"><input type="radio" th:field="*{type}" value="PROXY"> 리버스 프록시</label>
+                    <label class="inline"><input type="radio" th:field="*{type}" value="STATIC"> 정적 파일</label>
+                </fieldset>
+                <label>프록시 대상 (리버스 프록시)
+                    <input type="text" th:field="*{proxyTarget}" placeholder="http://127.0.0.1:8080">
+                    <span class="error" th:errors="*{proxyTargetValid}"></span>
+                </label>
+                <label>문서 루트 (정적 파일)
+                    <input type="text" th:field="*{staticRoot}" placeholder="/srv/www/app">
+                    <span class="error" th:errors="*{staticRootValid}"></span>
+                </label>
+                <label>HTTP 포트
+                    <input type="number" th:field="*{listenHttpPort}" min="1" max="65535">
+                    <span class="error" th:errors="*{listenHttpPort}"></span>
+                </label>
+                <button type="submit">초안 저장</button>
+                <p class="muted small">저장해도 nginx에는 바로 반영되지 않습니다. 적용 화면에서 검증 후 반영합니다.</p>
+            </form>
+        </section>
+        <section class="card">
+            <h2>설정 미리보기</h2>
+            <pre class="code" id="preview" th:fragment="preview"
+                 hx-post="/sites/preview" hx-include="#site-form" hx-swap="outerHTML"
+                 hx-trigger="input changed delay:400ms from:#site-form, change from:#site-form"
+                 th:text="${preview} ?: '값을 입력하면 만들어질 설정이 보입니다.'"></pre>
+        </section>
+    </div>
+</main>
+</body>
+</html>

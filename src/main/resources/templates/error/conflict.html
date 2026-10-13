@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('충돌')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<main class="page">
+    <section class="card result bad">
+        <h1 th:text="${title}">다른 사람이 먼저 저장했습니다</h1>
+        <p th:text="${detail}"></p>
+        <a href="javascript:history.back()">돌아가기</a>
+    </section>
+</main>
+</body>
+</html>

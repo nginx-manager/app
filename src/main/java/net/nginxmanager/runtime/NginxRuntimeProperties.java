@@ -12,5 +12,6 @@ public record NginxRuntimeProperties(
         Path configRoot,
         Path pidFile,
         URI statusUrl,
-        Duration commandTimeout) {
+        Duration commandTimeout,
+        Duration healthTimeout) {
 }
