@@ -20,6 +20,7 @@ import java.util.List;
 @Table(name = "certificate")
 public class TlsCertificate extends BaseEntity {
 
+    /** 만료 경고를 시작하는 남은 기간. 유효기간이 짧은 인증서는 유효기간의 1/3부터 경고한다(갱신 시점과 같다). */
     static final Duration EXPIRY_WARNING = Duration.ofDays(30);
 
     /** Let's Encrypt는 대표 도메인, 업로드는 사용자가 붙인 이름. 파일 디렉터리 이름으로도 쓴다. */
@@ -138,7 +139,17 @@ public class TlsCertificate extends BaseEntity {
     }
 
     public boolean isExpiringSoon(Instant now) {
-        return notAfter != null && now.plus(EXPIRY_WARNING).isAfter(notAfter);
+        if (notAfter == null) {
+            return false;
+        }
+        Duration warning = EXPIRY_WARNING;
+        if (notBefore != null) {
+            Duration third = Duration.between(notBefore, notAfter).dividedBy(3);
+            if (third.compareTo(warning) < 0) {
+                warning = third;
+            }
+        }
+        return now.plus(warning).isAfter(notAfter);
     }
 
     public boolean isFailing() {
