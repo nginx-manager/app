@@ -8,11 +8,13 @@
     <script th:src="@{/webjars/htmx.org/2.0.5/dist/htmx.min.js}" defer></script>
 </head>
 <body>
-<nav th:fragment="nav" class="nav">
+<th:block th:fragment="nav">
+<nav class="nav">
     <a class="brand" th:href="@{/}">nginx manager</a>
     <a th:href="@{/}">대시보드</a>
     <a th:href="@{/sites}">사이트</a>
     <a th:href="@{/files}">설정 파일</a>
+    <a th:href="@{/versions}">이력</a>
     <a th:href="@{/apply}">적용<span class="count" th:if="${pendingCount > 0}" th:text="${pendingCount}">2</span></a>
     <span class="spacer"></span>
     <span class="who" th:if="${currentUser}" th:text="${currentUser.username}">admin</span>
@@ -20,5 +22,10 @@
         <button type="submit" class="link">로그아웃</button>
     </form>
 </nav>
+<div class="drift-banner" th:if="${drift != null and !#lists.isEmpty(drift)}">
+    서버에서 직접 바뀐 설정 파일이 <strong th:text="${#lists.size(drift)}">1</strong>개 있습니다.
+    <a th:href="@{/versions#drift}">확인하기</a>
+</div>
+</th:block>
 </body>
 </html>

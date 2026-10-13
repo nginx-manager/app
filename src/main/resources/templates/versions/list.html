@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('이력')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<main class="page">
+    <h1>변경 이력</h1>
+
+    <section class="card" id="drift" th:if="${!#lists.isEmpty(drift)}">
+        <h2>서버에서 직접 바뀐 설정</h2>
+        <p>관리도구가 마지막으로 적용한 내용과 디스크의 파일이 다릅니다. 지금 상태를 새 버전으로 가져오면 이력과 되돌리기의 기준이 됩니다.</p>
+        <ul>
+            <li th:each="d : ${drift}">
+                <code th:text="${d.path}">nginx.conf</code>
+                <span class="badge warn" th:text="${d.kind.name() == 'MODIFIED' ? '바뀜' : (d.kind.name() == 'ADDED' ? '새 파일' : '사라짐')}">바뀜</span>
+            </li>
+        </ul>
+        <form th:if="${currentUser.canEdit()}" th:action="@{/drift/import}" method="post">
+            <button type="submit">지금 상태를 새 버전으로 가져오기</button>
+        </form>
+    </section>
+
+    <section class="card">
+        <p th:if="${#lists.isEmpty(versions)}" class="muted">아직 기록된 버전이 없습니다.</p>
+        <form th:unless="${#lists.isEmpty(versions)}" th:action="@{/versions/compare}" method="get">
+            <table>
+                <thead>
+                <tr><th>비교</th><th>버전</th><th>시각</th><th>작성자</th><th>종류</th><th>결과</th><th>메모</th><th>파일</th></tr>
+                </thead>
+                <tbody>
+                <tr th:each="v, stat : ${versions}">
+                    <td class="nowrap">
+                        <input type="radio" name="a" th:value="${v.id}" th:checked="${stat.index == 1}" aria-label="이전 버전">
+                        <input type="radio" name="b" th:value="${v.id}" th:checked="${stat.index == 0}" aria-label="이후 버전">
+                    </td>
+                    <td><a th:href="@{/versions/{id}(id=${v.id})}" th:text="'#' + ${v.id}">#3</a></td>
+                    <td class="nowrap" th:text="${#temporals.format(v.createdAt, 'yyyy-MM-dd HH:mm:ss')}">2026-10-13 10:00</td>
+                    <td th:text="${v.authorName ?: '시스템'}">admin</td>
+                    <td>
+                        <span th:text="${v.source.label()}">적용</span>
+                        <a th:if="${v.rolledBackToId != null}" th:href="@{/versions/{id}(id=${v.rolledBackToId})}"
+                           th:text="'→ #' + ${v.rolledBackToId}">→ #1</a>
+                    </td>
+                    <td><span class="badge" th:classappend="${v.result.name() == 'SUCCESS' ? 'ok' : 'bad'}"
+                              th:text="${v.result.label()}">적용됨</span></td>
+                    <td th:text="${v.message}">메모</td>
+                    <td th:text="${v.fileCount}">3</td>
+                </tr>
+                </tbody>
+            </table>
+            <button type="submit">선택한 두 버전 비교</button>
+        </form>
+        <p class="pager">
+            <a th:if="${page > 0}" th:href="@{/versions(page=${page - 1})}">← 최근</a>
+            <a th:if="${hasNext}" th:href="@{/versions(page=${page + 1})}">이전 →</a>
+        </p>
+    </section>
+</main>
+</body>
+</html>

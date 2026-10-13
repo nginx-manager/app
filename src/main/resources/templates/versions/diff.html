@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('버전 비교')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<main class="page">
+    <h1>
+        <a th:href="@{/versions/{id}(id=${from.id})}" th:text="'#' + ${from.id}">#1</a>
+        →
+        <a th:href="@{/versions/{id}(id=${to.id})}" th:text="'#' + ${to.id}">#3</a>
+    </h1>
+    <p class="muted" th:if="${!from.snapshot or !to.snapshot}">
+        실패한 버전은 적용하려던 파일만 담고 있어, 그 파일들만 비교합니다.
+    </p>
+    <section class="card">
+        <p th:if="${#lists.isEmpty(diffs)}" class="muted">두 버전의 설정이 같습니다.</p>
+        <div th:each="d : ${diffs}" class="pending">
+            <div class="title-row">
+                <code th:text="${d.path}">nginx.conf</code>
+                <span class="badge warn" th:text="${d.change.name() == 'ADDED' ? '추가' : (d.change.name() == 'REMOVED' ? '삭제' : '수정')}">수정</span>
+            </div>
+            <pre class="code diff" th:text="${d.diff}"></pre>
+        </div>
+    </section>
+</main>
+</body>
+</html>

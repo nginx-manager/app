@@ -3,11 +3,13 @@ package net.nginxmanager.support;
 import net.nginxmanager.audit.AuditLogRepository;
 import net.nginxmanager.config.ConfigFileRepository;
 import net.nginxmanager.config.ConfigVersionRepository;
+import net.nginxmanager.history.DriftDetector;
 import net.nginxmanager.site.SiteRepository;
 import net.nginxmanager.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Sort;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
@@ -45,15 +47,19 @@ public abstract class ConfigRootTest {
     protected UserRepository userRepository;
     @Autowired
     protected AuditLogRepository auditLogRepository;
+    @Autowired
+    protected DriftDetector driftDetector;
 
     @BeforeEach
     void resetState() throws IOException {
         nginx.reset();
         siteRepository.deleteAll();
         configFileRepository.deleteAll();
-        configVersionRepository.deleteAll();
+        // 되돌리기 버전이 이전 버전을 참조하므로 최신부터 지운다
+        configVersionRepository.deleteAll(configVersionRepository.findAll(Sort.by(Sort.Direction.DESC, "id")));
         auditLogRepository.deleteAll();
         userRepository.deleteAll();
+        driftDetector.invalidate();
         try (Stream<Path> paths = Files.walk(CONFIG_ROOT)) {
             paths.sorted(Comparator.reverseOrder()).filter(p -> !p.equals(CONFIG_ROOT)).forEach(p -> p.toFile().delete());
         }

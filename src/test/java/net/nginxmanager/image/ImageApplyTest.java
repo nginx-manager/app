@@ -42,6 +42,7 @@ class ImageApplyTest {
     static final Pattern VERSION = Pattern.compile("name=\"version\" value=\"(\\d+)\"");
 
     static GenericContainer<?> container;
+    static String siteFileId;
     static HttpClient http;
 
     @BeforeAll
@@ -86,6 +87,7 @@ class ImageApplyTest {
         Matcher link = FILE_LINK.matcher(get("/files").body());
         assertThat(link.find()).isTrue();
         String fileId = link.group(1);
+        siteFileId = fileId;
         Matcher version = VERSION.matcher(get("/files/" + fileId).body());
         assertThat(version.find()).isTrue();
 
@@ -97,6 +99,35 @@ class ImageApplyTest {
         assertThat(container.execInContainer("cat", "/etc/nginx/conf.d/sites/app.local.conf").getStdout())
                 .doesNotContain("no_such_flag");
         assertThat(siteStatus()).isEqualTo("200");
+    }
+
+    @Test
+    @Order(3)
+    void rollingBackToImportedConfigRemovesSite() throws Exception {
+        post("/apply/discard/" + siteFileId, Map.of(), "/apply");
+
+        // 버전 #1은 처음 시작할 때 가져온 설정이다
+        HttpResponse<String> rollback = post("/versions/1/rollback", Map.of(), "/versions/1");
+        assertThat(rollback.headers().firstValue("Location")).hasValueSatisfying(
+                location -> assertThat(location).doesNotContain("rejected").doesNotContain("unchanged"));
+
+        assertThat(get(rollback.headers().firstValue("Location").orElseThrow()
+                .replaceFirst("^https?://[^/]+", "")).body()).contains("되돌리기").contains("적용됨");
+        await().atMost(Duration.ofSeconds(10)).pollInterval(Duration.ofMillis(200))
+                .until(() -> siteStatus().equals("404"));
+    }
+
+    @Test
+    @Order(4)
+    void editsMadeOnTheServerAreDetectedAndImported() throws Exception {
+        container.execInContainer("sh", "-c", "echo '# edited by hand' >> /etc/nginx/nginx.conf");
+
+        assertThat(get("/versions").body()).contains("서버에서 직접 바뀐 설정").contains("nginx.conf");
+        HttpResponse<String> imported = post("/drift/import", Map.of(), "/versions");
+        assertThat(imported.statusCode()).isEqualTo(302);
+
+        String versions = get("/versions").body();
+        assertThat(versions).contains("외부 변경 가져오기").doesNotContain("id=\"drift\"");
     }
 
     private static String siteStatus() throws Exception {

@@ -63,3 +63,9 @@ label.inline input { width: auto; display: inline; margin: 0; }
 .pending { margin-bottom: 1rem; }
 .htmx-indicator { display: none; }
 .htmx-request .htmx-indicator, .htmx-request.htmx-indicator { display: inline; }
+.drift-banner { background: #fff6e5; border-bottom: 1px solid #f3d9a4; padding: .5rem 1.5rem; }
+.nowrap { white-space: nowrap; }
+.pager { display: flex; gap: 1rem; margin: .75rem 0 0; }
+.actions { display: flex; align-items: center; gap: .75rem; margin-top: 1rem; }
+details { margin: .4rem 0; }
+details summary { cursor: pointer; }
