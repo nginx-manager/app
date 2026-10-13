@@ -39,6 +39,16 @@ public class Site extends BaseEntity {
     @Column(nullable = false)
     private boolean enabled = true;
 
+    @Column(name = "https_enabled", nullable = false)
+    private boolean httpsEnabled;
+
+    @Column(name = "redirect_http_to_https", nullable = false)
+    private boolean redirectHttpToHttps = true;
+
+    /** 연결한 인증서. 연관 대신 id만 두어 목록 조회에서 추가 쿼리가 생기지 않게 한다. */
+    @Column(name = "certificate_id")
+    private Long certificateId;
+
     @OneToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "config_file_id")
     private ConfigFile configFile;
@@ -58,6 +68,18 @@ public class Site extends BaseEntity {
         this.listenHttpPort = form.listenHttpPort();
         this.staticRoot = form.type() == SiteType.STATIC ? form.staticRoot() : null;
         this.proxyTarget = form.type() == SiteType.PROXY ? form.proxyTarget() : null;
+        this.httpsEnabled = form.httpsEnabled();
+        this.redirectHttpToHttps = form.redirectHttpToHttps();
+    }
+
+    void linkCertificate(Long certificateId) {
+        this.certificateId = certificateId;
+    }
+
+    /** 이미 서비스 중인 사이트에서 HTTPS(Let's Encrypt)를 켠다. */
+    void enableHttps(Long certificateId) {
+        this.httpsEnabled = true;
+        this.certificateId = certificateId;
     }
 
     public void markImportedDisabled() {
@@ -73,9 +95,22 @@ public class Site extends BaseEntity {
         this.enabled = enabled;
     }
 
-    public SiteForm toForm() {
+    /** @param uploadedCertificateId 연결한 인증서가 업로드한 것이면 그 id, Let's Encrypt면 null */
+    public SiteForm toForm(Long uploadedCertificateId) {
         return new SiteForm(primaryDomain, extraDomains == null ? "" : extraDomains, type, listenHttpPort,
-                staticRoot, proxyTarget, getVersion());
+                staticRoot, proxyTarget, getVersion(), httpsEnabled, redirectHttpToHttps, uploadedCertificateId);
+    }
+
+    public boolean isHttpsEnabled() {
+        return httpsEnabled;
+    }
+
+    public boolean isRedirectHttpToHttps() {
+        return redirectHttpToHttps;
+    }
+
+    public Long getCertificateId() {
+        return certificateId;
     }
 
     public String getPrimaryDomain() {

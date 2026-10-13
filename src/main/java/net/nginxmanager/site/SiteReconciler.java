@@ -26,14 +26,14 @@ public class SiteReconciler {
     private final SiteRepository siteRepository;
     private final ConfigFileRepository configFileRepository;
     private final ConfigFileStore store;
-    private final SiteConfigRenderer renderer;
+    private final SiteRendering rendering;
 
     public SiteReconciler(SiteRepository siteRepository, ConfigFileRepository configFileRepository,
-                          ConfigFileStore store, SiteConfigRenderer renderer) {
+                          ConfigFileStore store, SiteRendering rendering) {
         this.siteRepository = siteRepository;
         this.configFileRepository = configFileRepository;
         this.store = store;
-        this.renderer = renderer;
+        this.rendering = rendering;
     }
 
     /** @param changedPaths 디스크에서 내용이 바뀌거나 생기거나 사라진 파일 */
@@ -76,7 +76,7 @@ public class SiteReconciler {
             site.moveTo(site.getConfigFile(), current.equals(enabledPath));
         }
         if (site.getType() != SiteType.RAW) {
-            String rendered = renderer.render(domain, site.toForm());
+            String rendered = rendering.render(site);
             if (!Objects.equals(rendered, store.read(site.getConfigFile().getPath()))) {
                 site.switchToRaw();
             }

@@ -18,6 +18,14 @@ nginx:
     status-url: http://127.0.0.1:1/nginx_status
     command-timeout: 2s
 
+nginx-manager:
+  acme:
+    webroot: ${java.io.tmpdir}/nm-test-acme-webroot
+    account-dir: ${java.io.tmpdir}/nm-test-acme-accounts
+  cert:
+    # 테스트에서는 예약 갱신을 돌리지 않는다. 필요한 테스트가 직접 부른다
+    initial-delay: PT24H
+
 logging:
   level:
     org.hibernate.engine.internal.StatisticalLoggingSessionEventListener: warn

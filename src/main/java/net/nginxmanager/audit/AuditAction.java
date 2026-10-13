@@ -11,5 +11,6 @@ public enum AuditAction {
     DRIFT_IMPORT,
     CERT_ISSUE,
     CERT_RENEW,
+    CERT_UPLOAD,
     RUNTIME_START
 }

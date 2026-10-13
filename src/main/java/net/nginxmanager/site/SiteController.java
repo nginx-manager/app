@@ -2,6 +2,9 @@ package net.nginxmanager.site;
 
 import jakarta.validation.Valid;
 import net.nginxmanager.common.NotFoundException;
+import net.nginxmanager.cert.CertificateSource;
+import net.nginxmanager.cert.TlsCertificate;
+import net.nginxmanager.cert.TlsCertificateRepository;
 import net.nginxmanager.config.ConfigFileStore;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
@@ -20,15 +23,24 @@ public class SiteController {
 
     private final SiteService siteService;
     private final SiteQueryRepository siteQueryRepository;
-    private final SiteConfigRenderer renderer;
+    private final SiteRendering rendering;
     private final ConfigFileStore store;
+    private final TlsCertificateRepository certificateRepository;
 
     public SiteController(SiteService siteService, SiteQueryRepository siteQueryRepository,
-                          SiteConfigRenderer renderer, ConfigFileStore store) {
+                          SiteRendering rendering, ConfigFileStore store,
+                          TlsCertificateRepository certificateRepository) {
         this.siteService = siteService;
         this.siteQueryRepository = siteQueryRepository;
-        this.renderer = renderer;
+        this.rendering = rendering;
         this.store = store;
+        this.certificateRepository = certificateRepository;
+    }
+
+    /** 사이트 폼의 인증서 선택 목록(업로드한 인증서). */
+    @ModelAttribute("uploadedCertificates")
+    public java.util.List<TlsCertificate> uploadedCertificates() {
+        return certificateRepository.findBySourceOrderByNameAsc(CertificateSource.UPLOADED);
     }
 
     @GetMapping
@@ -62,8 +74,9 @@ public class SiteController {
     public String detail(@PathVariable long id, Model model) {
         Site site = siteQueryRepository.findWithFile(id).orElseThrow(() -> new NotFoundException("site " + id));
         model.addAttribute("site", site);
-        model.addAttribute("form", site.toForm());
+        model.addAttribute("form", rendering.formOf(site));
         model.addAttribute("content", currentContent(site));
+        model.addAttribute("certificate", certificateOf(site));
         return "sites/detail";
     }
 
@@ -74,6 +87,7 @@ public class SiteController {
             Site site = siteQueryRepository.findWithFile(id).orElseThrow(() -> new NotFoundException("site " + id));
             model.addAttribute("site", site);
             model.addAttribute("content", currentContent(site));
+            model.addAttribute("certificate", certificateOf(site));
             return "sites/detail";
         }
         siteService.update(id, form, authentication.getName());
@@ -92,8 +106,13 @@ public class SiteController {
     public String preview(@Valid @ModelAttribute("form") SiteForm form, BindingResult bindingResult, Model model) {
         model.addAttribute("preview", bindingResult.hasErrors()
                 ? null
-                : renderer.render(form.primaryDomain().toLowerCase(), form));
+                : rendering.render(form.primaryDomain().toLowerCase(), form, form.certificateId()));
         return "sites/form :: preview";
+    }
+
+    private TlsCertificate certificateOf(Site site) {
+        return site.getCertificateId() == null ? null
+                : certificateRepository.findById(site.getCertificateId()).orElse(null);
     }
 
     private String currentContent(Site site) {

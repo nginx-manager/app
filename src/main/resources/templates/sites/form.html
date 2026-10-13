@@ -33,6 +33,19 @@
                     <input type="number" th:field="*{listenHttpPort}" min="1" max="65535">
                     <span class="error" th:errors="*{listenHttpPort}"></span>
                 </label>
+                <fieldset>
+                    <legend>HTTPS</legend>
+                    <label class="inline"><input type="checkbox" th:field="*{httpsEnabled}"> HTTPS 사용 (443)</label>
+                    <label class="inline"><input type="checkbox" th:field="*{redirectHttpToHttps}"> HTTP 요청을 HTTPS로 넘기기</label>
+                    <label>인증서
+                        <select th:field="*{certificateId}">
+                            <option value="">Let's Encrypt 자동 발급</option>
+                            <option th:each="c : ${uploadedCertificates}" th:value="${c.id}" th:text="${c.name} + ' (업로드)'">wildcard</option>
+                        </select>
+                    </label>
+                    <span class="error" th:errors="*{letsEncryptDomainsValid}"></span>
+                    <p class="muted small">Let's Encrypt를 고르면 적용 후 인증서를 받아 자동으로 HTTPS 설정을 다시 적용합니다. 인증서를 받기 전까지는 HTTP로만 응답합니다.</p>
+                </fieldset>
                 <button type="submit">초안 저장</button>
                 <p class="muted small">저장해도 nginx에는 바로 반영되지 않습니다. 적용 화면에서 검증 후 반영합니다.</p>
             </form>
