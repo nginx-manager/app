@@ -33,8 +33,24 @@ public class Site extends BaseEntity {
     @Column(name = "static_root")
     private String staticRoot;
 
-    @Column(name = "proxy_target")
+    /** 백엔드 주소. 여러 개면 줄마다 하나. */
+    @Column(name = "proxy_target", columnDefinition = "TEXT")
     private String proxyTarget;
+
+    @Column(name = "proxy_websocket", nullable = false)
+    private boolean proxyWebsocket;
+
+    /** 초. null이면 nginx 기본값. */
+    @Column(name = "proxy_connect_timeout")
+    private Integer proxyConnectTimeout;
+
+    /** 초. null이면 nginx 기본값. */
+    @Column(name = "proxy_read_timeout")
+    private Integer proxyReadTimeout;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "proxy_load_balancing", nullable = false, length = 20)
+    private LoadBalancing proxyLoadBalancing = LoadBalancing.ROUND_ROBIN;
 
     @Column(nullable = false)
     private boolean enabled = true;
@@ -67,7 +83,12 @@ public class Site extends BaseEntity {
         this.type = form.type();
         this.listenHttpPort = form.listenHttpPort();
         this.staticRoot = form.type() == SiteType.STATIC ? form.staticRoot() : null;
-        this.proxyTarget = form.type() == SiteType.PROXY ? form.proxyTarget() : null;
+        boolean proxy = form.type() == SiteType.PROXY;
+        this.proxyTarget = proxy ? form.proxyTargetNormalized() : null;
+        this.proxyWebsocket = proxy && form.proxyWebsocket();
+        this.proxyConnectTimeout = proxy ? form.proxyConnectTimeout() : null;
+        this.proxyReadTimeout = proxy ? form.proxyReadTimeout() : null;
+        this.proxyLoadBalancing = proxy ? form.proxyLoadBalancing() : LoadBalancing.ROUND_ROBIN;
         this.httpsEnabled = form.httpsEnabled();
         this.redirectHttpToHttps = form.redirectHttpToHttps();
     }
@@ -98,7 +119,8 @@ public class Site extends BaseEntity {
     /** @param uploadedCertificateId 연결한 인증서가 업로드한 것이면 그 id, Let's Encrypt면 null */
     public SiteForm toForm(Long uploadedCertificateId) {
         return new SiteForm(primaryDomain, extraDomains == null ? "" : extraDomains, type, listenHttpPort,
-                staticRoot, proxyTarget, getVersion(), httpsEnabled, redirectHttpToHttps, uploadedCertificateId);
+                staticRoot, proxyTarget, getVersion(), httpsEnabled, redirectHttpToHttps, uploadedCertificateId,
+                proxyWebsocket, proxyConnectTimeout, proxyReadTimeout, proxyLoadBalancing);
     }
 
     public boolean isHttpsEnabled() {
@@ -135,6 +157,22 @@ public class Site extends BaseEntity {
 
     public String getProxyTarget() {
         return proxyTarget;
+    }
+
+    public boolean isProxyWebsocket() {
+        return proxyWebsocket;
+    }
+
+    public Integer getProxyConnectTimeout() {
+        return proxyConnectTimeout;
+    }
+
+    public Integer getProxyReadTimeout() {
+        return proxyReadTimeout;
+    }
+
+    public LoadBalancing getProxyLoadBalancing() {
+        return proxyLoadBalancing;
     }
 
     public boolean isEnabled() {

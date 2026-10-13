@@ -21,16 +21,14 @@
                     <label class="inline"><input type="radio" th:field="*{type}" value="PROXY"> 리버스 프록시</label>
                     <label class="inline"><input type="radio" th:field="*{type}" value="STATIC"> 정적 파일</label>
                 </fieldset>
-                <label>프록시 대상 (리버스 프록시)
-                    <input type="text" th:field="*{proxyTarget}" placeholder="http://127.0.0.1:8080">
-                    <span class="error" th:errors="*{proxyTargetValid}"></span>
-                </label>
+                <th:block th:replace="~{sites/proxy-fields :: fields(true)}"></th:block>
                 <label>문서 루트 (정적 파일)
                     <input type="text" th:field="*{staticRoot}" placeholder="/srv/www/app">
                     <span class="error" th:errors="*{staticRootValid}"></span>
                 </label>
                 <label>HTTP 포트
                     <input type="number" th:field="*{listenHttpPort}" min="1" max="65535">
+                    <span class="error" th:errors="*{listenPortFree}"></span>
                     <span class="error" th:errors="*{listenHttpPort}"></span>
                 </label>
                 <fieldset>

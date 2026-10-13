@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<!-- 사이트 추가·수정 폼이 함께 쓰는 리버스 프록시 항목. th:object 안에서 넣는다 -->
+<th:block th:fragment="fields(editable)">
+    <label>프록시 대상 (리버스 프록시, 여러 개면 줄마다 하나)
+        <textarea th:field="*{proxyTarget}" rows="3" placeholder="http://127.0.0.1:8080" th:disabled="${!editable}"></textarea>
+        <span class="error" th:errors="*{proxyTargetValid}"></span>
+    </label>
+    <details class="proxy-options">
+        <summary>프록시 세부 설정 (웹소켓, 타임아웃, 부하 분산)</summary>
+        <label class="inline"><input type="checkbox" th:field="*{proxyWebsocket}" th:disabled="${!editable}"> 웹소켓 연결 넘기기</label>
+        <label>연결 타임아웃(초, 비우면 60)
+            <input type="number" th:field="*{proxyConnectTimeout}" min="1" max="3600" th:disabled="${!editable}">
+            <span class="error" th:errors="*{proxyConnectTimeout}"></span>
+        </label>
+        <label>응답 타임아웃(초, 비우면 60)
+            <input type="number" th:field="*{proxyReadTimeout}" min="1" max="3600" th:disabled="${!editable}">
+            <span class="error" th:errors="*{proxyReadTimeout}"></span>
+        </label>
+        <p class="muted small">웹소켓이나 오래 걸리는 요청은 응답 타임아웃을 길게(예: 3600) 잡으세요. 이 시간 동안 백엔드가 아무것도 보내지 않으면 연결을 끊습니다.</p>
+        <label>백엔드가 여럿일 때 나누는 방식
+            <select th:field="*{proxyLoadBalancing}" th:disabled="${!editable}">
+                <option th:each="lb : ${T(net.nginxmanager.site.LoadBalancing).values()}" th:value="${lb}" th:text="${lb.label}">차례대로</option>
+            </select>
+        </label>
+    </details>
+</th:block>
+</body>
+</html>

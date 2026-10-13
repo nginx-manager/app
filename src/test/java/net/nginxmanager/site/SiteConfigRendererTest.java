@@ -78,4 +78,102 @@ class SiteConfigRendererTest {
         SiteForm form = new SiteForm("app.local", "", SiteType.STATIC, 80, root, null, null);
         assertThat(validator.validate(form)).isNotEmpty();
     }
+
+    private static SiteForm proxy(String targets, boolean websocket, Integer connect, Integer read, LoadBalancing lb) {
+        return new SiteForm("app-1.example.com", "", SiteType.PROXY, 80, null, targets, null, false, true, null,
+                websocket, connect, read, lb);
+    }
+
+    @Test
+    void rendersUpstreamForSeveralBackends() {
+        SiteForm form = proxy("http://10.0.0.1:8080/api\nhttp://10.0.0.2/api, http://10.0.0.1:8080/api", false, null,
+                null, LoadBalancing.LEAST_CONN);
+
+        String config = renderer.render("app-1.example.com", form);
+
+        assertThat(config).startsWith(SiteConfigRenderer.HEADER + """
+                upstream backend_app__1_example_com {
+                    least_conn;
+                    server 10.0.0.1:8080;
+                    server 10.0.0.2:80;
+                }
+
+                server {
+                """);
+        assertThat(config).contains("        proxy_pass http://backend_app__1_example_com/api;\n")
+                .doesNotContain("map $http_upgrade", "proxy_read_timeout");
+        assertThat(form.proxyTargetNormalized()).isEqualTo("http://10.0.0.1:8080/api\nhttp://10.0.0.2/api");
+    }
+
+    @Test
+    void roundRobinUpstreamHasNoMethodAndHttpsBackendsKeepPort443() {
+        String config = renderer.render("app-1.example.com",
+                proxy("https://a.internal https://b.internal:8443", false, null, null, null));
+
+        assertThat(config).contains("    server a.internal:443;\n    server b.internal:8443;\n}")
+                .contains("proxy_pass https://backend_app__1_example_com;")
+                .doesNotContain("least_conn", "ip_hash");
+    }
+
+    @Test
+    void rendersWebsocketAndTimeouts() {
+        String config = renderer.render("app-1.example.com",
+                proxy("http://127.0.0.1:3000", true, 5, 3600, null));
+
+        assertThat(config).contains("""
+                map $http_upgrade $connection_upgrade_app__1_example_com {
+                    default upgrade;
+                    ''      close;
+                }
+                """).contains("""
+                        proxy_set_header Upgrade $http_upgrade;
+                        proxy_set_header Connection $connection_upgrade_app__1_example_com;
+                        proxy_connect_timeout 5s;
+                        proxy_read_timeout 3600s;
+                        proxy_send_timeout 3600s;
+                    }
+                """).contains("proxy_pass http://127.0.0.1:3000;").doesNotContain("upstream ");
+    }
+
+    @Test
+    void httpsSiteRendersUpstreamOnceForBothServers() {
+        SiteForm form = new SiteForm("app.local", "", SiteType.PROXY, 80, null, "http://a:1 http://b:1", null, true,
+                false, null, true, null, null, null);
+
+        String config = renderer.render("app.local", form,
+                new net.nginxmanager.cert.CertificatePaths("/etc/nginx/certs/c.pem", "/etc/nginx/certs/k.pem"));
+
+        assertThat(config.split("upstream backend_app_local", -1)).hasSize(2);
+        assertThat(config.split("map \\$http_upgrade", -1)).hasSize(2);
+        assertThat(config.split("proxy_pass http://backend_app_local;", -1)).hasSize(3);
+    }
+
+    @Test
+    void upstreamNamesDoNotCollide() {
+        assertThat(SiteConfigRenderer.upstreamName("a-b.com")).isNotEqualTo(SiteConfigRenderer.upstreamName("a.b-com"))
+                .isNotEqualTo(SiteConfigRenderer.upstreamName("a.b.com"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"http://a:1 https://b:1", "http://a:1/x http://b:1/y", "http://a:1 b:1"})
+    void rejectsBackendsThatCannotShareOneUpstream(String targets) {
+        assertThat(validator.validate(proxy(targets, false, null, null, null))).isNotEmpty();
+    }
+
+    @Test
+    void rejectsTooManyBackendsAndOutOfRangeTimeouts() {
+        String many = java.util.stream.IntStream.rangeClosed(1, SiteForm.MAX_BACKENDS + 1)
+                .mapToObj(i -> "http://10.0.0." + i + ":80").collect(java.util.stream.Collectors.joining("\n"));
+        assertThat(validator.validate(proxy(many, false, null, null, null))).isNotEmpty();
+        assertThat(validator.validate(proxy("http://a:1", false, 0, null, null))).isNotEmpty();
+        assertThat(validator.validate(proxy("http://a:1", false, null, 3601, null))).isNotEmpty();
+        assertThat(validator.validate(proxy("http://a:1", true, 1, 3600, LoadBalancing.IP_HASH))).isEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {8081, 9000})
+    void rejectsPortsTheManagerUses(int port) {
+        assertThat(validator.validate(new SiteForm("app.local", "", SiteType.PROXY, port, null, "http://a:1", null)))
+                .isNotEmpty();
+    }
 }
