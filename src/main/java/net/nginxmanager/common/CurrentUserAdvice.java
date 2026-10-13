@@ -1,5 +1,6 @@
 package net.nginxmanager.common;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -32,5 +33,13 @@ public class CurrentUserAdvice {
                 .map(GrantedAuthority::getAuthority)
                 .collect(Collectors.toUnmodifiableSet());
         return new CurrentUser(authentication.getName(), roles);
+    }
+
+    /** 메뉴에서 지금 보고 있는 항목을 표시하려고 경로의 첫 마디를 넣는다(예: /sites/3 → sites). */
+    @ModelAttribute("navSection")
+    public String navSection(HttpServletRequest request) {
+        String path = request.getRequestURI().substring(request.getContextPath().length());
+        String[] parts = path.split("/", 3);
+        return parts.length > 1 ? parts[1] : "";
     }
 }

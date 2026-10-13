@@ -10,21 +10,26 @@
 <body>
 <th:block th:fragment="nav">
 <nav class="nav">
-    <a class="brand" th:href="@{/}">nginx manager</a>
-    <a th:href="@{/}">대시보드</a>
-    <a th:href="@{/sites}">사이트</a>
-    <a th:href="@{/files}">설정 파일</a>
-    <a th:href="@{/versions}">이력</a>
-    <a th:href="@{/certs}">인증서</a>
-    <a th:if="${currentUser != null and currentUser.canEdit()}" th:href="@{/apply}">적용<span class="count" th:if="${pendingCount > 0}" th:text="${pendingCount}">2</span></a>
-    <a th:if="${currentUser != null and currentUser.isAdmin()}" th:href="@{/users}">사용자</a>
-    <a th:if="${currentUser != null and currentUser.isAdmin()}" th:href="@{/audit}">감사 로그</a>
-    <a th:if="${currentUser != null and currentUser.isAdmin()}" th:href="@{/settings/notifications}">설정</a>
+    <a class="brand" th:href="@{/}"><span class="logo" aria-hidden="true">N</span><span>nginx manager</span></a>
+    <div class="nav-links">
+        <a th:href="@{/}" th:classappend="${navSection == ''} ? 'active'"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>대시보드</span></a>
+        <a th:href="@{/sites}" th:classappend="${navSection == 'sites' or navSection == 'logs'} ? 'active'"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg><span>사이트</span></a>
+        <a th:href="@{/files}" th:classappend="${navSection == 'files'} ? 'active'"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg><span>설정 파일</span></a>
+        <a th:href="@{/versions}" th:classappend="${navSection == 'versions'} ? 'active'"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg><span>이력</span></a>
+        <a th:href="@{/certs}" th:classappend="${navSection == 'certs'} ? 'active'"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><span>인증서</span></a>
+        <a th:if="${currentUser != null and currentUser.canEdit()}" th:href="@{/apply}" th:classappend="${navSection == 'apply'} ? 'active'"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 21h14"/></svg><span>적용</span><span class="count" th:if="${pendingCount > 0}" th:text="${pendingCount}">2</span></a>
+        <span class="nav-label" th:if="${currentUser != null and currentUser.isAdmin()}">관리</span>
+        <a th:if="${currentUser != null and currentUser.isAdmin()}" th:href="@{/users}" th:classappend="${navSection == 'users'} ? 'active'"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M16 4a4 4 0 0 1 0 8M22 21a7 7 0 0 0-4-6.3"/></svg><span>사용자</span></a>
+        <a th:if="${currentUser != null and currentUser.isAdmin()}" th:href="@{/audit}" th:classappend="${navSection == 'audit'} ? 'active'"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 13l2 2 4-4"/></svg><span>감사 로그</span></a>
+        <a th:if="${currentUser != null and currentUser.isAdmin()}" th:href="@{/settings/notifications}" th:classappend="${navSection == 'settings'} ? 'active'"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span>설정</span></a>
+    </div>
     <span class="spacer"></span>
-    <a class="who" th:if="${currentUser}" th:href="@{/account}" th:text="${currentUser.username}">admin</a>
-    <form th:if="${currentUser}" th:action="@{/logout}" method="post" class="inline">
-        <button type="submit" class="link">로그아웃</button>
-    </form>
+    <div class="nav-user" th:if="${currentUser}">
+        <a class="who" th:href="@{/account}" th:classappend="${navSection == 'account'} ? 'active'"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span th:text="${currentUser.username}">admin</span></a>
+        <form th:action="@{/logout}" method="post" class="inline">
+            <button type="submit" class="link" title="로그아웃"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg><span>로그아웃</span></button>
+        </form>
+    </div>
 </nav>
 <div class="drift-banner" th:if="${drift != null and !#lists.isEmpty(drift)}">
     서버에서 직접 바뀐 설정 파일이 <strong th:text="${#lists.size(drift)}">1</strong>개 있습니다.
