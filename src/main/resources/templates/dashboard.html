@@ -45,6 +45,29 @@
         </ul>
     </section>
 
+    <div class="stats" id="stats">
+        <a class="stat" th:href="@{/}" th:classappend="${status.state.name() == 'RUNNING'} ? 'ok' : 'bad'">
+            <span class="stat-label" th:text="#{dashboard.stats.nginx}">nginx</span>
+            <strong class="stat-value" th:text="${status.state.name() == 'RUNNING'} ? #{dashboard.facts.running} : #{dashboard.facts.stopped}">실행 중</strong>
+            <span class="stat-sub" th:text="${status.version} ?: #{dashboard.unknown}">1.31.6</span>
+        </a>
+        <a class="stat" th:href="@{/sites}">
+            <span class="stat-label" th:text="#{dashboard.stats.sites}">활성 사이트</span>
+            <strong class="stat-value" th:text="${dashboard.enabledSiteCount}">3</strong>
+            <span class="stat-sub" th:text="#{dashboard.stats.sitesSub(${'' + dashboard.siteCount})}">전체 4개</span>
+        </a>
+        <a class="stat" th:href="${currentUser.canEdit()} ? @{/apply} : @{/versions}" th:classappend="${pendingCount > 0} ? 'warn'">
+            <span class="stat-label" th:text="#{dashboard.stats.pending}">적용 대기</span>
+            <strong class="stat-value" th:text="${pendingCount}">0</strong>
+            <span class="stat-sub" th:text="${pendingCount > 0} ? #{dashboard.stats.pendingSub} : #{dashboard.stats.pendingNone}">적용 화면에서 반영하세요</span>
+        </a>
+        <a class="stat" th:href="@{/certs}" th:classappend="${!#lists.isEmpty(dashboard.certificateWarnings)} ? 'warn'">
+            <span class="stat-label" th:text="#{dashboard.stats.certs}">인증서 경고</span>
+            <strong class="stat-value" th:text="${#lists.size(dashboard.certificateWarnings)}">0</strong>
+            <span class="stat-sub" th:text="${#lists.isEmpty(dashboard.certificateWarnings)} ? #{dashboard.stats.certsNone} : #{dashboard.stats.certsSub}">모두 정상</span>
+        </a>
+    </div>
+
     <div class="columns">
         <section class="card">
             <h2>nginx</h2>
