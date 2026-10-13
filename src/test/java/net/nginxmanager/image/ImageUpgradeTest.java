@@ -52,7 +52,7 @@ class ImageUpgradeTest {
 
     @Test
     void configRejectedAtStartupKeepsNginxDownUntilFixedInUi() throws Exception {
-        ManagerClient client = new ManagerClient(() -> baseUrl).setupAndLogin();
+        new ManagerClient(() -> baseUrl).setupAndLogin();
         assertThat(curl()).isEqualTo("404");
 
         // 새 nginx가 모르는 지시어가 든 설정으로 다시 시작한다
@@ -65,7 +65,7 @@ class ImageUpgradeTest {
                         HttpResponse.BodyHandlers.discarding()).statusCode() == 200);
 
         assertThat(curl()).isEqualTo("000");
-        client = new ManagerClient(() -> baseUrl).login();
+        ManagerClient client = new ManagerClient(() -> baseUrl).login();
         String dashboard = client.get("/").body();
         assertThat(dashboard).contains("시작 검사 실패").contains("unknown_upgrade_directive")
                 .contains("/etc/nginx/nginx.conf:");

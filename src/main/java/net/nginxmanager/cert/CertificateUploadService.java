@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Locale;
 
 /**
  * 가지고 있는 인증서와 키를 올린다. 키가 인증서와 맞는지 서명으로 확인하고, 키는 파일로만 저장한다(화면에 다시 보이지 않는다).
@@ -150,7 +151,7 @@ public class CertificateUploadService {
             if (names != null) {
                 for (List<?> entry : names) {
                     if (entry.size() >= 2 && Integer.valueOf(2).equals(entry.get(0))) {
-                        domains.add(entry.get(1).toString().toLowerCase());
+                        domains.add(entry.get(1).toString().toLowerCase(Locale.ROOT));
                     }
                 }
             }
@@ -161,7 +162,7 @@ public class CertificateUploadService {
             String subject = cert.getSubjectX500Principal().getName();
             for (String part : subject.split(",")) {
                 if (part.trim().startsWith("CN=")) {
-                    domains.add(part.trim().substring(3).toLowerCase());
+                    domains.add(part.trim().substring(3).toLowerCase(Locale.ROOT));
                 }
             }
         }

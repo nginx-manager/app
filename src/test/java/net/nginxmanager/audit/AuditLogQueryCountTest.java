@@ -10,7 +10,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.util.function.IntConsumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -36,12 +35,12 @@ class AuditLogQueryCountTest {
 
     @Test
     void recentListUsesSameNumberOfQueriesRegardlessOfRows() {
-        queryCounter.assertConstantQueries(seedLogsByDistinctUsers(),
+        queryCounter.assertConstantQueries(this::seedLogsByDistinctUsers,
                 () -> assertThat(auditLogQueryRepository.findRecent(100)).isNotEmpty(), 1, 50);
     }
 
-    private IntConsumer seedLogsByDistinctUsers() {
-        return n -> tx.executeWithoutResult(status -> {
+    private void seedLogsByDistinctUsers(int n) {
+        tx.executeWithoutResult(status -> {
             for (int i = 0; i < n; i++) {
                 User user = userRepository.save(new User("user-" + System.nanoTime() + "-" + i, "x", Role.VIEWER));
                 auditLogRepository.save(new AuditLog(user, user.getUsername(), AuditAction.LOGIN, null,

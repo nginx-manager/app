@@ -30,6 +30,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.net.InetAddress;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -86,7 +87,7 @@ class RenewFailureTest extends ConfigRootTest {
     @BeforeEach
     void startWebhook() throws IOException {
         acme.failure = null;
-        webhook = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        webhook = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         webhook.createContext("/hook", exchange -> {
             received.add(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
             exchange.sendResponseHeaders(204, -1);

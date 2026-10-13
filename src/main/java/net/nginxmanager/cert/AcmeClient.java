@@ -21,13 +21,10 @@ public interface AcmeClient {
     record RenewalWindow(Instant start, Instant end) {
     }
 
-    /**
-     * 발급 실패.
-     *
-     * @param retryAfter 서버가 다시 시도하라고 알려 준 시각(발급 한도 등). 없으면 null
-     */
+    /** 발급 실패. */
     class AcmeFailure extends Exception {
 
+        /** 서버가 다시 시도하라고 알려 준 시각(발급 한도 등). 없으면 null. */
         private final transient Instant retryAfter;
 
         public AcmeFailure(String message, Instant retryAfter, Throwable cause) {

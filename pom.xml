@@ -25,6 +25,8 @@
         <htmx.version>2.0.5</htmx.version>
         <acme4j.version>5.1.0</acme4j.version>
         <java-diff-utils.version>4.17</java-diff-utils.version>
+        <error-prone.version>2.50.0</error-prone.version>
+        <spotless.version>3.10.4</spotless.version>
     </properties>
 
     <dependencies>
@@ -137,7 +139,19 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
+                    <!-- Error Prone: 흔한 실수를 컴파일 단계에서 막는다. Querydsl이 만든 코드는 검사하지 않는다 -->
+                    <compilerArgs>
+                        <arg>-XDcompilePolicy=simple</arg>
+                        <arg>-XDaddTypeAnnotationsToSymbol=true</arg>
+                        <arg>--should-stop=ifError=FLOW</arg>
+                        <arg>-Xplugin:ErrorProne -XepDisableWarningsInGeneratedCode -XepExcludedPaths:.*/target/generated-(test-)?sources/.* -Xep:MissingSummary:OFF -Xep:NotJavadoc:OFF -Xep:StringSplitter:OFF</arg>
+                    </compilerArgs>
                     <annotationProcessorPaths>
+                        <path>
+                            <groupId>com.google.errorprone</groupId>
+                            <artifactId>error_prone_core</artifactId>
+                            <version>${error-prone.version}</version>
+                        </path>
                         <path>
                             <groupId>io.github.openfeign.querydsl</groupId>
                             <artifactId>querydsl-apt</artifactId>
@@ -151,6 +165,30 @@
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
+            </plugin>
+            <plugin>
+                <!-- 포맷 검사: mvn verify에서 확인하고, mvn spotless:apply로 고친다 -->
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+                <version>${spotless.version}</version>
+                <configuration>
+                    <java>
+                        <removeUnusedImports/>
+                        <trimTrailingWhitespace/>
+                        <endWithNewline/>
+                        <indent>
+                            <spaces>true</spaces>
+                            <spacesPerTab>4</spacesPerTab>
+                        </indent>
+                    </java>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

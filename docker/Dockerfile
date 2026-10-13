@@ -87,6 +87,7 @@ RUN ./configure \
 FROM ${MAVEN_IMAGE} AS app-build
 WORKDIR /src
 COPY pom.xml .
+COPY .mvn ./.mvn
 RUN mvn -B -q dependency:go-offline
 COPY src ./src
 RUN mvn -B -q package -DskipTests \

@@ -74,6 +74,7 @@ Java 21, Maven 3.9, Docker가 필요합니다.
 
 ```bash
 mvn verify                       # 단위·통합 테스트(실제 ACME 발급 테스트는 Docker로 Pebble을 띄움)
+mvn spotless:apply               # 포맷 맞추기(verify가 검사함). 컴파일 때는 Error Prone이 흔한 실수를 막습니다
 docker build -f docker/Dockerfile -t nginx-manager/app:dev .
 mvn -Pimage-test test -Dimage.name=nginx-manager/app:dev   # 이미지 테스트(실제 nginx로 적용·HTTPS·업그레이드 시나리오)
 ```

@@ -17,6 +17,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import java.util.Locale;
+
 @Controller
 @RequestMapping("/sites")
 public class SiteController {
@@ -106,7 +108,7 @@ public class SiteController {
     public String preview(@Valid @ModelAttribute("form") SiteForm form, BindingResult bindingResult, Model model) {
         model.addAttribute("preview", bindingResult.hasErrors()
                 ? null
-                : rendering.render(form.primaryDomain().toLowerCase(), form, form.certificateId()));
+                : rendering.render(form.primaryDomain().toLowerCase(Locale.ROOT), form, form.certificateId()));
         return "sites/form :: preview";
     }
 

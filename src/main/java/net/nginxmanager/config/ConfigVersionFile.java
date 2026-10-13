@@ -12,6 +12,8 @@ import net.nginxmanager.common.BaseEntity;
 @Table(name = "config_version_file")
 public class ConfigVersionFile extends BaseEntity {
 
+    // 외래 키 매핑. 조회는 버전 쪽에서 한다
+    @SuppressWarnings("unused")
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "config_version_id")
     private ConfigVersion configVersion;

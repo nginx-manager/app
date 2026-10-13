@@ -49,7 +49,8 @@ public class LogTailService {
 
     @Scheduled(fixedDelay = 1000)
     public void poll() {
-        for (Tail tail : tails) {
+        // 반복 중에 지우므로 사본을 돈다
+        for (Tail tail : List.copyOf(tails)) {
             try {
                 for (String line : tail.cursor().readNewLines()) {
                     tail.emitter().send(SseEmitter.event().name("line").data(line));

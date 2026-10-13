@@ -12,6 +12,8 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
+
 /** 사이트 초안 만들기·고치기. 디스크에는 쓰지 않고, 적용(ApplyService) 때 반영된다. */
 @Service
 public class SiteService {
@@ -36,7 +38,7 @@ public class SiteService {
 
     @Transactional
     public Site create(SiteForm form, String actor) {
-        String domain = form.primaryDomain().toLowerCase();
+        String domain = form.primaryDomain().toLowerCase(Locale.ROOT);
         String path = SitePaths.of(domain, true);
         if (siteRepository.existsByPrimaryDomain(domain) || configFileRepository.findByPath(path).isPresent()) {
             throw new DuplicateSiteException(domain);
