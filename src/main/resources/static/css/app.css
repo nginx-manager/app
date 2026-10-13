@@ -75,3 +75,4 @@ td form.inline input[type=password] { width: 10rem; }
 .warn-card { border-left: 4px solid #e0a100; }
 .log-lines { max-height: 60vh; overflow: auto; white-space: pre; font-size: .82rem; }
 .log-lines mark { background: #fff1a8; }
+.bad-card { border-left: 4px solid var(--bad); }

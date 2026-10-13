@@ -10,7 +10,9 @@
         <th:block th:if="${result != null}">
             <section class="card result ok" th:if="${result.succeeded()}">
                 <h2>적용했습니다</h2>
-                <p>문법 검증 → reload → 상태 확인을 모두 통과했습니다. 버전 <span th:text="${result.versionId}">3</span>으로 기록했습니다.</p>
+                <p th:unless="${result.reloadSkipped}">문법 검증 → reload → 상태 확인을 모두 통과했습니다. 버전 <span th:text="${result.versionId}">3</span>으로 기록했습니다.</p>
+                <p th:if="${result.reloadSkipped}">문법 검증을 통과해 설정을 반영하고 버전 <span th:text="${result.versionId}">3</span>으로 기록했습니다.
+                    nginx가 멈춰 있어 reload는 하지 않았습니다. <a th:href="@{/}">대시보드</a>에서 nginx를 시작하세요.</p>
             </section>
             <section class="card result bad" th:if="${result.result != null and result.result.name() == 'VALIDATION_FAILED'}">
                 <h2>문법 검증에 실패해 반영하지 않았습니다</h2>

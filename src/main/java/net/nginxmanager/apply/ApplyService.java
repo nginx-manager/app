@@ -13,6 +13,7 @@ import net.nginxmanager.runtime.HealthResult;
 import net.nginxmanager.runtime.NginxCommandException;
 import net.nginxmanager.runtime.NginxRuntime;
 import net.nginxmanager.runtime.NginxRuntimeProperties;
+import net.nginxmanager.runtime.RuntimeStatus;
 import net.nginxmanager.runtime.ValidationResult;
 import net.nginxmanager.user.User;
 import net.nginxmanager.user.UserRepository;
@@ -36,6 +37,8 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 @Service
 public class ApplyService {
+
+    static final String RELOAD_SKIPPED = "nginx가 멈춰 있어 reload하지 않았습니다. 대시보드에서 nginx를 시작하세요.";
 
     private static final Logger log = LoggerFactory.getLogger(ApplyService.class);
 
@@ -143,6 +146,14 @@ public class ApplyService {
             restore(backup);
             log.info("Apply rejected by nginx -t: {}", validation.errors());
             return record(changes, origin, VersionResult.VALIDATION_FAILED, validation.output(),
+                    validation.errors());
+        }
+
+        // nginx가 내려가 있으면(시작 검사 실패 등) reload할 대상이 없다. 검증된 설정만 남기고, 시작은 사용자가 한다
+        if (runtime.status().state() != RuntimeStatus.State.RUNNING) {
+            log.info("nginx is not running; configuration written without reload");
+            return record(changes, origin, VersionResult.SUCCESS,
+                    validation.output() + "\n" + RELOAD_SKIPPED,
                     validation.errors());
         }
 
