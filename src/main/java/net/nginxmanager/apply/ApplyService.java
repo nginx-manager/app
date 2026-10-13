@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
-import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * 초안을 nginx에 반영한다: 잠금 → 백업 → 쓰기 → 검증 → reload → 상태 확인.
@@ -42,8 +41,6 @@ public class ApplyService {
 
     private static final Logger log = LoggerFactory.getLogger(ApplyService.class);
 
-    private final ReentrantLock lock = new ReentrantLock();
-
     private final ConfigFileRepository configFileRepository;
     private final ConfigVersionRepository versionRepository;
     private final UserRepository userRepository;
@@ -53,11 +50,12 @@ public class ApplyService {
     private final TransactionTemplate tx;
     private final ApplicationEventPublisher events;
     private final ConfigSync sync;
+    private final ApplyLock lock;
 
     public ApplyService(ConfigFileRepository configFileRepository, ConfigVersionRepository versionRepository,
                         UserRepository userRepository, ConfigFileStore store, NginxRuntime runtime,
                         NginxRuntimeProperties properties, TransactionTemplate tx,
-                        ApplicationEventPublisher events, ConfigSync sync) {
+                        ApplicationEventPublisher events, ConfigSync sync, ApplyLock lock) {
         this.configFileRepository = configFileRepository;
         this.versionRepository = versionRepository;
         this.userRepository = userRepository;
@@ -67,6 +65,7 @@ public class ApplyService {
         this.tx = tx;
         this.events = events;
         this.sync = sync;
+        this.lock = lock;
     }
 
     /**
@@ -105,26 +104,12 @@ public class ApplyService {
 
     /** 적용과 겹치면 안 되는 작업을 잠금 안에서 실행한다. 이미 적용 중이면 기다리지 않고 거절한다. */
     public <T> T withLock(Supplier<T> work) {
-        if (!lock.tryLock()) {
-            throw new ApplyInProgressException();
-        }
-        try {
-            return work.get();
-        } finally {
-            lock.unlock();
-        }
+        return lock.withLock(work);
     }
 
     /** 잠금을 얻으면 실행하고, 적용 중이면 건너뛴다. */
     public <T> Optional<T> tryWithLock(Supplier<T> work) {
-        if (!lock.tryLock()) {
-            return Optional.empty();
-        }
-        try {
-            return Optional.ofNullable(work.get());
-        } finally {
-            lock.unlock();
-        }
+        return lock.tryWithLock(work);
     }
 
     private ApplyResult apply(List<FileChange> changes, Origin origin) {
@@ -134,13 +119,27 @@ public class ApplyService {
             backup.put(path, store.read(path));
         }
 
+        boolean[] reloaded = {false};
         try {
             changes.forEach(change -> store.write(change.path(), change.content()));
+            return verifyAndRecord(changes, origin, backup, reloaded);
         } catch (RuntimeException e) {
+            // nginx -t 시간 초과, pid 파일 오류, DB 오류 등 예상하지 못한 실패: 검증되지 않은 파일을 남기지 않는다
+            log.error("apply failed unexpectedly, restoring previous configuration", e);
             restore(backup);
+            if (reloaded[0]) {
+                try {
+                    runtime.reload();
+                } catch (RuntimeException reloadFailure) {
+                    log.error("reload after restore failed", reloadFailure);
+                }
+            }
             throw e;
         }
+    }
 
+    private ApplyResult verifyAndRecord(List<FileChange> changes, Origin origin, Map<String, String> backup,
+                                        boolean[] reloaded) {
         ValidationResult validation = runtime.validate();
         if (!validation.ok()) {
             restore(backup);
@@ -159,6 +158,7 @@ public class ApplyService {
 
         HealthResult health;
         try {
+            reloaded[0] = true;
             runtime.reload();
             health = runtime.healthCheck(properties.healthTimeout());
         } catch (NginxCommandException e) {
@@ -167,6 +167,7 @@ public class ApplyService {
         if (!health.healthy()) {
             log.warn("nginx unhealthy after reload ({}), restoring previous configuration", health.detail());
             restore(backup);
+            reloaded[0] = false;
             try {
                 runtime.reload();
             } catch (NginxCommandException e) {

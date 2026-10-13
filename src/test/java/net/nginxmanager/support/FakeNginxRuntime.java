@@ -18,6 +18,7 @@ public class FakeNginxRuntime implements NginxRuntime {
     public Supplier<HealthResult> health = HealthResult::ok;
     public int validateCalls;
     public int reloadCalls;
+    public int reopenCalls;
     public boolean running = true;
     public long pid = 1L;
     public int startCalls;
@@ -30,6 +31,7 @@ public class FakeNginxRuntime implements NginxRuntime {
         health = HealthResult::ok;
         validateCalls = 0;
         reloadCalls = 0;
+        reopenCalls = 0;
         running = true;
         pid = 1L;
         startCalls = 0;
@@ -67,6 +69,11 @@ public class FakeNginxRuntime implements NginxRuntime {
             }
         }
         return validation.get();
+    }
+
+    @Override
+    public void reopenLogs() {
+        reopenCalls++;
     }
 
     @Override

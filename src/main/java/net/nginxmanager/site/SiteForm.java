@@ -126,9 +126,39 @@ public record SiteForm(
                 || !targets.stream().allMatch(t -> t.matches(PROXY_TARGET))) {
             return false;
         }
+        if (!targets.stream().map(ProxyBackend::parse).allMatch(b -> b.port() >= 1 && b.port() <= 65535)) {
+            return false;
+        }
         // upstream으로 묶으면 proxy_pass에 스킴과 경로가 하나만 들어가므로 모두 같아야 한다
         return targets.stream().map(ProxyBackend::parse)
                 .map(b -> b.scheme() + b.path()).distinct().count() == 1;
+    }
+
+    /** 관리 화면과 상태 확인 포트로 프록시하면 관리 화면이 사이트 포트로 공개된다. */
+    @AssertTrue(message = "관리도구 자신(이 서버의 9000, 8081 포트)으로는 프록시할 수 없습니다.")
+    public boolean isProxyTargetNotManager() {
+        return type != SiteType.PROXY || !isProxyTargetValid()
+                || proxyTargets().stream().map(ProxyBackend::parse).noneMatch(ProxyBackend::isManager);
+    }
+
+    /**
+     * 문서 루트로 쓸 수 없는 디렉터리. 관리도구 DB(/data), 인증서 키, 실행 파일 등이 웹으로 공개되지 않게 한다.
+     * 이 디렉터리 자체, 그 아래, 그리고 이들을 담은 상위 디렉터리(/, /etc 등)를 모두 막는다.
+     */
+    static final List<String> PROTECTED_DIRS = List.of("/data", "/etc/nginx/certs", "/app", "/proc", "/sys",
+            "/run", "/root", "/var/lib/nginx-manager", "/command", "/package", "/etc/s6-overlay");
+
+    @AssertTrue(message = "이 디렉터리는 관리도구 데이터나 인증서 키가 있어 문서 루트로 쓸 수 없습니다.")
+    public boolean isStaticRootSafe() {
+        if (type != SiteType.STATIC || staticRoot == null || !isStaticRootValid()) {
+            return true;
+        }
+        String root = staticRoot.replaceAll("/+$", "");
+        if (root.isEmpty()) {
+            return false;
+        }
+        return PROTECTED_DIRS.stream().noneMatch(dir -> root.equals(dir) || root.startsWith(dir + "/")
+                || dir.startsWith(root + "/"));
     }
 
     @AssertTrue(message = "와일드카드 도메인(*.)은 Let's Encrypt 자동 발급(HTTP 인증)으로 받을 수 없습니다. 인증서를 업로드해 주세요.")
@@ -149,10 +179,10 @@ public record SiteForm(
         return domains;
     }
 
-    /** 관리 화면(9000)과 nginx 상태 확인(127.0.0.1:8081)이 쓰는 포트. */
-    static final List<Integer> RESERVED_PORTS = List.of(8081, 9000);
+    /** HTTPS(443), 관리 화면(9000), nginx 상태 확인(127.0.0.1:8081)이 쓰는 포트. */
+    static final List<Integer> RESERVED_PORTS = List.of(443, 8081, 9000);
 
-    @AssertTrue(message = "8081, 9000번 포트는 관리도구가 씁니다. 다른 포트를 골라 주세요.")
+    @AssertTrue(message = "443번은 HTTPS용이고 8081, 9000번은 관리도구가 씁니다. HTTP 포트로는 다른 포트를 골라 주세요.")
     public boolean isListenPortFree() {
         return !RESERVED_PORTS.contains(listenHttpPort);
     }

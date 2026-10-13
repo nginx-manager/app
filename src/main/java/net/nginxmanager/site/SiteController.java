@@ -67,7 +67,7 @@ public class SiteController {
             Site site = siteService.create(form, authentication.getName());
             return "redirect:/sites/" + site.getId() + "?saved";
         } catch (DuplicateSiteException e) {
-            bindingResult.rejectValue("primaryDomain", "duplicate", "이미 등록된 도메인입니다.");
+            bindingResult.rejectValue("primaryDomain", "duplicate", duplicateMessage(e));
             return "sites/form";
         }
     }
@@ -92,8 +92,21 @@ public class SiteController {
             model.addAttribute("certificate", certificateOf(site));
             return "sites/detail";
         }
-        siteService.update(id, form, authentication.getName());
+        try {
+            siteService.update(id, form, authentication.getName());
+        } catch (DuplicateSiteException e) {
+            bindingResult.rejectValue("extraDomains", "duplicate", duplicateMessage(e));
+            Site site = siteQueryRepository.findWithFile(id).orElseThrow(() -> new NotFoundException("site " + id));
+            model.addAttribute("site", site);
+            model.addAttribute("content", currentContent(site));
+            model.addAttribute("certificate", certificateOf(site));
+            return "sites/detail";
+        }
         return "redirect:/sites/" + id + "?saved";
+    }
+
+    private static String duplicateMessage(DuplicateSiteException e) {
+        return "이미 다른 사이트가 쓰는 도메인입니다: " + e.getDomain();
     }
 
     @PostMapping("/{id}/enabled")

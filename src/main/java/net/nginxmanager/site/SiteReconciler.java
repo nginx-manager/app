@@ -1,5 +1,6 @@
 package net.nginxmanager.site;
 
+import net.nginxmanager.cert.CertificateFiles;
 import net.nginxmanager.config.ConfigFile;
 import net.nginxmanager.config.ConfigFileRepository;
 import net.nginxmanager.config.ConfigFileStore;
@@ -8,7 +9,6 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
-import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -27,13 +27,15 @@ public class SiteReconciler {
     private final ConfigFileRepository configFileRepository;
     private final ConfigFileStore store;
     private final SiteRendering rendering;
+    private final CertificateFiles certificateFiles;
 
     public SiteReconciler(SiteRepository siteRepository, ConfigFileRepository configFileRepository,
-                          ConfigFileStore store, SiteRendering rendering) {
+                          ConfigFileStore store, SiteRendering rendering, CertificateFiles certificateFiles) {
         this.siteRepository = siteRepository;
         this.configFileRepository = configFileRepository;
         this.store = store;
         this.rendering = rendering;
+        this.certificateFiles = certificateFiles;
     }
 
     /** @param changedPaths 디스크에서 내용이 바뀌거나 생기거나 사라진 파일 */
@@ -76,11 +78,30 @@ public class SiteReconciler {
             site.moveTo(site.getConfigFile(), current.equals(enabledPath));
         }
         if (site.getType() != SiteType.RAW) {
-            String rendered = rendering.render(site);
-            if (!Objects.equals(rendered, store.read(site.getConfigFile().getPath()))) {
+            String disk = store.read(site.getConfigFile().getPath());
+            if (sameConfig(rendering.render(site), disk)) {
+                // 지금 폼 값이 그대로 반영되었다(적용)
+                site.markApplied();
+            } else if (!sameConfig(rendering.renderApplied(site), disk)) {
+                // 폼으로 만들 수 없는 내용이 되었다(되돌리기, 외부 변경)
                 site.switchToRaw();
             }
         }
+    }
+
+    /**
+     * 폼으로 만든 설정과 디스크 내용이 같은지. 인증서 파일 경로(발급마다 바뀌고 되돌리기로 예전 것을 가리킬 수 있다)와
+     * 인증서를 기다린다는 안내 주석은 비교하지 않는다.
+     */
+    private boolean sameConfig(String rendered, String disk) {
+        if (disk == null) {
+            return false;
+        }
+        return normalize(rendered).equals(normalize(disk));
+    }
+
+    private String normalize(String content) {
+        return certificateFiles.maskPaths(content.replace(SiteConfigRenderer.HTTPS_PENDING, ""));
     }
 
     private Optional<ConfigFile> onDisk(String path) {

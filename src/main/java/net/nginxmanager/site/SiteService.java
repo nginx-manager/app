@@ -1,5 +1,6 @@
 package net.nginxmanager.site;
 
+import net.nginxmanager.apply.ApplyLock;
 import net.nginxmanager.audit.AuditAction;
 import net.nginxmanager.audit.AuditEvent;
 import net.nginxmanager.cert.CertificateRegistry;
@@ -10,11 +11,15 @@ import net.nginxmanager.config.ConfigFileRepository;
 import net.nginxmanager.config.ConfigFileStore;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.Locale;
+import java.util.function.Supplier;
 
-/** 사이트 초안 만들기·고치기. 디스크에는 쓰지 않고, 적용(ApplyService) 때 반영된다. */
+/**
+ * 사이트 초안 만들기·고치기. 디스크에는 쓰지 않고, 적용(ApplyService) 때 반영된다.
+ * 초안을 바꾸는 작업은 적용 잠금 안에서 트랜잭션째 실행해, 적용 중에 저장한 초안이 적용 끝에 함께 비워지지 않게 한다.
+ */
 @Service
 public class SiteService {
 
@@ -24,25 +29,37 @@ public class SiteService {
     private final SiteRendering rendering;
     private final CertificateRegistry certificateRegistry;
     private final ApplicationEventPublisher events;
+    private final ApplyLock applyLock;
+    private final TransactionTemplate tx;
 
     public SiteService(SiteRepository siteRepository, ConfigFileRepository configFileRepository,
                        ConfigFileStore store, SiteRendering rendering, CertificateRegistry certificateRegistry,
-                       ApplicationEventPublisher events) {
+                       ApplicationEventPublisher events, ApplyLock applyLock, TransactionTemplate tx) {
         this.siteRepository = siteRepository;
         this.configFileRepository = configFileRepository;
         this.store = store;
         this.rendering = rendering;
         this.certificateRegistry = certificateRegistry;
         this.events = events;
+        this.applyLock = applyLock;
+        this.tx = tx;
     }
 
-    @Transactional
+    private <T> T locked(Supplier<T> work) {
+        return applyLock.withLock(() -> tx.execute(status -> work.get()));
+    }
+
     public Site create(SiteForm form, String actor) {
+        return locked(() -> doCreate(form, actor));
+    }
+
+    private Site doCreate(SiteForm form, String actor) {
         String domain = form.primaryDomain().toLowerCase(Locale.ROOT);
         String path = SitePaths.of(domain, true);
         if (siteRepository.existsByPrimaryDomain(domain) || configFileRepository.findByPath(path).isPresent()) {
             throw new DuplicateSiteException(domain);
         }
+        requireUnusedDomains(null, domain, form);
         ConfigFile file = configFileRepository.save(new ConfigFile(path, true));
         Site site = new Site(domain, form.type(), file);
         site.applyForm(form);
@@ -53,10 +70,17 @@ public class SiteService {
         return site;
     }
 
-    @Transactional
     public Site update(long siteId, SiteForm form, String actor) {
+        return locked(() -> doUpdate(siteId, form, actor));
+    }
+
+    private Site doUpdate(long siteId, SiteForm form, String actor) {
         Site site = load(siteId);
         requireVersion(site.getVersion(), form.version(), "site " + site.getPrimaryDomain());
+        if (site.getType() == SiteType.RAW) {
+            throw new IllegalStateException("raw sites are edited in the file editor");
+        }
+        requireUnusedDomains(site.getId(), site.getPrimaryDomain(), form);
         site.applyForm(form);
         site.linkCertificate(certificateFor(site.getPrimaryDomain(), form));
         site.getConfigFile().stageContent(rendering.render(site.getPrimaryDomain(), form, site.getCertificateId()));
@@ -65,8 +89,11 @@ public class SiteService {
     }
 
     /** 활성/비활성은 파일을 conf.d/sites 와 sites-disabled 사이로 옮기는 초안이다. */
-    @Transactional
     public Site setEnabled(long siteId, boolean enabled, long expectedVersion, String actor) {
+        return locked(() -> doSetEnabled(siteId, enabled, expectedVersion, actor));
+    }
+
+    private Site doSetEnabled(long siteId, boolean enabled, long expectedVersion, String actor) {
         Site site = load(siteId);
         requireVersion(site.getVersion(), expectedVersion, "site " + site.getPrimaryDomain());
         if (site.isEnabled() == enabled) {
@@ -86,8 +113,11 @@ public class SiteService {
     }
 
     /** 원문 편집. 폼 사이트의 파일이면 그 사이트는 원문 전용(RAW)으로 바뀐다. */
-    @Transactional
     public ConfigFile editRaw(long configFileId, String content, long expectedVersion, String actor) {
+        return locked(() -> doEditRaw(configFileId, content, expectedVersion, actor));
+    }
+
+    private ConfigFile doEditRaw(long configFileId, String content, long expectedVersion, String actor) {
         ConfigFile file = configFileRepository.findById(configFileId)
                 .orElseThrow(() -> new NotFoundException("config file " + configFileId));
         requireVersion(file.getVersion(), expectedVersion, "file " + file.getPath());
@@ -100,20 +130,76 @@ public class SiteService {
     }
 
     /** 초안을 버린다. 디스크에 한 번도 쓰지 않은 새 사이트면 사이트 자체를 지운다. */
-    @Transactional
     public void discard(long configFileId, String actor) {
+        locked(() -> {
+            doDiscard(configFileId, actor);
+            return null;
+        });
+    }
+
+    private void doDiscard(long configFileId, String actor) {
         ConfigFile file = configFileRepository.findById(configFileId)
                 .orElseThrow(() -> new NotFoundException("config file " + configFileId));
-        boolean neverWritten = file.getLastKnownHash() == null && store.read(file.getPath()) == null;
-        if (neverWritten && file.isDraftDelete()) {
-            configFileRepository.delete(file);
-        } else if (neverWritten) {
-            siteRepository.findByConfigFileId(configFileId).ifPresent(siteRepository::delete);
-            configFileRepository.delete(file);
-        } else {
-            file.discardDraft();
+        if (!revertMove(file)) {
+            boolean neverWritten = isNeverWritten(file);
+            if (neverWritten && file.isDraftDelete()) {
+                configFileRepository.delete(file);
+            } else if (neverWritten) {
+                siteRepository.findByConfigFileId(configFileId).ifPresent(siteRepository::delete);
+                configFileRepository.delete(file);
+            } else {
+                file.discardDraft();
+                // 폼 저장은 사이트 값도 바꿔 두므로, 초안을 버리면 마지막으로 반영된 값으로 되돌린다
+                siteRepository.findByConfigFileId(configFileId)
+                        .filter(site -> site.getType() != SiteType.RAW)
+                        .ifPresent(Site::restoreApplied);
+            }
         }
         events.publishEvent(AuditEvent.success(actor, AuditAction.SITE_SAVE, "discard:" + file.getPath()));
+    }
+
+    /**
+     * 활성/비활성 전환은 "새 위치에 쓰기"와 "원래 위치 지우기" 두 초안으로 이뤄진다. 그중 하나만 버리면 사이트가
+     * 사라지거나(새 위치만 버림) 끈 사이트가 계속 서비스되므로(지우기만 버림), 어느 쪽을 버려도 전환 전체를 되돌린다.
+     *
+     * @return 전환 중인 파일이라 되돌렸으면 true
+     */
+    private boolean revertMove(ConfigFile file) {
+        String domain = SitePaths.domainOf(file.getPath());
+        if (domain == null) {
+            return false;
+        }
+        boolean fileEnabledSide = file.getPath().startsWith(SitePaths.ENABLED_DIR);
+        ConfigFile other = configFileRepository.findByPath(SitePaths.of(domain, !fileEnabledSide)).orElse(null);
+        Site site = siteRepository.findByPrimaryDomain(domain).orElse(null);
+        if (other == null || site == null) {
+            return false;
+        }
+        ConfigFile source;
+        ConfigFile target;
+        if (file.isDraftDelete() && site.getConfigFile().getId().equals(other.getId()) && other.hasPendingChange()) {
+            source = file;
+            target = other;
+        } else if (other.isDraftDelete() && site.getConfigFile().getId().equals(file.getId())) {
+            source = other;
+            target = file;
+        } else {
+            return false;
+        }
+        source.discardDraft();
+        if (isNeverWritten(target)) {
+            site.moveTo(source, source.getPath().startsWith(SitePaths.ENABLED_DIR));
+            siteRepository.flush();
+            configFileRepository.delete(target);
+        } else {
+            target.discardDraft();
+            site.moveTo(source, source.getPath().startsWith(SitePaths.ENABLED_DIR));
+        }
+        return true;
+    }
+
+    private boolean isNeverWritten(ConfigFile file) {
+        return file.getLastKnownHash() == null && store.read(file.getPath()) == null;
     }
 
     /**
@@ -122,8 +208,11 @@ public class SiteService {
      *
      * @return 발급할 인증서 id
      */
-    @Transactional
     public long enableLetsEncrypt(long siteId, String actor) {
+        return locked(() -> doEnableLetsEncrypt(siteId, actor));
+    }
+
+    private long doEnableLetsEncrypt(long siteId, String actor) {
         Site site = load(siteId);
         if (site.getType() == SiteType.RAW) {
             throw new IllegalStateException("raw sites manage TLS in their own config");
@@ -134,6 +223,10 @@ public class SiteService {
                 https.certificateDomains(site.getPrimaryDomain()));
         site.applyForm(https);
         site.enableHttps(certificateId);
+        if (!site.getConfigFile().hasPendingChange()) {
+            // 디스크의 설정은 인증서를 받기 전까지 그대로이므로 지금 값이 반영된 값이다. 발급이 끝나면 이 값으로 HTTPS를 더한다
+            site.markApplied();
+        }
         events.publishEvent(AuditEvent.success(actor, AuditAction.SITE_SAVE, "site:" + site.getPrimaryDomain() + " https"));
         return certificateId;
     }
@@ -146,6 +239,30 @@ public class SiteService {
             return certificateRegistry.requireUploaded(form.certificateId());
         }
         return certificateRegistry.letsEncryptFor(domain, form.certificateDomains(domain));
+    }
+
+    /**
+     * 다른 사이트가 이미 대표·추가 도메인으로 쓰는 이름은 받지 않는다. nginx는 겹치는 server_name을 경고만 하고
+     * 한쪽을 무시하므로, 검증을 통과해도 한 사이트가 조용히 그 도메인에 응답하지 않게 된다.
+     */
+    private void requireUnusedDomains(Long siteId, String primary, SiteForm form) {
+        java.util.Set<String> taken = new java.util.HashSet<>();
+        for (Site other : siteRepository.findAll()) {
+            if (other.getId().equals(siteId)) {
+                continue;
+            }
+            taken.add(other.getPrimaryDomain().toLowerCase(Locale.ROOT));
+            if (other.getExtraDomains() != null) {
+                for (String extra : other.getExtraDomains().split(" ")) {
+                    taken.add(extra.toLowerCase(Locale.ROOT));
+                }
+            }
+        }
+        for (String domain : form.certificateDomains(primary.toLowerCase(Locale.ROOT))) {
+            if (taken.contains(domain)) {
+                throw new DuplicateSiteException(domain);
+            }
+        }
     }
 
     private Site load(long siteId) {

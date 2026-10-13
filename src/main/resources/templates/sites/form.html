@@ -25,6 +25,7 @@
                 <label>문서 루트 (정적 파일)
                     <input type="text" th:field="*{staticRoot}" placeholder="/srv/www/app">
                     <span class="error" th:errors="*{staticRootValid}"></span>
+                    <span class="error" th:errors="*{staticRootSafe}"></span>
                 </label>
                 <label>HTTP 포트
                     <input type="number" th:field="*{listenHttpPort}" min="1" max="65535">

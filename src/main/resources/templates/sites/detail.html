@@ -33,6 +33,7 @@
                 <label>문서 루트
                     <input type="text" th:field="*{staticRoot}" th:disabled="${!currentUser.canEdit()}">
                     <span class="error" th:errors="*{staticRootValid}"></span>
+                    <span class="error" th:errors="*{staticRootSafe}"></span>
                 </label>
                 <label>HTTP 포트
                     <input type="number" th:field="*{listenHttpPort}" th:disabled="${!currentUser.canEdit()}">

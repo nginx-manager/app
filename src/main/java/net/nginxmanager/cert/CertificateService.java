@@ -11,6 +11,7 @@ import net.nginxmanager.common.NotFoundException;
 import net.nginxmanager.config.ConfigFile;
 import net.nginxmanager.config.ConfigFileRepository;
 import net.nginxmanager.config.ConfigFileStore;
+import net.nginxmanager.config.ConfigVersionRepository;
 import net.nginxmanager.config.VersionSource;
 import net.nginxmanager.notify.NotificationService;
 import net.nginxmanager.site.Site;
@@ -59,6 +60,7 @@ public class CertificateService {
     private final TlsCertificateRepository certificateRepository;
     private final SiteRepository siteRepository;
     private final ConfigFileRepository configFileRepository;
+    private final ConfigVersionRepository configVersionRepository;
     private final ConfigFileStore store;
     private final SiteRendering rendering;
     private final SiteConfigRenderer renderer;
@@ -72,7 +74,8 @@ public class CertificateService {
     private final Clock clock;
 
     public CertificateService(TlsCertificateRepository certificateRepository, SiteRepository siteRepository,
-                              ConfigFileRepository configFileRepository, ConfigFileStore store,
+                              ConfigFileRepository configFileRepository,
+                              ConfigVersionRepository configVersionRepository, ConfigFileStore store,
                               SiteRendering rendering, SiteConfigRenderer renderer, CertificateFiles certificateFiles,
                               AcmeClient acme, ApplyService applyService, TransactionTemplate tx,
                               NotificationService notifications, ApplicationEventPublisher events,
@@ -80,6 +83,7 @@ public class CertificateService {
         this.certificateRepository = certificateRepository;
         this.siteRepository = siteRepository;
         this.configFileRepository = configFileRepository;
+        this.configVersionRepository = configVersionRepository;
         this.store = store;
         this.rendering = rendering;
         this.renderer = renderer;
@@ -171,10 +175,20 @@ public class CertificateService {
      */
     Optional<String> install(long id, Target target, CertificatePaths fresh, Instant notBefore, Instant notAfter,
                              Instant nextRenewal, VersionSource source, String actor, String message) {
-        Runnable activate = () -> load(id).activate(fresh, notBefore, notAfter, nextRenewal, clock.instant());
+        // 사용자가 쓰던 초안도 새 경로로 고치되, 적용에 성공했을 때만 고친다(실패하면 새 인증서 파일을 지우므로)
+        Map<Long, String> draftUpdates = new ConcurrentHashMap<>();
+        Runnable activate = () -> {
+            load(id).activate(fresh, notBefore, notAfter, nextRenewal, clock.instant());
+            draftUpdates.forEach((fileId, draft) -> configFileRepository.findById(fileId)
+                    .filter(file -> file.getDraftContent() != null)
+                    .ifPresent(file -> file.stageContent(draft)));
+        };
         ApplyResult result;
         try {
-            result = applyWaiting(() -> tx.execute(status -> changesFor(id, target.paths(), fresh)),
+            result = applyWaiting(() -> tx.execute(status -> {
+                        draftUpdates.clear();
+                        return changesFor(id, target.name(), fresh, draftUpdates);
+                    }),
                     new ApplyService.Origin(actor, message, source, null, activate));
         } catch (RuntimeException e) {
             certificateFiles.discard(fresh);
@@ -188,7 +202,7 @@ public class CertificateService {
                     "새 인증서를 적용하지 못해 이전 설정으로 되돌렸습니다(버전 #" + result.versionId() + "). "
                             + Objects.toString(result.detail(), ""), null));
         }
-        certificateFiles.prune(target.name(), fresh);
+        certificateFiles.prune(target.name(), fresh, this::referenced);
         log.info("{} applied ({})", message, fresh.certPath());
         return Optional.empty();
     }
@@ -202,36 +216,51 @@ public class CertificateService {
     }
 
     /**
-     * 인증서를 쓰는 설정 파일의 새 내용. 폼 사이트는 새 경로로 다시 만들고, 그 밖의 파일은 이전 경로를 새 경로로 바꾼다.
-     * 사용자가 쓰던 초안도 같은 식으로 고쳐 둔다(초안은 적용하지 않는다).
+     * 인증서를 쓰는 설정 파일의 새 내용. 디스크에 있는 설정은 이 인증서의 어느 디렉터리든 가리키는 경로만 새 경로로 바꾼다
+     * (사이트 폼에 저장만 하고 적용하지 않은 편집이 함께 반영되지 않게). 처음 발급이라 HTTPS 설정이 아직 없는 폼 사이트는
+     * 마지막으로 반영된 폼 값으로 새로 만든다. 사용자의 초안은 고칠 내용을 draftUpdates에 담아 두고 적용에 성공하면 고친다.
      */
-    private List<FileChange> changesFor(long id, CertificatePaths previous, CertificatePaths fresh) {
+    private List<FileChange> changesFor(long id, String name, CertificatePaths fresh, Map<Long, String> draftUpdates) {
         Map<String, String> changes = new LinkedHashMap<>();
+        Set<Long> handled = new java.util.HashSet<>();
         for (Site site : siteRepository.findByCertificateId(id)) {
-            if (site.getType() == SiteType.RAW || !site.isHttpsEnabled()) {
+            if (site.getType() == SiteType.RAW) {
                 continue;
             }
             ConfigFile file = site.getConfigFile();
-            String content = renderer.render(site.getPrimaryDomain(), rendering.formOf(site), fresh);
-            if (file.getDraftContent() != null) {
-                file.stageContent(content);
+            handled.add(file.getId());
+            if (site.isHttpsEnabled() && file.getDraftContent() != null) {
+                draftUpdates.put(file.getId(), renderer.render(site.getPrimaryDomain(), rendering.formOf(site), fresh));
             }
-            // 아직 적용하지 않은 사이트 파일은 쓰지 않는다(사용자가 적용할 때 새 경로로 반영된다)
-            if (store.read(file.getPath()) != null) {
-                changes.put(file.getPath(), content);
+            String disk = store.read(file.getPath());
+            if (disk == null) {
+                // 아직 적용하지 않은 사이트 파일은 쓰지 않는다(사용자가 적용할 때 새 경로로 반영된다)
+                continue;
+            }
+            String repointed = certificateFiles.repoint(disk, name, fresh);
+            if (!repointed.equals(disk)) {
+                changes.put(file.getPath(), repointed);
+            } else if (id == Objects.requireNonNullElse(site.getAppliedCertificateId(), -1L)
+                    && rendering.appliedFormOf(site).httpsEnabled()) {
+                changes.put(file.getPath(),
+                        renderer.render(site.getPrimaryDomain(), rendering.appliedFormOf(site), fresh));
             }
         }
-        if (previous != null) {
-            for (ConfigFile file : configFileRepository.findAllByOrderByPathAsc()) {
-                if (changes.containsKey(file.getPath())) {
-                    continue;
+        for (ConfigFile file : configFileRepository.findAllByOrderByPathAsc()) {
+            if (handled.contains(file.getId())) {
+                continue;
+            }
+            String disk = store.read(file.getPath());
+            if (disk != null) {
+                String repointed = certificateFiles.repoint(disk, name, fresh);
+                if (!repointed.equals(disk)) {
+                    changes.put(file.getPath(), repointed);
                 }
-                String disk = store.read(file.getPath());
-                if (disk != null && references(disk, previous)) {
-                    changes.put(file.getPath(), replace(disk, previous, fresh));
-                }
-                if (file.getDraftContent() != null && references(file.getDraftContent(), previous)) {
-                    file.stageContent(replace(file.getDraftContent(), previous, fresh));
+            }
+            if (file.getDraftContent() != null) {
+                String repointed = certificateFiles.repoint(file.getDraftContent(), name, fresh);
+                if (!repointed.equals(file.getDraftContent())) {
+                    draftUpdates.put(file.getId(), repointed);
                 }
             }
         }
@@ -241,12 +270,18 @@ public class CertificateService {
                 .toList();
     }
 
-    private static boolean references(String content, CertificatePaths paths) {
-        return content.contains(paths.certPath()) || content.contains(paths.keyPath());
-    }
-
-    private static String replace(String content, CertificatePaths from, CertificatePaths to) {
-        return content.replace(from.certPath(), to.certPath()).replace(from.keyPath(), to.keyPath());
+    /** 인증서 디렉터리를 지금 디스크의 설정, 초안, 되돌릴 수 있는 버전 중 어디서든 쓰는지. */
+    private boolean referenced(String directory) {
+        return Boolean.TRUE.equals(tx.execute(status -> {
+            for (ConfigFile file : configFileRepository.findAllByOrderByPathAsc()) {
+                String disk = store.read(file.getPath());
+                if (disk != null && disk.contains(directory)) {
+                    return true;
+                }
+            }
+            return configFileRepository.existsByDraftContentContaining(directory)
+                    || configVersionRepository.existsByFilesContentContaining(directory);
+        }));
     }
 
     /** 다른 적용이 끝날 때까지 기다렸다가 적용한다. 시스템 작업이라 사용자처럼 바로 거절하지 않는다. */

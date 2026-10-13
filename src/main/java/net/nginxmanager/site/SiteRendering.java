@@ -29,11 +29,23 @@ public class SiteRendering {
         return renderer.render(primaryDomain, form, tls);
     }
 
+    /** 마지막으로 반영된 폼 값으로 만든 설정(아직 적용하지 않은 편집은 빠진다). */
+    public String renderApplied(Site site) {
+        return render(site.getPrimaryDomain(), appliedFormOf(site), site.getAppliedCertificateId());
+    }
+
+    public SiteForm appliedFormOf(Site site) {
+        return site.toAppliedForm(uploadedOrNull(site.getAppliedCertificateId()));
+    }
+
     public SiteForm formOf(Site site) {
-        Long uploaded = site.getCertificateId() == null ? null : certificateRepository.findById(site.getCertificateId())
+        return site.toForm(uploadedOrNull(site.getCertificateId()));
+    }
+
+    private Long uploadedOrNull(Long certificateId) {
+        return certificateId == null ? null : certificateRepository.findById(certificateId)
                 .filter(c -> c.getSource() == CertificateSource.UPLOADED)
                 .map(TlsCertificate::getId)
                 .orElse(null);
-        return site.toForm(uploaded);
     }
 }

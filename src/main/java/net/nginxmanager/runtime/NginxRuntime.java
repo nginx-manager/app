@@ -24,6 +24,9 @@ public interface NginxRuntime {
     /** 마스터 프로세스가 살아 있고 stub_status가 200을 줄 때까지 timeout 동안 다시 확인한다. */
     HealthResult healthCheck(Duration timeout);
 
+    /** {@code nginx -s reopen}. 로그 파일을 옮긴 뒤 새 파일에 쓰게 한다. 명령이 실패하면 {@link NginxCommandException}. */
+    void reopenLogs();
+
     /** 내려가 있는 nginx를 s6로 다시 띄운다({@code s6-svc -u}). 명령이 실패하면 {@link NginxCommandException}. */
     void start();
 }

@@ -11,6 +11,12 @@ import jakarta.persistence.Table;
 import net.nginxmanager.common.BaseEntity;
 import net.nginxmanager.config.ConfigFile;
 
+import java.io.IOException;
+import java.io.StringReader;
+import java.io.StringWriter;
+import java.io.UncheckedIOException;
+import java.util.Properties;
+
 /** nginx server 블록 하나. 설정 파일 하나와 짝을 이룬다. */
 @Entity
 @Table(name = "site")
@@ -65,6 +71,13 @@ public class Site extends BaseEntity {
     @Column(name = "certificate_id")
     private Long certificateId;
 
+    /**
+     * 마지막으로 nginx에 반영된 폼 값. 폼을 저장하면 위 열들은 바로 바뀌지만(초안), 초안을 버리면 이 값으로 되돌리고,
+     * 인증서 발급·갱신은 이 값으로 설정을 만들어 아직 적용하지 않은 편집이 함께 반영되지 않게 한다.
+     */
+    @Column(name = "applied_settings", columnDefinition = "TEXT")
+    private String appliedSettings;
+
     @OneToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "config_file_id")
     private ConfigFile configFile;
@@ -91,6 +104,104 @@ public class Site extends BaseEntity {
         this.proxyLoadBalancing = proxy ? form.proxyLoadBalancing() : LoadBalancing.ROUND_ROBIN;
         this.httpsEnabled = form.httpsEnabled();
         this.redirectHttpToHttps = form.redirectHttpToHttps();
+    }
+
+    /** 사이트 파일이 적용되었다: 지금 폼 값이 nginx에 반영된 값이다. */
+    public void markApplied() {
+        Properties values = new Properties();
+        values.setProperty("type", type.name());
+        values.setProperty("listenHttpPort", Integer.toString(listenHttpPort));
+        values.setProperty("httpsEnabled", Boolean.toString(httpsEnabled));
+        values.setProperty("redirectHttpToHttps", Boolean.toString(redirectHttpToHttps));
+        values.setProperty("proxyWebsocket", Boolean.toString(proxyWebsocket));
+        values.setProperty("proxyLoadBalancing", proxyLoadBalancing.name());
+        putIfPresent(values, "extraDomains", extraDomains);
+        putIfPresent(values, "staticRoot", staticRoot);
+        putIfPresent(values, "proxyTarget", proxyTarget);
+        putIfPresent(values, "certificateId", certificateId);
+        putIfPresent(values, "proxyConnectTimeout", proxyConnectTimeout);
+        putIfPresent(values, "proxyReadTimeout", proxyReadTimeout);
+        StringWriter out = new StringWriter();
+        try {
+            values.store(out, null);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        this.appliedSettings = out.toString();
+    }
+
+    /**
+     * 버린 초안의 폼 값을 마지막으로 반영된 값으로 되돌린다.
+     *
+     * @return 반영된 값이 기록되어 있어 되돌렸으면 true
+     */
+    boolean restoreApplied() {
+        Properties values = applied();
+        if (values == null) {
+            return false;
+        }
+        type = SiteType.valueOf(values.getProperty("type"));
+        listenHttpPort = Integer.parseInt(values.getProperty("listenHttpPort"));
+        httpsEnabled = Boolean.parseBoolean(values.getProperty("httpsEnabled"));
+        redirectHttpToHttps = Boolean.parseBoolean(values.getProperty("redirectHttpToHttps"));
+        proxyWebsocket = Boolean.parseBoolean(values.getProperty("proxyWebsocket"));
+        proxyLoadBalancing = LoadBalancing.valueOf(values.getProperty("proxyLoadBalancing"));
+        extraDomains = values.getProperty("extraDomains");
+        staticRoot = values.getProperty("staticRoot");
+        proxyTarget = values.getProperty("proxyTarget");
+        certificateId = longOrNull(values.getProperty("certificateId"));
+        proxyConnectTimeout = intOrNull(values.getProperty("proxyConnectTimeout"));
+        proxyReadTimeout = intOrNull(values.getProperty("proxyReadTimeout"));
+        return true;
+    }
+
+    /** 마지막으로 반영된 폼 값. 기록이 없으면(이전 버전에서 만든 사이트) 지금 값을 쓴다. */
+    public SiteForm toAppliedForm(Long uploadedCertificateId) {
+        Properties values = applied();
+        if (values == null) {
+            return toForm(uploadedCertificateId);
+        }
+        return new SiteForm(primaryDomain, values.getProperty("extraDomains", ""),
+                SiteType.valueOf(values.getProperty("type")), Integer.parseInt(values.getProperty("listenHttpPort")),
+                values.getProperty("staticRoot"), values.getProperty("proxyTarget"), getVersion(),
+                Boolean.parseBoolean(values.getProperty("httpsEnabled")),
+                Boolean.parseBoolean(values.getProperty("redirectHttpToHttps")), uploadedCertificateId,
+                Boolean.parseBoolean(values.getProperty("proxyWebsocket")),
+                intOrNull(values.getProperty("proxyConnectTimeout")), intOrNull(values.getProperty("proxyReadTimeout")),
+                LoadBalancing.valueOf(values.getProperty("proxyLoadBalancing")));
+    }
+
+    /** 마지막으로 반영된 값에서 쓰던 인증서. 기록이 없으면 지금 값. */
+    public Long getAppliedCertificateId() {
+        Properties values = applied();
+        return values == null ? certificateId : longOrNull(values.getProperty("certificateId"));
+    }
+
+    private Properties applied() {
+        if (appliedSettings == null) {
+            return null;
+        }
+        Properties values = new Properties();
+        try {
+            values.load(new StringReader(appliedSettings));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return values;
+    }
+
+    private static void putIfPresent(Properties values, String key, Object value) {
+        if (value != null) {
+            values.setProperty(key, value.toString());
+        }
+    }
+
+    private static Long longOrNull(String value) {
+        return value == null ? null : Long.valueOf(value);
+    }
+
+    private static Integer intOrNull(String value) {
+        return value == null ? null : Integer.valueOf(value);
     }
 
     void linkCertificate(Long certificateId) {

@@ -176,4 +176,49 @@ class SiteConfigRendererTest {
         assertThat(validator.validate(new SiteForm("app.local", "", SiteType.PROXY, port, null, "http://a:1", null)))
                 .isNotEmpty();
     }
+
+    @Test
+    void httpsBackendsGetSni() {
+        assertThat(renderer.render("app-1.example.com", proxy("https://api.example.com", false, null, null, null)))
+                .contains("proxy_ssl_server_name on;")
+                .doesNotContain("proxy_ssl_name");
+        assertThat(renderer.render("app-1.example.com",
+                proxy("https://a.internal https://b.internal:8443", false, null, null, null)))
+                .contains("proxy_ssl_server_name on;")
+                .contains("proxy_ssl_name a.internal;");
+        assertThat(renderer.render("app-1.example.com", proxy("http://a.internal", false, null, null, null)))
+                .doesNotContain("proxy_ssl");
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {443, 8081, 9000})
+    void reservedPortsCannotBeHttpPort(int port) {
+        SiteForm form = new SiteForm("app.local", "", SiteType.PROXY, port, null, "http://10.0.0.1:8080", null);
+
+        assertThat(validator.validate(form)).isNotEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"http://127.0.0.1:9000", "http://localhost:8081", "http://[::1]:9000",
+            "http://10.0.0.1:70000"})
+    void managerAndInvalidPortsAreRejectedAsProxyTarget(String target) {
+        SiteForm form = new SiteForm("app.local", "", SiteType.PROXY, 80, null, target, null);
+
+        assertThat(validator.validate(form)).isNotEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"/data", "/data/", "/data/backups", "/", "/etc/nginx/certs", "/var/lib", "/proc/1"})
+    void protectedDirectoriesCannotBeStaticRoot(String root) {
+        SiteForm form = new SiteForm("app.local", "", SiteType.STATIC, 80, root, null, null);
+
+        assertThat(validator.validate(form)).isNotEmpty();
+    }
+
+    @Test
+    void ordinaryStaticRootIsAccepted() {
+        SiteForm form = new SiteForm("app.local", "", SiteType.STATIC, 80, "/srv/www/app", null, null);
+
+        assertThat(validator.validate(form)).isEmpty();
+    }
 }

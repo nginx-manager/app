@@ -6,6 +6,7 @@
     <label>프록시 대상 (리버스 프록시, 여러 개면 줄마다 하나)
         <textarea th:field="*{proxyTarget}" rows="3" placeholder="http://127.0.0.1:8080" th:disabled="${!editable}"></textarea>
         <span class="error" th:errors="*{proxyTargetValid}"></span>
+        <span class="error" th:errors="*{proxyTargetNotManager}"></span>
     </label>
     <details class="proxy-options">
         <summary>프록시 세부 설정 (웹소켓, 타임아웃, 부하 분산)</summary>

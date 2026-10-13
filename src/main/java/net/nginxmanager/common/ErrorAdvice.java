@@ -1,5 +1,6 @@
 package net.nginxmanager.common;
 
+import net.nginxmanager.apply.ApplyInProgressException;
 import org.springframework.http.HttpStatus;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -14,6 +15,14 @@ public class ErrorAdvice {
     public String concurrentEdit(Model model) {
         model.addAttribute("title", "다른 사람이 먼저 저장했습니다");
         model.addAttribute("detail", "화면을 새로 고쳐 최신 내용을 확인한 뒤 다시 저장해 주세요. 입력하신 내용은 저장되지 않았습니다.");
+        return "error/conflict";
+    }
+
+    @ExceptionHandler(ApplyInProgressException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public String applyInProgress(Model model) {
+        model.addAttribute("title", "지금 설정을 적용하는 중입니다");
+        model.addAttribute("detail", "적용이 끝난 뒤 다시 시도해 주세요. 입력하신 내용은 저장되지 않았습니다.");
         return "error/conflict";
     }
 }
