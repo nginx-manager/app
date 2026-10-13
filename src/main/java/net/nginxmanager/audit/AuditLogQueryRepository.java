@@ -14,7 +14,7 @@ import static net.nginxmanager.user.QUser.user;
 public class AuditLogQueryRepository {
 
     public record AuditLogRow(Long id, Instant createdAt, String username, String userRole, AuditAction action,
-                              String target, AuditResult result) {
+                              String target, AuditResult result, String detail) {
     }
 
     private final JPAQueryFactory queryFactory;
@@ -28,7 +28,7 @@ public class AuditLogQueryRepository {
         return queryFactory
                 .select(Projections.constructor(AuditLogRow.class,
                         auditLog.id, auditLog.createdAt, auditLog.username, user.role.stringValue(),
-                        auditLog.action, auditLog.target, auditLog.result))
+                        auditLog.action, auditLog.target, auditLog.result, auditLog.detail))
                 .from(auditLog)
                 .leftJoin(auditLog.user, user)
                 .orderBy(auditLog.id.desc())

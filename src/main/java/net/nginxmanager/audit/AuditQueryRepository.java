@@ -35,7 +35,7 @@ public class AuditQueryRepository {
         return queryFactory
                 .select(Projections.constructor(AuditLogQueryRepository.AuditLogRow.class,
                         auditLog.id, auditLog.createdAt, auditLog.username, user.role.stringValue(),
-                        auditLog.action, auditLog.target, auditLog.result))
+                        auditLog.action, auditLog.target, auditLog.result, auditLog.detail))
                 .from(auditLog)
                 .leftJoin(auditLog.user, user)
                 .where(conditions(filter, zone))

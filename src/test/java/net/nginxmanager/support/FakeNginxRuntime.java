@@ -19,6 +19,7 @@ public class FakeNginxRuntime implements NginxRuntime {
     public int validateCalls;
     public int reloadCalls;
     public boolean running = true;
+    public long pid = 1L;
     public int startCalls;
     /** 설정하면 validate()가 이 래치가 풀릴 때까지 기다린다(동시 적용 테스트). */
     public CountDownLatch blockValidation;
@@ -30,6 +31,7 @@ public class FakeNginxRuntime implements NginxRuntime {
         validateCalls = 0;
         reloadCalls = 0;
         running = true;
+        pid = 1L;
         startCalls = 0;
         blockValidation = null;
         validationStarted = null;
@@ -48,7 +50,7 @@ public class FakeNginxRuntime implements NginxRuntime {
     @Override
     public RuntimeStatus status() {
         return new RuntimeStatus(running ? RuntimeStatus.State.RUNNING : RuntimeStatus.State.STOPPED, "1.31.6",
-                List.of(), running ? 1L : null);
+                List.of(), running ? pid : null);
     }
 
     @Override

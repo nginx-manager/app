@@ -13,5 +13,6 @@ public enum AuditAction {
     CERT_RENEW,
     CERT_UPLOAD,
     RUNTIME_START,
-    UPGRADE
+    UPGRADE,
+    NGINX_RESTART
 }
