@@ -27,6 +27,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
 /**
  * 이미지 안의 실제 nginx에 화면으로 사이트를 만들어 적용하고, 깨진 설정은 적용되지 않는지 확인한다.
@@ -74,7 +75,9 @@ class ImageApplyTest {
         HttpResponse<String> applied = post("/apply", Map.of("message", "add app.local"), "/apply");
         assertThat(applied.body()).contains("모두 통과했습니다");
 
-        assertThat(siteStatus()).isEqualTo("200");
+        // reload는 신호만 보내고 끝나므로, 새 워커가 뜰 때까지 잠깐 기다린다
+        await().atMost(Duration.ofSeconds(10)).pollInterval(Duration.ofMillis(200))
+                .until(() -> siteStatus().equals("200"));
     }
 
     @Test
