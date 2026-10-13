@@ -68,7 +68,9 @@ class ImageCertificateTest {
 
         await().atMost(Duration.ofSeconds(60)).pollInterval(Duration.ofMillis(500))
                 .until(() -> curl("https://" + DOMAIN + "/").equals("200"));
-        assertThat(curl("http://" + DOMAIN + "/")).isEqualTo("301");
+        // reload 직후에는 이전 워커가 잠깐 남아 있을 수 있다
+        await().atMost(Duration.ofSeconds(10)).pollInterval(Duration.ofMillis(200))
+                .until(() -> curl("http://" + DOMAIN + "/").equals("301"));
         // curl -v가 보여 주는 서버 인증서 발급자
         String handshake = container.execInContainer("curl", "--noproxy", "*", "-k", "-s", "-v", "-o", "/dev/null",
                 "--resolve", DOMAIN + ":443:127.0.0.1", "https://" + DOMAIN + "/").getStderr();
