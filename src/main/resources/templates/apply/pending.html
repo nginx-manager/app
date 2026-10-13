@@ -1,22 +1,23 @@
 <!DOCTYPE html>
-<html lang="ko" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="~{fragments/layout :: head('적용')}"></head>
+<html lang="ko" th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(#{apply.title})}"></head>
 <body>
 <nav th:replace="~{fragments/layout :: nav}"></nav>
 <main class="page">
-    <h1>적용</h1>
+    <h1 th:text="#{apply.title}">적용</h1>
+    <p class="hint" th:text="#{apply.help.intro}">초안으로 저장한 변경은 여기서 적용해야 서버에 반영됩니다.</p>
 
     <div id="result" th:fragment="result">
         <th:block th:if="${result != null}">
             <section class="card result ok" th:if="${result.succeeded()}">
-                <h2>적용했습니다</h2>
-                <p th:unless="${result.reloadSkipped}">문법 검증 → reload → 상태 확인을 모두 통과했습니다. 버전 <span th:text="${result.versionId}">3</span>으로 기록했습니다.</p>
-                <p th:if="${result.reloadSkipped}">문법 검증을 통과해 설정을 반영하고 버전 <span th:text="${result.versionId}">3</span>으로 기록했습니다.
-                    nginx가 멈춰 있어 reload는 하지 않았습니다. <a th:href="@{/}">대시보드</a>에서 nginx를 시작하세요.</p>
+                <h2 th:text="#{apply.result.ok.title}">적용했습니다</h2>
+                <p th:unless="${result.reloadSkipped}" th:text="#{apply.result.ok.recorded(${'' + result.versionId})}">문법 검증 → reload → 상태 확인을 모두 통과했습니다. 버전 3으로 기록했습니다.</p>
+                <p th:if="${result.reloadSkipped}"><span th:text="#{apply.result.ok.reloadSkipped(${'' + result.versionId})}">문법 검증을 통과해 설정을 반영하고 버전 3으로 기록했습니다. nginx가 멈춰 있어 reload는 하지 않았습니다.</span>
+                    <a th:href="@{/}" th:text="#{apply.result.ok.reloadSkipped.link}">대시보드</a><span th:text="#{apply.result.ok.reloadSkipped.after}">에서 nginx를 시작하세요.</span></p>
             </section>
             <section class="card result bad" th:if="${result.result != null and result.result.name() == 'VALIDATION_FAILED'}">
-                <h2>문법 검증에 실패해 반영하지 않았습니다</h2>
-                <p>서버의 설정은 그대로입니다. 아래 위치를 고친 뒤 다시 적용하세요.</p>
+                <h2 th:text="#{apply.result.validationFailed.title}">문법 검증에 실패해 반영하지 않았습니다</h2>
+                <p th:text="#{apply.result.validationFailed.body}">서버의 설정은 그대로입니다. 아래 위치를 고친 뒤 다시 적용하세요.</p>
                 <ul>
                     <li th:each="m : ${result.messages}">
                         <code th:if="${m.file != null}" th:text="${m.file} + ':' + ${m.line}">conf.d/sites/a.conf:7</code>
@@ -26,35 +27,37 @@
                 <pre class="code" th:text="${result.detail}"></pre>
             </section>
             <section class="card result bad" th:if="${result.result != null and result.result.name() == 'AUTO_RECOVERED'}">
-                <h2>반영 후 nginx 상태가 나빠 직전 설정으로 되돌렸습니다</h2>
+                <h2 th:text="#{apply.result.autoRecovered.title}">반영 후 nginx 상태가 나빠 직전 설정으로 되돌렸습니다</h2>
                 <p th:text="${result.detail}">status endpoint unreachable</p>
             </section>
             <section class="card result" th:if="${result.nothingChanged()}">
-                <p>적용할 변경이 없습니다.</p>
+                <p th:text="#{apply.empty}">적용할 변경이 없습니다.</p>
             </section>
         </th:block>
     </div>
 
     <section class="card">
-        <h2>적용 대기 중인 변경</h2>
-        <p th:if="${#lists.isEmpty(pending)}" class="muted">적용할 변경이 없습니다.</p>
+        <h2 th:text="#{apply.pending.title}">적용 대기 중인 변경</h2>
+        <p th:if="${#lists.isEmpty(pending)}" class="muted" th:text="#{apply.empty}">적용할 변경이 없습니다.</p>
         <div th:each="p : ${pending}" class="pending">
             <div class="title-row">
                 <code th:text="${p.path}">conf.d/sites/app.local.conf</code>
-                <span th:if="${p.delete}" class="badge warn">삭제</span>
+                <span th:if="${p.delete}" class="badge warn" th:text="#{apply.pending.delete}">삭제</span>
                 <form th:if="${currentUser.canEdit()}" th:action="@{/apply/discard/{id}(id=${p.id})}" method="post" class="inline">
-                    <button type="submit" class="link">초안 버리기</button>
+                    <button type="submit" class="link" th:text="#{apply.pending.discard}">초안 버리기</button>
                 </form>
             </div>
             <pre class="code diff" th:text="${p.diff}"></pre>
         </div>
         <form th:if="${currentUser.canEdit() and !#lists.isEmpty(pending)}" th:action="@{/apply}" method="post"
               hx-post="/apply" hx-target="#result" hx-swap="outerHTML" hx-disabled-elt="find button">
-            <label>변경 메모 (선택)
-                <input type="text" name="message" maxlength="500" placeholder="예: app 백엔드 포트 변경">
+            <label><th:block th:text="#{apply.form.message}">변경 메모 (선택)</th:block>
+                <input type="text" name="message" maxlength="500" placeholder="예: app 백엔드 포트 변경" th:placeholder="#{apply.form.message.placeholder}">
+                <span class="hint" th:text="#{apply.form.message.hint}">이력에 함께 남아, 나중에 무엇을 왜 바꿨는지 찾을 때 도움이 됩니다.</span>
             </label>
-            <button type="submit">검증 후 적용</button>
-            <span class="htmx-indicator muted">검증하고 reload하는 중…</span>
+            <p class="hint" th:text="#{apply.form.help}">검증 후 적용은 nginx -t로 문법을 검사하고, 통과하면 reload한 뒤 상태를 확인합니다. 문법 검사에 실패하면 아무것도 바꾸지 않고, reload 후 상태가 나쁘면 직전 설정으로 자동으로 되돌립니다.</p>
+            <button type="submit" th:text="#{apply.form.submit}">검증 후 적용</button>
+            <span class="htmx-indicator muted" th:text="#{apply.form.progress}">검증하고 reload하는 중…</span>
         </form>
     </section>
 </main>

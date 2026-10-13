@@ -24,6 +24,10 @@ nginx-manager:
 spring:
   application:
     name: nginx-manager
+  messages:
+    # 화면 문구. messages.properties(한국어)가 기본이고 _en, _ja, _zh_CN이 번역이다
+    basename: messages
+    fallback-to-system-locale: false
   datasource:
     url: jdbc:sqlite:${nginx-manager.data-dir}/nginx-manager.db?journal_mode=WAL&foreign_keys=on&busy_timeout=5000
     hikari:

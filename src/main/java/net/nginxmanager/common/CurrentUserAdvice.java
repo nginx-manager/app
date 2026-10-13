@@ -6,6 +6,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
 
+import java.util.Arrays;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -41,5 +42,18 @@ public class CurrentUserAdvice {
         String path = request.getRequestURI().substring(request.getContextPath().length());
         String[] parts = path.split("/", 3);
         return parts.length > 1 ? parts[1] : "";
+    }
+
+    /** 언어 전환 링크가 지금 화면의 검색 조건을 잃지 않도록 lang을 뺀 쿼리 문자열을 넣는다(끝에 &). */
+    @ModelAttribute("langQuery")
+    public String langQuery(HttpServletRequest request) {
+        String query = request.getQueryString();
+        if (query == null || query.isEmpty()) {
+            return "?";
+        }
+        String kept = Arrays.stream(query.split("&"))
+                .filter(part -> !part.isEmpty() && !part.startsWith("lang="))
+                .collect(Collectors.joining("&"));
+        return kept.isEmpty() ? "?" : "?" + kept + "&";
     }
 }

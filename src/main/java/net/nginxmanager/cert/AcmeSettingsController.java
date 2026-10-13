@@ -1,5 +1,6 @@
 package net.nginxmanager.cert;
 
+import net.nginxmanager.common.Messages;
 import net.nginxmanager.audit.AuditAction;
 import net.nginxmanager.audit.AuditEvent;
 import org.springframework.context.ApplicationEventPublisher;
@@ -21,9 +22,11 @@ public class AcmeSettingsController {
     private final AcmeSettingsRepository settingsRepository;
     private final AcmeProperties properties;
     private final ApplicationEventPublisher events;
+    private final Messages messages;
 
     public AcmeSettingsController(AcmeSettingsRepository settingsRepository, AcmeProperties properties,
-                                  ApplicationEventPublisher events) {
+                                  ApplicationEventPublisher events, Messages messages) {
+        this.messages = messages;
         this.settingsRepository = settingsRepository;
         this.properties = properties;
         this.events = events;
@@ -42,7 +45,7 @@ public class AcmeSettingsController {
     public String save(@RequestParam AcmeEnvironment environment, @RequestParam(required = false) String contactEmail,
                        Authentication authentication, RedirectAttributes redirect) {
         if (contactEmail != null && !contactEmail.isBlank() && !contactEmail.trim().matches("[^@\\s]+@[^@\\s]+\\.[^@\\s]+")) {
-            redirect.addFlashAttribute("error", "메일 주소 형식이 아닙니다.");
+            redirect.addFlashAttribute("error", messages.get("msg.notify.invalidEmail"));
             return "redirect:/settings/acme";
         }
         AcmeSettings settings = settingsRepository.findFirstByOrderByIdAsc()
@@ -50,7 +53,7 @@ public class AcmeSettingsController {
         settings.update(environment, contactEmail);
         events.publishEvent(AuditEvent.success(authentication.getName(), AuditAction.USER_CHANGE,
                 "settings:acme " + environment));
-        redirect.addFlashAttribute("notice", "저장했습니다.");
+        redirect.addFlashAttribute("notice", messages.get("msg.saved"));
         return "redirect:/settings/acme";
     }
 }

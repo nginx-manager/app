@@ -1,25 +1,27 @@
 <!DOCTYPE html>
-<html lang="ko" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="~{fragments/layout :: head('최초 설정')}"></head>
+<html lang="ko" th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(#{setup.pageTitle})}"></head>
 <body class="centered">
+<div th:replace="~{fragments/layout :: langs}"></div>
 <main class="card narrow">
-    <h1>관리자 계정 만들기</h1>
-    <p>처음 실행했습니다. 이 계정으로 다른 사용자를 초대하고 권한을 줄 수 있습니다.</p>
+    <h1 th:text="#{setup.title}">관리자 계정 만들기</h1>
+    <p th:text="#{setup.intro}">처음 실행했습니다. 이 계정으로 다른 사용자를 초대하고 권한을 줄 수 있습니다.</p>
     <form th:action="@{/setup}" th:object="${form}" method="post">
-        <label>아이디
+        <label><span th:text="#{setup.username}">아이디</span>
             <input type="text" th:field="*{username}" autocomplete="username" required autofocus>
             <span class="error" th:errors="*{username}"></span>
         </label>
-        <label>비밀번호 (10자 이상)
+        <label><span th:text="#{setup.password}">비밀번호 (10자 이상)</span>
             <input type="password" th:field="*{password}" autocomplete="new-password" required>
             <span class="error" th:errors="*{password}"></span>
         </label>
-        <label>비밀번호 확인
+        <label><span th:text="#{setup.passwordConfirm}">비밀번호 확인</span>
             <input type="password" th:field="*{passwordConfirm}" autocomplete="new-password" required>
             <span class="error" th:errors="*{passwordConfirm}"></span>
         </label>
-        <button type="submit">만들기</button>
+        <button type="submit" th:text="#{setup.submit}">만들기</button>
     </form>
+    <p class="hint" th:text="#{setup.hint}">이 화면은 등록된 사용자가 하나도 없을 때만 나타납니다. 비밀번호를 잃어버리지 않도록 안전한 곳에 보관하세요.</p>
 </main>
 </body>
 </html>

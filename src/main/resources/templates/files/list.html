@@ -1,20 +1,21 @@
 <!DOCTYPE html>
-<html lang="ko" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="~{fragments/layout :: head('설정 파일')}"></head>
+<html lang="ko" th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(#{files.list.title})}"></head>
 <body>
 <nav th:replace="~{fragments/layout :: nav}"></nav>
 <main class="page">
-    <h1>설정 파일</h1>
+    <h1 th:text="#{files.list.title}">설정 파일</h1>
+    <p class="hint" th:text="#{files.list.help}">관리도구가 관리하는 nginx 설정 파일을 직접 편집합니다. 저장한 내용은 초안이며, 적용 화면에서 반영해야 서버에 적용됩니다.</p>
     <section class="card">
-        <p th:if="${#lists.isEmpty(files)}" class="muted">관리 중인 설정 파일이 없습니다.</p>
+        <p th:if="${#lists.isEmpty(files)}" class="muted" th:text="#{files.list.empty}">관리 중인 설정 파일이 없습니다.</p>
         <table th:unless="${#lists.isEmpty(files)}">
-            <thead><tr><th>경로</th><th></th></tr></thead>
+            <thead><tr><th th:text="#{files.list.col.path}">경로</th><th></th></tr></thead>
             <tbody>
             <tr th:each="f : ${files}">
                 <td><a th:href="@{/files/{id}(id=${f.id})}" th:text="${f.path}">nginx.conf</a></td>
                 <td>
-                    <span th:if="${f.draftDelete}" class="badge warn">삭제 대기</span>
-                    <span th:if="${f.draftContent != null}" class="badge warn">적용 대기</span>
+                    <span th:if="${f.draftDelete}" class="badge warn" th:text="#{files.list.badge.pendingDelete}">삭제 대기</span>
+                    <span th:if="${f.draftContent != null}" class="badge warn" th:text="#{files.list.badge.pendingApply}">적용 대기</span>
                 </td>
             </tr>
             </tbody>

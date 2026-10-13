@@ -1,28 +1,32 @@
 <!DOCTYPE html>
-<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<html lang="ko" th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org">
 <body>
 <!-- 사이트 추가·수정 폼이 함께 쓰는 리버스 프록시 항목. th:object 안에서 넣는다 -->
 <th:block th:fragment="fields(editable)">
-    <label>프록시 대상 (리버스 프록시, 여러 개면 줄마다 하나)
+    <label><th:block th:text="#{sites.proxy.target}">프록시 대상 (리버스 프록시, 여러 개면 줄마다 하나)</th:block>
+        <span class="hint" th:text="#{sites.proxy.target.hint}">요청을 넘길 백엔드 주소입니다.</span>
         <textarea th:field="*{proxyTarget}" rows="3" placeholder="http://127.0.0.1:8080" th:disabled="${!editable}"></textarea>
         <span class="error" th:errors="*{proxyTargetValid}"></span>
         <span class="error" th:errors="*{proxyTargetNotManager}"></span>
     </label>
     <details class="proxy-options">
-        <summary>프록시 세부 설정 (웹소켓, 타임아웃, 부하 분산)</summary>
-        <label class="inline"><input type="checkbox" th:field="*{proxyWebsocket}" th:disabled="${!editable}"> 웹소켓 연결 넘기기</label>
-        <label>연결 타임아웃(초, 비우면 60)
+        <summary th:text="#{sites.proxy.options}">프록시 세부 설정 (웹소켓, 타임아웃, 부하 분산)</summary>
+        <label class="inline"><input type="checkbox" th:field="*{proxyWebsocket}" th:disabled="${!editable}"> <th:block th:text="#{sites.proxy.websocket}">웹소켓 연결 넘기기</th:block></label>
+        <p class="hint" th:text="#{sites.proxy.websocket.hint}">백엔드가 WebSocket을 쓸 때 켭니다.</p>
+        <label><th:block th:text="#{sites.proxy.connectTimeout}">연결 타임아웃(초, 비우면 60)</th:block>
+            <span class="hint" th:text="#{sites.proxy.connectTimeout.hint}">백엔드와 연결을 맺을 때까지 기다리는 시간입니다.</span>
             <input type="number" th:field="*{proxyConnectTimeout}" min="1" max="3600" th:disabled="${!editable}">
             <span class="error" th:errors="*{proxyConnectTimeout}"></span>
         </label>
-        <label>응답 타임아웃(초, 비우면 60)
+        <label><th:block th:text="#{sites.proxy.readTimeout}">응답 타임아웃(초, 비우면 60)</th:block>
             <input type="number" th:field="*{proxyReadTimeout}" min="1" max="3600" th:disabled="${!editable}">
             <span class="error" th:errors="*{proxyReadTimeout}"></span>
         </label>
-        <p class="muted small">웹소켓이나 오래 걸리는 요청은 응답 타임아웃을 길게(예: 3600) 잡으세요. 이 시간 동안 백엔드가 아무것도 보내지 않으면 연결을 끊습니다.</p>
-        <label>백엔드가 여럿일 때 나누는 방식
+        <p class="muted small" th:text="#{sites.proxy.readTimeout.note}">웹소켓이나 오래 걸리는 요청은 응답 타임아웃을 길게(예: 3600) 잡으세요. 이 시간 동안 백엔드가 아무것도 보내지 않으면 연결을 끊습니다.</p>
+        <label><th:block th:text="#{sites.proxy.loadBalancing}">백엔드가 여럿일 때 나누는 방식</th:block>
+            <span class="hint" th:text="#{sites.proxy.loadBalancing.hint}">프록시 대상이 두 개 이상일 때만 쓰입니다.</span>
             <select th:field="*{proxyLoadBalancing}" th:disabled="${!editable}">
-                <option th:each="lb : ${T(net.nginxmanager.site.LoadBalancing).values()}" th:value="${lb}" th:text="${lb.label}">차례대로</option>
+                <option th:each="lb : ${T(net.nginxmanager.site.LoadBalancing).values()}" th:value="${lb}" th:text="#{|enum.LoadBalancing.${lb.name()}|}">차례대로</option>
             </select>
         </label>
     </details>

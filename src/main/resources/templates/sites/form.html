@@ -1,60 +1,67 @@
 <!DOCTYPE html>
-<html lang="ko" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="~{fragments/layout :: head('사이트 추가')}"></head>
+<html lang="ko" th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(#{sites.form.title})}"></head>
 <body>
 <nav th:replace="~{fragments/layout :: nav}"></nav>
 <main class="page">
-    <h1>사이트 추가</h1>
+    <h1 th:text="#{sites.form.title}">사이트 추가</h1>
     <div class="columns">
         <section class="card">
             <form th:action="@{/sites/new}" th:object="${form}" method="post" id="site-form">
-                <label>도메인
+                <label><th:block th:text="#{sites.field.domain}">도메인</th:block>
+                    <span class="hint" th:text="#{sites.field.domain.hint}">이 사이트로 받을 대표 도메인입니다.</span>
                     <input type="text" th:field="*{primaryDomain}" placeholder="app.example.com" required>
                     <span class="error" th:errors="*{primaryDomain}"></span>
                 </label>
-                <label>추가 도메인 (공백이나 쉼표로 구분, 선택)
+                <label><th:block th:text="#{sites.form.extraDomains}">추가 도메인 (공백이나 쉼표로 구분, 선택)</th:block>
+                    <span class="hint" th:text="#{sites.field.extraDomains.hint}">같은 사이트로 받을 다른 이름입니다.</span>
                     <input type="text" th:field="*{extraDomains}" placeholder="www.app.example.com">
                     <span class="error" th:errors="*{extraDomainsValid}"></span>
                 </label>
                 <fieldset>
-                    <legend>유형</legend>
-                    <label class="inline"><input type="radio" th:field="*{type}" value="PROXY"> 리버스 프록시</label>
-                    <label class="inline"><input type="radio" th:field="*{type}" value="STATIC"> 정적 파일</label>
+                    <legend th:text="#{sites.field.type}">유형</legend>
+                    <label class="inline"><input type="radio" th:field="*{type}" value="PROXY"> <th:block th:text="#{sites.field.type.PROXY}">리버스 프록시</th:block></label>
+                    <label class="inline"><input type="radio" th:field="*{type}" value="STATIC"> <th:block th:text="#{sites.field.type.STATIC}">정적 파일</th:block></label>
+                    <p class="hint" th:text="#{sites.field.type.hint}">리버스 프록시는 요청을 애플리케이션 서버로 넘깁니다.</p>
                 </fieldset>
                 <th:block th:replace="~{sites/proxy-fields :: fields(true)}"></th:block>
-                <label>문서 루트 (정적 파일)
+                <label><th:block th:text="#{sites.form.staticRoot}">문서 루트 (정적 파일)</th:block>
+                    <span class="hint" th:text="#{sites.field.staticRoot.hint}">내보낼 폴더의 절대 경로입니다.</span>
                     <input type="text" th:field="*{staticRoot}" placeholder="/srv/www/app">
                     <span class="error" th:errors="*{staticRootValid}"></span>
                     <span class="error" th:errors="*{staticRootSafe}"></span>
                 </label>
-                <label>HTTP 포트
+                <label><th:block th:text="#{sites.field.httpPort}">HTTP 포트</th:block>
+                    <span class="hint" th:text="#{sites.field.httpPort.hint}">보통 80입니다.</span>
                     <input type="number" th:field="*{listenHttpPort}" min="1" max="65535">
                     <span class="error" th:errors="*{listenPortFree}"></span>
                     <span class="error" th:errors="*{listenHttpPort}"></span>
                 </label>
                 <fieldset>
                     <legend>HTTPS</legend>
-                    <label class="inline"><input type="checkbox" th:field="*{httpsEnabled}"> HTTPS 사용 (443)</label>
-                    <label class="inline"><input type="checkbox" th:field="*{redirectHttpToHttps}"> HTTP 요청을 HTTPS로 넘기기</label>
-                    <label>인증서
+                    <label class="inline"><input type="checkbox" th:field="*{httpsEnabled}"> <th:block th:text="#{sites.field.httpsEnabled}">HTTPS 사용 (443)</th:block></label>
+                    <label class="inline"><input type="checkbox" th:field="*{redirectHttpToHttps}"> <th:block th:text="#{sites.field.redirect}">HTTP 요청을 HTTPS로 넘기기</th:block></label>
+                    <p class="hint" th:text="#{sites.field.redirect.hint}">켜면 http:// 로 들어온 요청을 https:// 주소로 301 리디렉션합니다.</p>
+                    <label><th:block th:text="#{sites.field.certificate}">인증서</th:block>
                         <select th:field="*{certificateId}">
-                            <option value="">Let's Encrypt 자동 발급</option>
-                            <option th:each="c : ${uploadedCertificates}" th:value="${c.id}" th:text="${c.name} + ' (업로드)'">wildcard</option>
+                            <option value="" th:text="#{sites.field.certificate.letsEncrypt}">Let's Encrypt 자동 발급</option>
+                            <option th:each="c : ${uploadedCertificates}" th:value="${c.id}" th:text="#{sites.field.certificate.uploaded(${c.name})}">wildcard</option>
                         </select>
                     </label>
                     <span class="error" th:errors="*{letsEncryptDomainsValid}"></span>
-                    <p class="muted small">Let's Encrypt를 고르면 적용 후 인증서를 받아 자동으로 HTTPS 설정을 다시 적용합니다. 인증서를 받기 전까지는 HTTP로만 응답합니다.</p>
+                    <p class="muted small" th:text="#{sites.field.certificate.note}">Let's Encrypt를 고르면 적용 후 인증서를 받아 자동으로 HTTPS 설정을 다시 적용합니다. 인증서를 받기 전까지는 HTTP로만 응답합니다.</p>
+                    <p class="hint" th:text="#{sites.field.certificate.hint}">와일드카드 도메인은 인증서를 업로드해야 합니다.</p>
                 </fieldset>
-                <button type="submit">초안 저장</button>
-                <p class="muted small">저장해도 nginx에는 바로 반영되지 않습니다. 적용 화면에서 검증 후 반영합니다.</p>
+                <button type="submit" th:text="#{sites.field.saveDraft}">초안 저장</button>
+                <p class="muted small" th:text="#{sites.form.saveNote}">저장해도 nginx에는 바로 반영되지 않습니다. 적용 화면에서 검증 후 반영합니다.</p>
             </form>
         </section>
         <section class="card">
-            <h2>설정 미리보기</h2>
+            <h2 th:text="#{sites.form.preview}">설정 미리보기</h2>
             <pre class="code" id="preview" th:fragment="preview"
                  hx-post="/sites/preview" hx-include="#site-form" hx-swap="outerHTML"
                  hx-trigger="input changed delay:400ms from:#site-form, change from:#site-form"
-                 th:text="${preview} ?: '값을 입력하면 만들어질 설정이 보입니다.'"></pre>
+                 th:text="${preview} ?: #{sites.form.preview.empty}"></pre>
         </section>
     </div>
 </main>

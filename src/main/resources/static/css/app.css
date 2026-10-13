@@ -77,6 +77,14 @@ li { margin: .25rem 0; }
 .nav-links { display: flex; flex-direction: column; gap: .15rem; }
 .nav-label { margin: 1rem .7rem .35rem; color: var(--side-muted); font-size: .72rem; font-weight: 600; letter-spacing: .06em; }
 .nav .spacer { flex: 1; }
+.langs { display: grid; grid-template-columns: 1fr 1fr; gap: .2rem; padding: .5rem .35rem .75rem; }
+body.centered .langs { display: flex; gap: .25rem; }
+.nav .langs a { width: auto; justify-content: center; padding: .2rem .5rem; border-radius: 6px; font-size: .75rem; color: var(--side-muted); }
+.nav .langs a.active { background: rgba(148, 163, 184, .16); color: #fff; }
+.nav .langs a.active .icon { color: inherit; }
+body.centered .langs { position: fixed; top: 1rem; right: 1rem; padding: 0; }
+body.centered .langs a { padding: .25rem .6rem; border-radius: 6px; font-size: .8rem; color: var(--muted); }
+body.centered .langs a.active { background: #fff; color: var(--fg); box-shadow: var(--shadow); }
 .nav-user { border-top: 1px solid rgba(148, 163, 184, .15); padding-top: .75rem; display: flex; flex-direction: column; gap: .15rem; }
 .nav-user form.inline { display: block; }
 .nav button.link { justify-content: flex-start; background: none; font: inherit; cursor: pointer; text-align: left; color: var(--side-muted); }
@@ -126,9 +134,11 @@ legend { padding: 0; margin-bottom: .45rem; font-size: .85rem; font-weight: 500;
 label.inline { display: inline-flex; gap: .45rem; align-items: center; margin: 0 1.25rem .4rem 0; font-weight: 400; font-size: .92rem; color: var(--fg); cursor: pointer; }
 fieldset > label:not(.inline) { margin-top: .6rem; }
 form.inline { display: inline; }
-.row-form { display: flex; flex-wrap: wrap; align-items: end; gap: .75rem 1rem; }
+.row-form { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .75rem 1rem; }
 .row-form label { margin: 0; flex: 1 1 180px; }
-.row-form button { flex: none; }
+.row-form > button, .row-form > button[type=submit] { flex: none; margin-top: calc(.85rem * 1.5 + .35rem); }
+.row-form > p.error { flex-basis: 100%; margin: 0; }
+button + .hint, button + p.hint { margin-top: .75rem; }
 details { margin: .25rem 0 1rem; padding: .75rem 1rem; border: 1px solid var(--line); border-radius: 8px; background: var(--subtle); }
 details[open] summary { margin-bottom: .9rem; }
 details summary { cursor: pointer; font-size: .9rem; font-weight: 500; color: #374151; }
@@ -186,6 +196,12 @@ td input[type=radio] { vertical-align: middle; margin-right: .35rem; }
 
 /* 알림 문구 */
 .error { color: var(--bad); font-size: .85rem; }
+.hint { display: block; margin: .3rem 0 0; color: var(--muted); font-size: .8rem; font-weight: 400; line-height: 1.5; }
+p.hint { margin: 0 0 1rem; }
+dl.hint { display: grid; grid-template-columns: max-content 1fr; gap: .3rem 1rem; margin: 1rem 0 0; padding-top: .9rem; border-top: 1px solid var(--line); }
+dl.hint dt { font-weight: 600; color: #374151; }
+dl.hint dd { margin: 0; }
+label.inline + .hint, fieldset > .hint { margin-top: -.1rem; margin-bottom: .6rem; }
 label .error { display: block; margin-top: .3rem; font-weight: 400; }
 .error:empty { display: none; }
 p.error:not(.code), p.notice {
@@ -214,7 +230,7 @@ textarea.editor { min-height: 60vh; margin: 0 0 1rem; padding: .9rem; font-famil
 .cm-editor.cm-focused { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
 .pending { margin-bottom: 1.25rem; padding-bottom: .25rem; }
 .pending code, .card > .title-row > code { background: none; padding: 0; font-size: .9rem; font-weight: 600; color: var(--fg); }
-pre.code:empty { display: none; }
+pre.code:empty, code:empty { display: none; }
 summary code { background: none; padding: 0; }
 .log-lines { max-height: 60vh; overflow: auto; white-space: pre; font-size: .8rem; }
 .log-lines mark { background: #fde68a; color: #111827; border-radius: 2px; }
@@ -240,6 +256,7 @@ body > footer, .footer { padding: 1.25rem 2rem 2rem; text-align: center; color: 
     .nav-user { border-top: 0; padding-top: 0; margin-left: auto; }
     .nav a, .nav button.link { width: auto; white-space: nowrap; padding: .45rem .6rem; }
     .nav-user span { display: none; }
+    .nav .langs { display: flex; padding: 0; }
     .page { padding: 1.25rem 1rem 2rem; }
     .columns { grid-template-columns: 1fr; }
     .card { padding: 1rem; }

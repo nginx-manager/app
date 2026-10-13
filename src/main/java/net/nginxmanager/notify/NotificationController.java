@@ -1,5 +1,6 @@
 package net.nginxmanager.notify;
 
+import net.nginxmanager.common.Messages;
 import net.nginxmanager.common.NotFoundException;
 import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,9 +24,11 @@ public class NotificationController {
 
     private final NotificationChannelRepository channelRepository;
     private final NotificationService notificationService;
+    private final Messages messages;
 
     public NotificationController(NotificationChannelRepository channelRepository,
-                                  NotificationService notificationService) {
+                                  NotificationService notificationService, Messages messages) {
+        this.messages = messages;
         this.channelRepository = channelRepository;
         this.notificationService = notificationService;
     }
@@ -42,7 +45,7 @@ public class NotificationController {
         boolean valid = type == ChannelType.EMAIL ? EMAIL.matcher(value).matches() : URL.matcher(value).matches();
         if (!valid || value.length() > 500) {
             redirect.addFlashAttribute("error", type == ChannelType.EMAIL
-                    ? "메일 주소 형식이 아닙니다." : "http:// 또는 https:// 로 시작하는 URL이어야 합니다.");
+                    ? messages.get("msg.notify.invalidEmail") : messages.get("msg.notify.invalidUrl"));
             return "redirect:/settings/notifications";
         }
         channelRepository.save(new NotificationChannel(type, value));
@@ -65,11 +68,11 @@ public class NotificationController {
     @PostMapping("/{id}/test")
     public String test(@PathVariable long id, RedirectAttributes redirect) {
         NotificationService.Delivery delivery = notificationService.send(load(id), new NotificationService.Notice(
-                "TEST", "테스트 알림", "nginx manager 알림 설정이 동작합니다."));
+                "TEST", messages.get("msg.notify.testTitle"), messages.get("msg.notify.testBody")));
         if (delivery.error() == null) {
-            redirect.addFlashAttribute("notice", "테스트 알림을 보냈습니다.");
+            redirect.addFlashAttribute("notice", messages.get("msg.notify.testSent"));
         } else {
-            redirect.addFlashAttribute("error", "보내지 못했습니다: " + delivery.error());
+            redirect.addFlashAttribute("error", messages.get("msg.notify.testFailed", delivery.error()));
         }
         return "redirect:/settings/notifications";
     }

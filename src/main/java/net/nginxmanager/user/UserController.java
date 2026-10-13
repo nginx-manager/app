@@ -42,7 +42,7 @@ public class UserController {
                 userService.invite(invite, authentication.getName());
                 return "redirect:/users?invited=" + invite.username();
             } catch (DuplicateUsernameException e) {
-                bindingResult.rejectValue("username", "duplicate", "이미 있는 아이디입니다.");
+                bindingResult.rejectValue("username", "msg.user.duplicate", "이미 있는 아이디입니다.");
             }
         }
         return list(model);

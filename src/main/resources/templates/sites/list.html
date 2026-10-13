@@ -1,18 +1,18 @@
 <!DOCTYPE html>
-<html lang="ko" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="~{fragments/layout :: head('사이트')}"></head>
+<html lang="ko" th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(#{sites.list.title})}"></head>
 <body>
 <nav th:replace="~{fragments/layout :: nav}"></nav>
 <main class="page">
     <div class="title-row">
-        <h1>사이트</h1>
-        <a class="button" th:if="${currentUser.canEdit()}" th:href="@{/sites/new}">사이트 추가</a>
+        <h1 th:text="#{sites.list.title}">사이트</h1>
+        <a class="button" th:if="${currentUser.canEdit()}" th:href="@{/sites/new}" th:text="#{sites.list.add}">사이트 추가</a>
     </div>
     <section class="card">
-        <p th:if="${#lists.isEmpty(sites)}" class="muted">등록된 사이트가 없습니다.</p>
+        <p th:if="${#lists.isEmpty(sites)}" class="muted" th:text="#{sites.list.empty}">등록된 사이트가 없습니다.</p>
         <table th:unless="${#lists.isEmpty(sites)}">
             <thead>
-            <tr><th>도메인</th><th>유형</th><th>포트</th><th>상태</th><th></th></tr>
+            <tr><th th:text="#{sites.list.col.domain}">도메인</th><th th:text="#{sites.list.col.type}">유형</th><th th:text="#{sites.list.col.port}">포트</th><th th:text="#{sites.list.col.status}">상태</th><th></th></tr>
             </thead>
             <tbody>
             <tr th:each="s : ${sites}">
@@ -21,16 +21,16 @@
                     <div class="muted small" th:if="${s.extraDomains}" th:text="${s.extraDomains}">www.app.local</div>
                 </td>
                 <td th:switch="${s.type.name()}">
-                    <span th:case="'STATIC'">정적</span>
-                    <span th:case="'PROXY'">프록시</span>
-                    <span th:case="*">원문 편집</span>
+                    <span th:case="'STATIC'" th:text="#{sites.list.type.STATIC}">정적</span>
+                    <span th:case="'PROXY'" th:text="#{sites.list.type.PROXY}">프록시</span>
+                    <span th:case="*" th:text="#{sites.list.type.RAW}">원문 편집</span>
                 </td>
                 <td th:text="${s.listenHttpPort}">80</td>
                 <td>
-                    <span th:if="${s.enabled}" class="badge ok">활성</span>
-                    <span th:unless="${s.enabled}" class="badge">비활성</span>
+                    <span th:if="${s.enabled}" class="badge ok" th:text="#{sites.status.enabled}">활성</span>
+                    <span th:unless="${s.enabled}" class="badge" th:text="#{sites.status.disabled}">비활성</span>
                 </td>
-                <td><span th:if="${s.pending}" class="badge warn">적용 대기</span></td>
+                <td><span th:if="${s.pending}" class="badge warn" th:text="#{sites.status.pending}">적용 대기</span></td>
             </tr>
             </tbody>
         </table>

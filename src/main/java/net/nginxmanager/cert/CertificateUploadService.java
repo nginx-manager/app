@@ -36,9 +36,27 @@ import java.util.Locale;
 @Service
 public class CertificateUploadService {
 
+    /** 올린 인증서를 쓸 수 없다. code가 있으면 화면은 그 메시지(args)를 사용자의 언어로 보여 준다. */
     public static class InvalidCertificateException extends RuntimeException {
+        private final String code;
+        private final transient Object[] args;
+
         public InvalidCertificateException(String message) {
+            this(null, message);
+        }
+
+        public InvalidCertificateException(String code, String message, Object... args) {
             super(message);
+            this.code = code;
+            this.args = args;
+        }
+
+        public String code() {
+            return code;
+        }
+
+        public Object[] args() {
+            return args.clone();
         }
     }
 
@@ -69,7 +87,7 @@ public class CertificateUploadService {
         try {
             safeName = CertificateFiles.safeName(name.trim());
         } catch (IllegalArgumentException e) {
-            throw new InvalidCertificateException("이름은 영문 소문자, 숫자, . - 만 쓸 수 있습니다.");
+            throw new InvalidCertificateException("msg.cert.upload.badName", "이름은 영문 소문자, 숫자, . - 만 쓸 수 있습니다.");
         }
         List<X509Certificate> chain;
         try {
@@ -82,12 +100,13 @@ public class CertificateUploadService {
         requireMatch(leaf, key);
         Instant now = clock.instant();
         if (leaf.getNotAfter().toInstant().isBefore(now)) {
-            throw new InvalidCertificateException("이미 만료된 인증서입니다(" + leaf.getNotAfter().toInstant() + ").");
+            throw new InvalidCertificateException("msg.cert.upload.expired", "이미 만료된 인증서입니다(" + leaf.getNotAfter().toInstant() + ").",
+                    leaf.getNotAfter().toInstant().toString());
         }
 
         Optional<TlsCertificate> existing = certificateRepository.findByName(safeName);
         if (existing.isPresent() && existing.get().getSource() != CertificateSource.UPLOADED) {
-            throw new InvalidCertificateException("Let's Encrypt 인증서와 같은 이름입니다. 다른 이름을 써 주세요.");
+            throw new InvalidCertificateException("msg.cert.upload.nameTaken", "Let's Encrypt 인증서와 같은 이름입니다. 다른 이름을 써 주세요.");
         }
         Long id = existing.map(TlsCertificate::getId).orElseGet(() -> tx.execute(status ->
                 certificateRepository.save(TlsCertificate.uploaded(safeName, domainsOf(leaf))).getId()));
@@ -113,9 +132,10 @@ public class CertificateUploadService {
                 return converter.getPrivateKey(info);
             }
         } catch (IOException e) {
-            throw new InvalidCertificateException("개인 키를 읽을 수 없습니다: " + e.getMessage());
+            throw new InvalidCertificateException("msg.cert.upload.unreadableKey", "개인 키를 읽을 수 없습니다: " + e.getMessage(),
+                    String.valueOf(e.getMessage()));
         }
-        throw new InvalidCertificateException("암호가 걸리지 않은 PEM 개인 키가 아닙니다.");
+        throw new InvalidCertificateException("msg.cert.upload.notPlainKey", "암호가 걸리지 않은 PEM 개인 키가 아닙니다.");
     }
 
     /** 키로 서명하고 인증서의 공개 키로 확인해, 둘이 짝인지 본다. */
@@ -127,7 +147,8 @@ public class CertificateUploadService {
                 case "RSA" -> "SHA256withRSA";
                 case "EC", "ECDSA" -> "SHA256withECDSA";
                 case "Ed25519", "EdDSA" -> "Ed25519";
-                default -> throw new InvalidCertificateException("지원하지 않는 키 종류입니다: " + key.getAlgorithm());
+                default -> throw new InvalidCertificateException("msg.cert.upload.keyType", "지원하지 않는 키 종류입니다: " + key.getAlgorithm(),
+                        key.getAlgorithm());
             };
             Signature signer = Signature.getInstance(algorithm, BC);
             signer.initSign(key);
@@ -137,10 +158,10 @@ public class CertificateUploadService {
             verifier.initVerify(cert.getPublicKey());
             verifier.update(data);
             if (!verifier.verify(signature)) {
-                throw new InvalidCertificateException("개인 키가 인증서와 맞지 않습니다.");
+                throw new InvalidCertificateException("msg.cert.upload.keyMismatch", "개인 키가 인증서와 맞지 않습니다.");
             }
         } catch (GeneralSecurityException e) {
-            throw new InvalidCertificateException("개인 키가 인증서와 맞지 않습니다.");
+            throw new InvalidCertificateException("msg.cert.upload.keyMismatch", "개인 키가 인증서와 맞지 않습니다.");
         }
     }
 
