@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('사용자')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<main class="page">
+    <h1>사용자</h1>
+
+    <p class="notice" th:if="${param.invited}" th:text="${param.invited[0]} + ' 계정을 만들었습니다. 정한 비밀번호를 본인에게 전해 주세요.'">계정을 만들었습니다.</p>
+    <p class="notice" th:if="${param.saved}">저장했습니다. 바뀐 사용자는 다시 로그인해야 합니다.</p>
+    <p class="error" th:if="${param.error != null and param.error[0] == 'last-admin'}">활성 관리자가 최소 한 명은 있어야 합니다.</p>
+    <p class="error" th:if="${param.error != null and param.error[0] == 'password'}">비밀번호는 10자 이상이어야 합니다.</p>
+
+    <section class="card">
+        <table>
+            <thead>
+            <tr><th>아이디</th><th>역할</th><th>상태</th><th>만든 날</th><th>비밀번호 재설정</th></tr>
+            </thead>
+            <tbody>
+            <tr th:each="u : ${users}">
+                <td>
+                    <span th:text="${u.username}">admin</span>
+                    <span class="muted small" th:if="${u.username == currentUser.username}">(나)</span>
+                </td>
+                <td>
+                    <form th:action="@{/users/{id}/role(id=${u.id})}" method="post" class="inline">
+                        <input type="hidden" name="version" th:value="${u.version}">
+                        <select name="role" th:aria-label="${u.username} + ' 역할'" onchange="this.form.submit()">
+                            <option th:each="r : ${roles}" th:value="${r}" th:text="${r}" th:selected="${r == u.role}">ADMIN</option>
+                        </select>
+                        <noscript><button type="submit" class="link">변경</button></noscript>
+                    </form>
+                </td>
+                <td>
+                    <span class="badge" th:classappend="${u.enabled ? 'ok' : 'bad'}" th:text="${u.enabled ? '활성' : '비활성'}">활성</span>
+                    <span class="badge warn" th:if="${u.lockedNow}">잠김</span>
+                    <form th:unless="${u.username == currentUser.username}" th:action="@{/users/{id}/enabled(id=${u.id})}" method="post" class="inline">
+                        <input type="hidden" name="version" th:value="${u.version}">
+                        <input type="hidden" name="enabled" th:value="${!u.enabled}">
+                        <button type="submit" class="link" th:text="${u.enabled ? '비활성화' : '활성화'}">비활성화</button>
+                    </form>
+                </td>
+                <td class="nowrap" th:text="${#temporals.format(u.createdAt, 'yyyy-MM-dd')}">2026-10-13</td>
+                <td>
+                    <form th:action="@{/users/{id}/password(id=${u.id})}" method="post" class="inline">
+                        <input type="hidden" name="version" th:value="${u.version}">
+                        <input type="password" name="password" minlength="10" autocomplete="new-password"
+                               th:aria-label="${u.username} + ' 새 비밀번호'" placeholder="새 비밀번호">
+                        <button type="submit" class="link">재설정</button>
+                    </form>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section class="card">
+        <h2>사용자 추가</h2>
+        <form th:action="@{/users}" th:object="${invite}" method="post" class="row-form">
+            <label>아이디 <input type="text" th:field="*{username}" required></label>
+            <p class="error" th:if="${#fields.hasErrors('username')}" th:errors="*{username}"></p>
+            <label>초기 비밀번호 <input type="password" th:field="*{password}" minlength="10" autocomplete="new-password" required></label>
+            <p class="error" th:if="${#fields.hasErrors('password')}" th:errors="*{password}"></p>
+            <label>역할
+                <select th:field="*{role}">
+                    <option value="VIEWER">VIEWER: 보기만</option>
+                    <option value="EDITOR">EDITOR: 편집과 적용</option>
+                    <option value="ADMIN">ADMIN: 사용자·설정 관리까지</option>
+                </select>
+            </label>
+            <button type="submit">추가</button>
+        </form>
+    </section>
+</main>
+</body>
+</html>

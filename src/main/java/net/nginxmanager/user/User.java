@@ -46,6 +46,10 @@ public class User extends BaseEntity {
         return lockedUntil != null && lockedUntil.isAfter(now);
     }
 
+    public boolean isLockedNow() {
+        return isLocked(Instant.now());
+    }
+
     /** 실패 횟수를 올리고, 한도에 닿으면 잠근 뒤 횟수를 초기화한다. 잠겼으면 true. */
     public boolean recordLoginFailure(int maxAttempts, Duration lockDuration, Instant now) {
         failedLoginCount++;
@@ -55,6 +59,20 @@ public class User extends BaseEntity {
             return true;
         }
         return false;
+    }
+
+    void changeRole(Role role) {
+        this.role = role;
+    }
+
+    void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    void changePassword(String passwordHash) {
+        this.passwordHash = passwordHash;
+        this.failedLoginCount = 0;
+        this.lockedUntil = null;
     }
 
     public void recordLoginSuccess() {

@@ -69,3 +69,6 @@ label.inline input { width: auto; display: inline; margin: 0; }
 .actions { display: flex; align-items: center; gap: .75rem; margin-top: 1rem; }
 details { margin: .4rem 0; }
 details summary { cursor: pointer; }
+.row-form { display: flex; flex-wrap: wrap; align-items: end; gap: .75rem; }
+.row-form label { margin: 0; }
+td form.inline input[type=password] { width: 10rem; }

@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('내 계정')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<main class="page">
+    <h1>비밀번호 변경</h1>
+    <section class="card narrow">
+        <p class="notice" th:if="${param.saved}">비밀번호를 바꿨습니다.</p>
+        <form th:action="@{/account}" th:object="${form}" method="post">
+            <label>현재 비밀번호 <input type="password" th:field="*{currentPassword}" autocomplete="current-password" required></label>
+            <p class="error" th:if="${#fields.hasErrors('currentPassword')}" th:errors="*{currentPassword}"></p>
+            <label>새 비밀번호 <input type="password" th:field="*{newPassword}" minlength="10" autocomplete="new-password" required></label>
+            <p class="error" th:if="${#fields.hasErrors('newPassword')}" th:errors="*{newPassword}"></p>
+            <label>새 비밀번호 확인 <input type="password" th:field="*{newPasswordConfirm}" autocomplete="new-password" required></label>
+            <p class="error" th:if="${#fields.hasErrors('confirmed')}" th:errors="*{confirmed}"></p>
+            <button type="submit">변경</button>
+        </form>
+    </section>
+</main>
+</body>
+</html>
