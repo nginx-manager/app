@@ -7,6 +7,8 @@ import java.util.Optional;
 
 public interface SiteRepository extends JpaRepository<Site, Long> {
 
+    long countByEnabledTrue();
+
     boolean existsByPrimaryDomain(String primaryDomain);
 
     Optional<Site> findByPrimaryDomain(String primaryDomain);

@@ -1,6 +1,5 @@
 package net.nginxmanager.dashboard;
 
-import net.nginxmanager.runtime.NginxRuntime;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -8,15 +7,17 @@ import org.springframework.web.bind.annotation.GetMapping;
 @Controller
 public class DashboardController {
 
-    private final NginxRuntime runtime;
+    private final DashboardService dashboardService;
 
-    public DashboardController(NginxRuntime runtime) {
-        this.runtime = runtime;
+    public DashboardController(DashboardService dashboardService) {
+        this.dashboardService = dashboardService;
     }
 
     @GetMapping("/")
     public String dashboard(Model model) {
-        model.addAttribute("status", runtime.status());
+        DashboardService.Dashboard dashboard = dashboardService.load();
+        model.addAttribute("dashboard", dashboard);
+        model.addAttribute("status", dashboard.status());
         return "dashboard";
     }
 }

@@ -65,6 +65,16 @@ public class LocalNginxRuntime implements NginxRuntime {
     }
 
     @Override
+    public void start() {
+        CommandRunner.Result result = commandRunner.run(
+                List.of(properties.s6Svc().toString(), "-u", properties.s6Service().toString()),
+                properties.commandTimeout());
+        if (result.exitCode() != 0) {
+            throw new NginxCommandException("nginx start failed: " + result.output().strip());
+        }
+    }
+
+    @Override
     public HealthResult healthCheck(Duration timeout) {
         long deadline = System.nanoTime() + timeout.toNanos();
         HealthResult last;

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(${site.primaryDomain} + ' 로그')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<main class="page">
+    <div class="title-row">
+        <h1><a th:href="@{/sites/{id}(id=${site.id})}" th:text="${site.primaryDomain}">app.local</a> 로그</h1>
+        <a th:href="@{/logs/{id}(id=${site.id},type='ACCESS')}" th:classappend="${type.name() == 'ACCESS'} ? 'current'">access</a>
+        <a th:href="@{/logs/{id}(id=${site.id},type='ERROR')}" th:classappend="${type.name() == 'ERROR'} ? 'current'">error</a>
+    </div>
+
+    <section class="card">
+        <form th:action="@{/logs/{id}(id=${site.id})}" method="get" class="row-form">
+            <input type="hidden" name="type" th:value="${type}">
+            <label>찾을 말 <input type="search" name="q" th:value="${q}" placeholder="예: 502, /api, upstream" maxlength="200"></label>
+            <button type="submit">검색</button>
+            <button type="button" class="secondary" id="live-toggle"
+                    th:attr="data-stream=@{/logs/{id}/stream(id=${site.id},type=${type})}">실시간 보기</button>
+        </form>
+        <p class="muted small" th:if="${result.missing}">로그 파일이 아직 없습니다. 이 사이트로 요청이 들어오면 생깁니다.</p>
+        <p class="muted small" th:unless="${result.missing}">
+            <span th:text="${#lists.size(result.lines)}">0</span>줄
+            <span th:if="${#lists.size(result.lines) >= limit}" th:text="'(최근 ' + ${limit} + '줄까지)'"></span>
+            <span th:if="${result.exhausted}">· 파일 끝부분만 찾았습니다</span>
+            · 최근 줄이 위에 있습니다
+        </p>
+        <pre class="code log-lines" id="search-lines"><th:block th:each="l : ${result.lines}">[[${l}]]
+</th:block></pre>
+    </section>
+
+    <section class="card" id="live" hidden>
+        <div class="title-row">
+            <h2>실시간</h2>
+            <span class="badge ok" id="live-state">연결 중</span>
+        </div>
+        <pre class="code log-lines" id="live-lines"></pre>
+    </section>
+</main>
+<script th:src="@{/js/log-tail.js}" defer></script>
+</body>
+</html>
