@@ -15,9 +15,11 @@
     <a th:href="@{/sites}">사이트</a>
     <a th:href="@{/files}">설정 파일</a>
     <a th:href="@{/versions}">이력</a>
-    <a th:href="@{/apply}">적용<span class="count" th:if="${pendingCount > 0}" th:text="${pendingCount}">2</span></a>
+    <a th:if="${currentUser != null and currentUser.canEdit()}" th:href="@{/apply}">적용<span class="count" th:if="${pendingCount > 0}" th:text="${pendingCount}">2</span></a>
+    <a th:if="${currentUser != null and currentUser.isAdmin()}" th:href="@{/users}">사용자</a>
+    <a th:if="${currentUser != null and currentUser.isAdmin()}" th:href="@{/audit}">감사 로그</a>
     <span class="spacer"></span>
-    <span class="who" th:if="${currentUser}" th:text="${currentUser.username}">admin</span>
+    <a class="who" th:if="${currentUser}" th:href="@{/account}" th:text="${currentUser.username}">admin</a>
     <form th:if="${currentUser}" th:action="@{/logout}" method="post" class="inline">
         <button type="submit" class="link">로그아웃</button>
     </form>

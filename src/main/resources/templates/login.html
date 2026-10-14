@@ -6,6 +6,7 @@
     <h1>nginx manager</h1>
     <p class="notice" th:if="${param.setup}">관리자 계정을 만들었습니다. 로그인해 주세요.</p>
     <p class="notice" th:if="${param.logout}">로그아웃했습니다.</p>
+    <p class="notice" th:if="${param.expired}">계정 정보가 바뀌어 로그아웃됐습니다. 다시 로그인해 주세요.</p>
     <p class="error" th:if="${param.error}">아이디나 비밀번호가 맞지 않거나, 계정이 잠겨 있습니다.</p>
     <form th:action="@{/login}" method="post">
         <label>아이디 <input type="text" name="username" autocomplete="username" required autofocus></label>

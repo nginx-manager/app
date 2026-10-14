@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('감사 로그')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<main class="page">
+    <h1>감사 로그</h1>
+    <section class="card">
+        <form th:action="@{/audit}" method="get" class="row-form">
+            <label>사용자 <input type="text" name="username" th:value="${filter.username}"></label>
+            <label>동작
+                <select name="action">
+                    <option value="">전체</option>
+                    <option th:each="a : ${actions}" th:value="${a}" th:text="${a}" th:selected="${a == filter.action}">APPLY</option>
+                </select>
+            </label>
+            <label>결과
+                <select name="result">
+                    <option value="">전체</option>
+                    <option th:each="r : ${results}" th:value="${r}" th:text="${r}" th:selected="${r == filter.result}">SUCCESS</option>
+                </select>
+            </label>
+            <label>시작일 <input type="date" name="from" th:value="${filter.from}"></label>
+            <label>종료일 <input type="date" name="to" th:value="${filter.to}"></label>
+            <button type="submit">검색</button>
+        </form>
+    </section>
+    <section class="card">
+        <p th:if="${#lists.isEmpty(logs)}" class="muted">조건에 맞는 기록이 없습니다.</p>
+        <table th:unless="${#lists.isEmpty(logs)}">
+            <thead>
+            <tr><th>시각</th><th>사용자</th><th>동작</th><th>대상</th><th>결과</th></tr>
+            </thead>
+            <tbody>
+            <tr th:each="l : ${logs}">
+                <td class="nowrap" th:text="${#temporals.format(l.createdAt, 'yyyy-MM-dd HH:mm:ss')}">2026-10-13</td>
+                <td>
+                    <span th:text="${l.username ?: '시스템'}">admin</span>
+                    <span class="muted small" th:if="${l.userRole != null}" th:text="${l.userRole}">ADMIN</span>
+                </td>
+                <td th:text="${l.action}">APPLY</td>
+                <td><code th:text="${l.target}">version:3</code></td>
+                <td><span class="badge" th:classappend="${l.result.name() == 'SUCCESS' ? 'ok' : 'bad'}" th:text="${l.result}">SUCCESS</span></td>
+            </tr>
+            </tbody>
+        </table>
+        <p class="pager">
+            <a th:if="${page > 0}" th:href="@{/audit(username=${filter.username},action=${filter.action},result=${filter.result},from=${filter.from},to=${filter.to},page=${page - 1})}">← 최근</a>
+            <a th:if="${hasNext}" th:href="@{/audit(username=${filter.username},action=${filter.action},result=${filter.result},from=${filter.from},to=${filter.to},page=${page + 1})}">이전 →</a>
+        </p>
+    </section>
+</main>
+</body>
+</html>
