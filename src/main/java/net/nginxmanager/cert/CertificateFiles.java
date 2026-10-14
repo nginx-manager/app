@@ -18,6 +18,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
+import java.util.Locale;
 
 /**
  * 인증서 파일을 &lt;설정 루트&gt;/certs/&lt;이름&gt;/&lt;시각&gt;/ 에 둔다. 발급·갱신마다 새 디렉터리를 만들어
@@ -100,7 +101,7 @@ public class CertificateFiles {
     }
 
     static String safeName(String name) {
-        String safe = name.toLowerCase().replaceAll("[^a-z0-9.-]", "-");
+        String safe = name.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9.-]", "-");
         if (safe.isBlank() || safe.startsWith(".")) {
             throw new IllegalArgumentException("invalid certificate name: " + name);
         }

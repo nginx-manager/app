@@ -10,6 +10,7 @@ import net.nginxmanager.site.SiteService;
 import net.nginxmanager.site.SiteType;
 import net.nginxmanager.support.ConfigRootTest;
 import net.nginxmanager.support.FakeNginxRuntime;
+import org.hibernate.Hibernate;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -49,7 +50,7 @@ class ApplyServiceTest extends ConfigRootTest {
     private ConfigVersion version(Long id) {
         return tx.execute(status -> {
             ConfigVersion version = configVersionRepository.findById(id).orElseThrow();
-            version.getFiles().size();
+            Hibernate.initialize(version.getFiles());
             return version;
         });
     }

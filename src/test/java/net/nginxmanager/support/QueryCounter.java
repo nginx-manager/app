@@ -29,7 +29,9 @@ public class QueryCounter {
     }
 
     public <T> long count(Supplier<T> action) {
-        return count((Runnable) action::get);
+        return count(() -> {
+            var unused = action.get();
+        });
     }
 
     /**

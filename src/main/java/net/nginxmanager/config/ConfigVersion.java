@@ -21,6 +21,8 @@ import java.util.List;
 @Table(name = "config_version")
 public class ConfigVersion extends BaseEntity {
 
+    // Querydsl 조회(작성자 조인)에서만 쓴다
+    @SuppressWarnings("unused")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id")
     private User author;

@@ -59,7 +59,9 @@ public class CertificateController {
 
     @PostMapping("/certs/{id}/renew")
     public String renew(@PathVariable long id, RedirectAttributes redirect) {
-        certificateRepository.findById(id).orElseThrow(() -> new NotFoundException("certificate " + id));
+        if (!certificateRepository.existsById(id)) {
+            throw new NotFoundException("certificate " + id);
+        }
         certificateService.submit(id);
         redirect.addFlashAttribute("notice", "발급·갱신을 시작했습니다. 끝나면 이 목록과 이력에 결과가 보입니다.");
         return "redirect:/certs";

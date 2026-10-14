@@ -103,7 +103,8 @@ public class NotificationService {
 
     static String json(String value) {
         StringBuilder out = new StringBuilder("\"");
-        for (char c : value.toCharArray()) {
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
             switch (c) {
                 case '"' -> out.append("\\\"");
                 case '\\' -> out.append("\\\\");

@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.Locale;
 
 /**
  * 사이트 폼. 값은 nginx 설정에 그대로 들어가므로 세미콜론·중괄호·공백이 들어갈 수 없는 형식만 받는다.
@@ -90,7 +91,7 @@ public record SiteForm(
         domains.add(primary);
         String normalized = extraDomainsNormalized();
         if (normalized != null) {
-            Arrays.stream(normalized.split(" ")).map(String::toLowerCase).filter(d -> !domains.contains(d))
+            Arrays.stream(normalized.split(" ")).map(d -> d.toLowerCase(Locale.ROOT)).filter(d -> !domains.contains(d))
                     .forEach(domains::add);
         }
         return domains;

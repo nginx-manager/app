@@ -65,7 +65,7 @@ class RoleAccessTest extends ConfigRootTest {
             MockHttpServletRequestBuilder request = method.equals("GET") ? get(path) : post(path).with(csrf());
             int status = mvc.perform(request.with(user("u-" + role).roles(role.name())))
                     .andReturn().getResponse().getStatus();
-            boolean allowed = role.ordinal() <= minimum.ordinal();
+            boolean allowed = role.compareTo(minimum) <= 0;
             if (allowed) {
                 assertThat(status).as("%s %s as %s", method, path, role).isNotEqualTo(403);
             } else {

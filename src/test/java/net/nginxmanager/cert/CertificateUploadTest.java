@@ -26,6 +26,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.net.InetAddress;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -116,7 +117,7 @@ class CertificateUploadTest extends ConfigRootTest {
     @Test
     void expiringCertificateIsAnnouncedOnceAWeek() throws IOException {
         List<String> received = new CopyOnWriteArrayList<>();
-        HttpServer webhook = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        HttpServer webhook = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         webhook.createContext("/hook", exchange -> {
             received.add(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
             exchange.sendResponseHeaders(200, -1);
@@ -162,8 +163,8 @@ class CertificateUploadTest extends ConfigRootTest {
                 .andExpect(content().string(org.hamcrest.Matchers.not(containsString("인증서 업로드</h2>"))));
 
         mvc.perform(multipart("/certs/upload").with(csrf()).with(user("ed").roles("EDITOR"))
-                        .file(new MockMultipartFile("certificate", "x", "text/plain", "garbage".getBytes()))
-                        .file(new MockMultipartFile("privateKey", "y", "text/plain", "garbage".getBytes()))
+                        .file(new MockMultipartFile("certificate", "x", "text/plain", "garbage".getBytes(StandardCharsets.UTF_8)))
+                        .file(new MockMultipartFile("privateKey", "y", "text/plain", "garbage".getBytes(StandardCharsets.UTF_8)))
                         .param("name", "bad"))
                 .andExpect(flash().attributeExists("error"));
 
