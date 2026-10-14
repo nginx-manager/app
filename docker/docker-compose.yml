@@ -11,6 +11,8 @@ services:
     ports:
       - "80:80"
       - "443:443"
+      - "443:443/udp"   # HTTP/3(QUIC)
+      # 스트림(TCP/UDP) 프록시를 만들면 그 포트도 여기에 더한다. 예: - "5432:5432", - "1883:1883"
     volumes:
       - nm-conf:/etc/nginx                # nginx 설정, 인증서(certs/)
       - nm-logs:/var/log/nginx            # 접근·오류 로그

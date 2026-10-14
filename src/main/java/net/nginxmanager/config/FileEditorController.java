@@ -35,13 +35,49 @@ public class FileEditorController {
         return "files/list";
     }
 
+    @GetMapping("/new")
+    public String newFile(Model model) {
+        model.addAttribute("path", "");
+        model.addAttribute("content", "");
+        return "files/new";
+    }
+
+    /** 새 파일 초안. 폼이 없는 모듈(njs, mail, stream include 등)의 설정을 둘 곳을 만든다. */
+    @PostMapping("/new")
+    public String create(@RequestParam String path, @RequestParam(defaultValue = "") String content,
+                         Authentication authentication, Model model) {
+        String trimmed = path.strip();
+        String error = null;
+        if (!NewFilePath.isValid(trimmed)) {
+            error = "files.new.error.path";
+        } else {
+            try {
+                ConfigFile file = siteService.createFile(trimmed, content, authentication.getName());
+                return "redirect:/files/" + file.getId() + "?saved";
+            } catch (IllegalArgumentException e) {
+                error = "files.new.error.exists";
+            }
+        }
+        model.addAttribute("path", trimmed);
+        model.addAttribute("content", content);
+        model.addAttribute("errorKey", error);
+        return "files/new";
+    }
+
     @GetMapping("/{id}")
     public String edit(@PathVariable long id, Model model) {
         ConfigFile file = configFileRepository.findById(id).orElseThrow(() -> new NotFoundException("file " + id));
         model.addAttribute("file", file);
         model.addAttribute("content", file.getDraftContent() != null ? file.getDraftContent() : store.read(file.getPath()));
         model.addAttribute("site", siteRepository.findByConfigFileId(id).orElse(null));
+        model.addAttribute("deletable", siteService.isDeletable(file) && !file.isDraftDelete());
         return "files/edit";
+    }
+
+    @PostMapping("/{id}/delete")
+    public String delete(@PathVariable long id, @RequestParam long version, Authentication authentication) {
+        ConfigFile file = siteService.deleteFile(id, version, authentication.getName());
+        return file.isDraftDelete() ? "redirect:/files/" + id + "?deleted" : "redirect:/files?deleted";
     }
 
     @PostMapping("/{id}")

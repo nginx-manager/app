@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ko" th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(#{streams.form.title})}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<main class="page">
+    <h1 th:text="#{streams.form.title}">스트림 추가</h1>
+    <div class="columns">
+        <section class="card">
+            <form th:action="@{/streams/new}" th:object="${form}" method="post" id="stream-form">
+                <fieldset>
+                    <legend th:text="#{streams.field.protocol}">프로토콜</legend>
+                    <label class="inline"><input type="radio" th:field="*{protocol}" value="TCP"> TCP</label>
+                    <label class="inline"><input type="radio" th:field="*{protocol}" value="UDP"> UDP</label>
+                    <p class="hint" th:text="#{streams.field.protocol.hint}">설명</p>
+                </fieldset>
+                <label><th:block th:text="#{streams.field.listenPort}">받을 포트</th:block>
+                    <span class="hint" th:text="#{streams.field.listenPort.hint}">설명</span>
+                    <input type="number" th:field="*{listenPort}" min="1" max="65535" required>
+                    <span class="error" th:errors="*{listenPort}"></span>
+                    <span class="error" th:errors="*{listenPortFree}"></span>
+                </label>
+                <th:block th:replace="~{streams/fields :: fields(true)}"></th:block>
+                <button type="submit" th:text="#{sites.field.saveDraft}">초안 저장</button>
+                <p class="muted small" th:text="#{streams.form.portNote}">nginx 컨테이너에서 이 포트를 열어야 합니다.</p>
+            </form>
+        </section>
+        <section class="card">
+            <h2 th:text="#{sites.form.preview}">설정 미리보기</h2>
+            <pre class="code" id="preview" th:fragment="preview"
+                 hx-post="/streams/preview" hx-include="#stream-form" hx-swap="outerHTML"
+                 hx-trigger="input changed delay:400ms from:#stream-form, change from:#stream-form"
+                 th:text="${preview} ?: #{sites.form.preview.empty}"></pre>
+        </section>
+    </div>
+</main>
+</body>
+</html>

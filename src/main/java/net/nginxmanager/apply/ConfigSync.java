@@ -5,6 +5,7 @@ import net.nginxmanager.config.ConfigFileRepository;
 import net.nginxmanager.config.ConfigFileStore;
 import net.nginxmanager.config.ConfigVersion;
 import net.nginxmanager.site.SiteReconciler;
+import net.nginxmanager.stream.StreamReconciler;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,12 +19,14 @@ public class ConfigSync {
     private final ConfigFileRepository configFileRepository;
     private final ConfigFileStore store;
     private final SiteReconciler siteReconciler;
+    private final StreamReconciler streamReconciler;
 
     public ConfigSync(ConfigFileRepository configFileRepository, ConfigFileStore store,
-                      SiteReconciler siteReconciler) {
+                      SiteReconciler siteReconciler, StreamReconciler streamReconciler) {
         this.configFileRepository = configFileRepository;
         this.store = store;
         this.siteReconciler = siteReconciler;
+        this.streamReconciler = streamReconciler;
     }
 
     /**
@@ -45,7 +48,9 @@ public class ConfigSync {
                 file.markApplied(hash);
             }
         }
-        siteReconciler.reconcile(changes.stream().map(FileChange::path).toList());
+        List<String> paths = changes.stream().map(FileChange::path).toList();
+        siteReconciler.reconcile(paths);
+        streamReconciler.reconcile(paths);
         for (FileChange change : changes) {
             if (change.content() != null) {
                 continue;

@@ -45,6 +45,20 @@ public class SiteController {
         return certificateRepository.findBySourceOrderByNameAsc(CertificateSource.UPLOADED);
     }
 
+    /**
+     * HTTP/3를 켤 수 있는지: nginx.conf에 443/UDP를 reuseport로 여는 기본 서버가 있어야 한다
+     * (예전 기본 설정으로 시작한 설치에는 없다).
+     */
+    @ModelAttribute("http3Ready")
+    public boolean http3Ready() {
+        String conf = store.read("nginx.conf");
+        return conf != null && conf.lines().anyMatch(line -> {
+            String trimmed = line.strip();
+            return !trimmed.startsWith("#") && trimmed.startsWith("listen") && trimmed.contains("quic")
+                    && trimmed.contains("reuseport");
+        });
+    }
+
     @GetMapping
     public String list(Model model) {
         model.addAttribute("sites", siteQueryRepository.findAllRows());
@@ -68,6 +82,9 @@ public class SiteController {
             return "redirect:/sites/" + site.getId() + "?saved";
         } catch (DuplicateSiteException e) {
             bindingResult.rejectValue("primaryDomain", "msg.site.domainTaken", new Object[] {e.getDomain()}, duplicateMessage(e));
+            return "sites/form";
+        } catch (MissingPasswordException e) {
+            rejectMissingPassword(bindingResult, e);
             return "sites/form";
         }
     }
@@ -101,8 +118,20 @@ public class SiteController {
             model.addAttribute("content", currentContent(site));
             model.addAttribute("certificate", certificateOf(site));
             return "sites/detail";
+        } catch (MissingPasswordException e) {
+            rejectMissingPassword(bindingResult, e);
+            Site site = siteQueryRepository.findWithFile(id).orElseThrow(() -> new NotFoundException("site " + id));
+            model.addAttribute("site", site);
+            model.addAttribute("content", currentContent(site));
+            model.addAttribute("certificate", certificateOf(site));
+            return "sites/detail";
         }
         return "redirect:/sites/" + id + "?saved";
+    }
+
+    private static void rejectMissingPassword(BindingResult bindingResult, MissingPasswordException e) {
+        bindingResult.rejectValue("options.authUsers", "msg.site.authPasswordRequired",
+                new Object[] {e.getUsername()}, "새 사용자에는 비밀번호가 필요합니다: " + e.getUsername());
     }
 
     private static String duplicateMessage(DuplicateSiteException e) {

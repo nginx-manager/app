@@ -41,6 +41,13 @@ public class SiteReconciler {
     /** @param changedPaths 디스크에서 내용이 바뀌거나 생기거나 사라진 파일 */
     @Transactional(propagation = Propagation.MANDATORY)
     public void reconcile(Collection<String> changedPaths) {
+        // 비밀번호 파일을 먼저 맞춰야 사이트를 맞출 때 반영된 값(markApplied)에 지금 해시가 들어간다
+        for (String path : changedPaths) {
+            if (path.startsWith(Htpasswd.DIR)) {
+                siteRepository.findByPrimaryDomain(path.substring(Htpasswd.DIR.length()))
+                        .ifPresent(site -> site.updateHtpasswd(store.read(path)));
+            }
+        }
         for (String path : changedPaths) {
             String domain = SitePaths.domainOf(path);
             if (domain != null) {

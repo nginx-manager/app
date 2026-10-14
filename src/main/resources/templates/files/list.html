@@ -4,7 +4,11 @@
 <body>
 <nav th:replace="~{fragments/layout :: nav}"></nav>
 <main class="page">
-    <h1 th:text="#{files.list.title}">설정 파일</h1>
+    <div class="title-row">
+        <h1 th:text="#{files.list.title}">설정 파일</h1>
+        <a class="button" th:if="${currentUser.canEdit()}" th:href="@{/files/new}" th:text="#{files.list.new}">새 파일</a>
+    </div>
+    <p class="notice" th:if="${param.deleted}" th:text="#{files.list.deleted}">새 파일 초안을 지웠습니다.</p>
     <p class="hint" th:text="#{files.list.help}">관리도구가 관리하는 nginx 설정 파일을 직접 편집합니다. 저장한 내용은 초안이며, 적용 화면에서 반영해야 서버에 적용됩니다.</p>
     <section class="card">
         <p th:if="${#lists.isEmpty(files)}" class="muted" th:text="#{files.list.empty}">관리 중인 설정 파일이 없습니다.</p>

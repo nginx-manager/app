@@ -11,6 +11,8 @@ public interface ConfigFileRepository extends JpaRepository<ConfigFile, Long> {
 
     List<ConfigFile> findAllByOrderByPathAsc();
 
+    List<ConfigFile> findByPathStartingWith(String prefix);
+
     long countByDraftContentIsNotNullOrDraftDeleteTrue();
 
     boolean existsByDraftContentContaining(String text);
