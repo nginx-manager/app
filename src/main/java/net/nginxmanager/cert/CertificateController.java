@@ -5,6 +5,8 @@ import net.nginxmanager.common.NotFoundException;
 import net.nginxmanager.site.Site;
 import net.nginxmanager.site.SiteRepository;
 import net.nginxmanager.site.SiteService;
+import net.nginxmanager.site.SiteType;
+import net.nginxmanager.site.WildcardLetsEncryptException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -18,6 +20,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -57,26 +60,54 @@ public class CertificateController {
         model.addAttribute("running", certificates.stream()
                 .filter(c -> certificateService.isRunning(c.getId())).map(TlsCertificate::getId).toList());
         model.addAttribute("now", clock.instant());
+        // 인증서 없이 만든 폼 사이트: 여기서도 Let's Encrypt 인증서를 받을 수 있다
+        model.addAttribute("sitesWithoutHttps", siteRepository.findAll().stream()
+                .filter(s -> s.getType() != SiteType.RAW && !s.isHttpsEnabled())
+                .sorted(Comparator.comparing(Site::getPrimaryDomain))
+                .toList());
         return "certs/list";
     }
 
+    /**
+     * 지금 발급·갱신한다(실패한 발급 다시 시도 포함).
+     *
+     * @param siteId 사이트 화면에서 눌렀으면 그 사이트. 끝나면 사이트 화면으로 돌아간다
+     */
     @PostMapping("/certs/{id}/renew")
-    public String renew(@PathVariable long id, RedirectAttributes redirect) {
+    public String renew(@PathVariable long id, @RequestParam(required = false) Long siteId,
+                        RedirectAttributes redirect) {
         if (!certificateRepository.existsById(id)) {
             throw new NotFoundException("certificate " + id);
         }
         certificateService.submit(id);
         redirect.addFlashAttribute("notice", messages.get("msg.cert.renewStarted"));
-        return "redirect:/certs";
+        return siteId == null ? "redirect:/certs" : "redirect:/sites/" + siteId + "#https";
     }
 
-    /** 서비스 중인 폼 사이트에 Let's Encrypt HTTPS를 켜고 바로 발급을 시작한다. */
+    /**
+     * 만들어 둔 폼 사이트에 Let's Encrypt HTTPS를 켠다. 서비스 중인 사이트는 바로 발급을 시작하고,
+     * 아직 적용하지 않은(또는 꺼 둔) 사이트는 적용할 때 발급한다.
+     *
+     * @param from 인증서 화면에서 눌렀으면 "certs". 그 화면으로 돌아간다
+     */
     @PostMapping("/certs/letsencrypt")
-    public String letsEncrypt(@RequestParam long siteId, Authentication authentication, RedirectAttributes redirect) {
-        long certificateId = siteService.enableLetsEncrypt(siteId, authentication.getName());
-        certificateService.submit(certificateId);
-        redirect.addFlashAttribute("notice", messages.get("msg.cert.issueStarted"));
-        return "redirect:/sites/" + siteId;
+    public String letsEncrypt(@RequestParam long siteId, @RequestParam(required = false) String from,
+                              Authentication authentication, RedirectAttributes redirect) {
+        String back = "certs".equals(from) ? "redirect:/certs" : "redirect:/sites/" + siteId + "#https";
+        SiteService.LetsEncryptRequest request;
+        try {
+            request = siteService.enableLetsEncrypt(siteId, authentication.getName());
+        } catch (WildcardLetsEncryptException e) {
+            redirect.addFlashAttribute("error", messages.get("msg.validation.wildcardLetsEncrypt"));
+            return back;
+        }
+        if (request.issueNow()) {
+            certificateService.submit(request.certificateId());
+            redirect.addFlashAttribute("notice", messages.get("msg.cert.issueStarted"));
+        } else {
+            redirect.addFlashAttribute("notice", messages.get("msg.cert.issueAfterApply"));
+        }
+        return back;
     }
 
     @PostMapping("/certs/upload")

@@ -184,7 +184,7 @@ class CertificateUploadTest extends ConfigRootTest {
                 .andExpect(content().string(containsString("web (업로드)")));
         mvc.perform(get("/sites/new").with(user("ed").roles("EDITOR")))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Encrypt 자동 발급")));
+                .andExpect(content().string(containsString("Encrypt 인증서 발급 (무료, 자동 갱신)")));
         mvc.perform(get("/settings/acme").with(user("admin").roles("ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("스테이징")));

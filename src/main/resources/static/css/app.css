@@ -151,6 +151,14 @@ legend { padding: 0; margin-bottom: .45rem; font-size: .85rem; font-weight: 500;
 label.inline { display: inline-flex; gap: .45rem; align-items: center; margin: 0 1.25rem .4rem 0; font-weight: 400; font-size: .92rem; color: var(--fg); cursor: pointer; }
 fieldset > label:not(.inline) { margin-top: .6rem; }
 form.inline { display: inline; }
+/* 사이트 폼의 HTTPS 방식 선택: 줄마다 하나씩 고르고, 고른 방식에 필요한 항목만 보인다 */
+.https-choice label.choice { display: flex; gap: .6rem; align-items: flex-start; margin: 0 0 .5rem; padding: .6rem .8rem; border: 1px solid var(--line); border-radius: 8px; font-weight: 500; font-size: .92rem; color: var(--fg); cursor: pointer; }
+.https-choice label.choice input { margin-top: .2rem; flex: none; }
+.https-choice label.choice:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.https-choice label.choice:has(input:disabled:not(:checked)) { opacity: .65; cursor: default; }
+.https-choice .https-uploaded, .https-choice .https-on { margin-top: .6rem; }
+.https-choice:has(input[value="NONE"]:checked) .https-on { display: none; }
+.https-choice:not(:has(input[value="UPLOADED"]:checked)) .https-uploaded { display: none; }
 .row-form { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .75rem 1rem; }
 .row-form label { margin: 0; flex: 1 1 180px; }
 .row-form > button, .row-form > button[type=submit] { flex: none; margin-top: calc(.85rem * 1.5 + .35rem); }
