@@ -72,3 +72,6 @@ details summary { cursor: pointer; }
 .row-form { display: flex; flex-wrap: wrap; align-items: end; gap: .75rem; }
 .row-form label { margin: 0; }
 td form.inline input[type=password] { width: 10rem; }
+.warn-card { border-left: 4px solid #e0a100; }
+.log-lines { max-height: 60vh; overflow: auto; white-space: pre; font-size: .82rem; }
+.log-lines mark { background: #fff1a8; }

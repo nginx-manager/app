@@ -55,6 +55,8 @@ class RoleAccessTest extends ConfigRootTest {
             "POST, /settings/acme,       ADMIN",
             "GET,  /settings/notifications, ADMIN",
             "POST, /settings/notifications, ADMIN",
+            "GET,  /logs/1,              VIEWER",
+            "POST, /runtime/start,       ADMIN",
             "GET,  /account,             VIEWER",
             "POST, /account,             VIEWER",
     })

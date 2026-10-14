@@ -9,6 +9,7 @@
         <span th:if="${site.enabled}" class="badge ok">활성</span>
         <span th:unless="${site.enabled}" class="badge">비활성</span>
         <span th:if="${site.configFile.hasPendingChange()}" class="badge warn">적용 대기</span>
+        <a th:href="@{/logs/{id}(id=${site.id})}">로그 보기</a>
     </div>
     <p class="notice" th:if="${notice}" th:text="${notice}">완료</p>
     <p class="notice" th:if="${param.saved}">초안을 저장했습니다. <a th:href="@{/apply}">적용 화면</a>에서 반영하세요.</p>

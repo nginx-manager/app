@@ -18,6 +18,8 @@ public class FakeNginxRuntime implements NginxRuntime {
     public Supplier<HealthResult> health = HealthResult::ok;
     public int validateCalls;
     public int reloadCalls;
+    public boolean running = true;
+    public int startCalls;
     /** 설정하면 validate()가 이 래치가 풀릴 때까지 기다린다(동시 적용 테스트). */
     public CountDownLatch blockValidation;
     public CountDownLatch validationStarted;
@@ -27,6 +29,8 @@ public class FakeNginxRuntime implements NginxRuntime {
         health = HealthResult::ok;
         validateCalls = 0;
         reloadCalls = 0;
+        running = true;
+        startCalls = 0;
         blockValidation = null;
         validationStarted = null;
     }
@@ -43,7 +47,8 @@ public class FakeNginxRuntime implements NginxRuntime {
 
     @Override
     public RuntimeStatus status() {
-        return new RuntimeStatus(RuntimeStatus.State.RUNNING, "1.31.6", List.of(), 1L);
+        return new RuntimeStatus(running ? RuntimeStatus.State.RUNNING : RuntimeStatus.State.STOPPED, "1.31.6",
+                List.of(), running ? 1L : null);
     }
 
     @Override
@@ -70,5 +75,11 @@ public class FakeNginxRuntime implements NginxRuntime {
     @Override
     public HealthResult healthCheck(Duration timeout) {
         return health.get();
+    }
+
+    @Override
+    public void start() {
+        startCalls++;
+        running = true;
     }
 }
