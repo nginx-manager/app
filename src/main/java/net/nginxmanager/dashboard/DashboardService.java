@@ -7,6 +7,9 @@ import net.nginxmanager.history.VersionQueryRepository;
 import net.nginxmanager.runtime.NginxRuntime;
 import net.nginxmanager.runtime.RuntimeStatus;
 import net.nginxmanager.site.SiteRepository;
+import net.nginxmanager.startup.StartupCheck;
+import net.nginxmanager.startup.StartupCheckService;
+import net.nginxmanager.startup.VersionChange;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,7 +31,8 @@ public class DashboardService {
 
     public record Dashboard(RuntimeStatus status, long siteCount, long enabledSiteCount,
                             List<VersionQueryRepository.VersionRow> recentVersions,
-                            List<CertificateWarning> certificateWarnings, long databaseBytes) {
+                            List<CertificateWarning> certificateWarnings, long databaseBytes,
+                            StartupCheck failedStartupCheck, VersionChange versionChange, String appVersion) {
     }
 
     private final NginxRuntime runtime;
@@ -36,16 +40,19 @@ public class DashboardService {
     private final VersionQueryRepository versionQueryRepository;
     private final TlsCertificateRepository certificateRepository;
     private final JdbcClient jdbc;
+    private final StartupCheckService startupCheckService;
     private final Clock clock;
 
     public DashboardService(NginxRuntime runtime, SiteRepository siteRepository,
                             VersionQueryRepository versionQueryRepository,
-                            TlsCertificateRepository certificateRepository, JdbcClient jdbc, Clock clock) {
+                            TlsCertificateRepository certificateRepository, JdbcClient jdbc,
+                            StartupCheckService startupCheckService, Clock clock) {
         this.runtime = runtime;
         this.siteRepository = siteRepository;
         this.versionQueryRepository = versionQueryRepository;
         this.certificateRepository = certificateRepository;
         this.jdbc = jdbc;
+        this.startupCheckService = startupCheckService;
         this.clock = clock;
     }
 
@@ -56,8 +63,14 @@ public class DashboardService {
                 .filter(c -> c.isFailing() || (c.getStatus() == CertificateStatus.ACTIVE && c.isExpiringSoon(now)))
                 .map(c -> warning(c, now))
                 .toList();
-        return new Dashboard(runtime.status(), siteRepository.count(), siteRepository.countByEnabledTrue(),
-                versionQueryRepository.findPage(0, RECENT_VERSIONS), warnings, databaseBytes());
+        RuntimeStatus status = runtime.status();
+        // 시작 검사 실패는 nginx가 아직 내려가 있는 동안만 보여 준다(다시 띄웠으면 해결된 것)
+        StartupCheck failed = startupCheckService.check()
+                .filter(check -> !check.ok() && status.state() != RuntimeStatus.State.RUNNING)
+                .orElse(null);
+        return new Dashboard(status, siteRepository.count(), siteRepository.countByEnabledTrue(),
+                versionQueryRepository.findPage(0, RECENT_VERSIONS), warnings, databaseBytes(), failed,
+                startupCheckService.versionChange().orElse(null), startupCheckService.appVersion());
     }
 
     private static CertificateWarning warning(TlsCertificate c, Instant now) {

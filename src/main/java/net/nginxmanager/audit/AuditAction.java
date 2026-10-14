@@ -12,5 +12,6 @@ public enum AuditAction {
     CERT_ISSUE,
     CERT_RENEW,
     CERT_UPLOAD,
-    RUNTIME_START
+    RUNTIME_START,
+    UPGRADE
 }

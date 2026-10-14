@@ -23,6 +23,11 @@ public record ApplyResult(VersionResult result, Long versionId, List<String> cha
         return result == VersionResult.SUCCESS;
     }
 
+    /** 검증은 통과했지만 nginx가 멈춰 있어 reload하지 않았다. */
+    public boolean isReloadSkipped() {
+        return succeeded() && detail() != null && detail().contains(ApplyService.RELOAD_SKIPPED);
+    }
+
     public boolean nothingChanged() {
         return result == null;
     }

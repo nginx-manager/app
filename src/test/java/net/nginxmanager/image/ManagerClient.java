@@ -12,6 +12,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -24,17 +25,26 @@ final class ManagerClient {
     static final String PASSWORD = "correct-horse-battery";
     private static final Pattern CSRF = Pattern.compile("name=\"_csrf\"[^>]*value=\"([^\"]+)\"");
 
-    private final GenericContainer<?> container;
+    private final Supplier<String> baseUrl;
     private final HttpClient http = HttpClient.newBuilder().proxy(HttpClient.Builder.NO_PROXY)
             .cookieHandler(new CookieManager()).build();
 
     ManagerClient(GenericContainer<?> container) {
-        this.container = container;
+        this(() -> "http://" + container.getHost() + ":" + container.getMappedPort(9000));
+    }
+
+    /** 컨테이너를 다시 시작해 포트가 바뀌었을 때처럼 주소를 직접 정한다. */
+    ManagerClient(Supplier<String> baseUrl) {
+        this.baseUrl = baseUrl;
     }
 
     /** 첫 관리자를 만들고 로그인한다. */
     ManagerClient setupAndLogin() throws IOException, InterruptedException {
         post("/setup", Map.of("username", "admin", "password", PASSWORD, "passwordConfirm", PASSWORD), "/setup");
+        return login();
+    }
+
+    ManagerClient login() throws IOException, InterruptedException {
         HttpResponse<String> login = post("/login", Map.of("username", "admin", "password", PASSWORD), "/login");
         assertThat(login.headers().firstValue("Location")).hasValueSatisfying(l -> assertThat(l).doesNotContain("error"));
         return this;
@@ -61,7 +71,7 @@ final class ManagerClient {
     }
 
     private URI uri(String path) {
-        return URI.create("http://" + container.getHost() + ":" + container.getMappedPort(9000) + path);
+        return URI.create(baseUrl.get() + path);
     }
 
     private static String enc(String value) {

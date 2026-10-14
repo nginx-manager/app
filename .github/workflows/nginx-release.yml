@@ -1,0 +1,129 @@
+name: Release image
+
+# nginx 새 릴리스(보안 패치 포함)가 나오면 이미지를 다시 빌드·테스트해 게시한다(FR-026).
+# 관리도구를 릴리스(v* 태그)할 때도 같은 절차로 게시한다.
+# 태그는 <관리도구 버전>-nginx<nginx 버전>과 latest. 이전 태그는 지우지 않으므로 언제든 되돌릴 수 있다.
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      nginx_version:
+        description: 'nginx 버전(비우면 최신 릴리스)'
+        required: false
+      force:
+        description: '같은 태그가 이미 있어도 다시 게시'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  packages: write
+  issues: write
+
+concurrency:
+  group: release-image
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # 예약 실행은 최신 관리도구 릴리스 태그를 기준으로 nginx만 올린다
+          fetch-depth: 0
+
+      - name: Pick versions
+        id: versions
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_NGINX: ${{ inputs.nginx_version }}
+        run: |
+          set -euo pipefail
+          nginx="${INPUT_NGINX:-}"
+          if [ -z "$nginx" ]; then
+            nginx="$(gh api repos/nginx/nginx/releases/latest --jq .tag_name | sed 's/^release-//')"
+          fi
+          if ! echo "$nginx" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "unexpected nginx version: $nginx" >&2
+            exit 1
+          fi
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            ref="${GITHUB_REF_NAME}"
+          else
+            ref="$(git tag --list 'v*' --sort=-v:refname | head -n1)"
+          fi
+          if [ -z "$ref" ]; then
+            echo "no app release tag (v*) yet; nothing to publish" >&2
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          app="${ref#v}"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+          echo "nginx=$nginx" >> "$GITHUB_OUTPUT"
+          echo "app=$app" >> "$GITHUB_OUTPUT"
+          echo "tag=${app}-nginx${nginx}" >> "$GITHUB_OUTPUT"
+
+      - name: Skip when already published
+        id: existing
+        if: steps.versions.outputs.skip != 'true'
+        run: |
+          # 릴리스 태그를 밀었거나 force로 돌리면 다시 게시하고, 그 밖에는 이미 있는 태그를 건너뛴다
+          if [ "${{ github.event_name }}" != "push" ] && [ "${{ inputs.force }}" != "true" ]; then
+            if docker manifest inspect "$IMAGE:${{ steps.versions.outputs.tag }}" > /dev/null 2>&1; then
+              echo "$IMAGE:${{ steps.versions.outputs.tag }} already exists"
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+      - name: Check out release
+        if: steps.versions.outputs.skip != 'true' && steps.existing.outputs.skip != 'true'
+        run: git checkout --quiet "${{ steps.versions.outputs.ref }}"
+
+      - uses: actions/setup-java@v4
+        if: steps.versions.outputs.skip != 'true' && steps.existing.outputs.skip != 'true'
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build image
+        if: steps.versions.outputs.skip != 'true' && steps.existing.outputs.skip != 'true'
+        run: |
+          mvn -B -q versions:set -DnewVersion="${{ steps.versions.outputs.app }}" -DgenerateBackupPoms=false
+          docker build -f docker/Dockerfile \
+            --build-arg NGINX_VERSION="${{ steps.versions.outputs.nginx }}" \
+            -t "$IMAGE:${{ steps.versions.outputs.tag }}" .
+
+      - name: Test image
+        if: steps.versions.outputs.skip != 'true' && steps.existing.outputs.skip != 'true'
+        run: mvn -B -Pimage-test test -Dimage.name="$IMAGE:${{ steps.versions.outputs.tag }}"
+
+      - name: Publish
+        if: steps.versions.outputs.skip != 'true' && steps.existing.outputs.skip != 'true'
+        run: |
+          echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker tag "$IMAGE:${{ steps.versions.outputs.tag }}" "$IMAGE:latest"
+          docker push "$IMAGE:${{ steps.versions.outputs.tag }}"
+          docker push "$IMAGE:latest"
+
+      - name: Open an issue when the build fails
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="이미지 릴리스 실패: ${{ steps.versions.outputs.tag || github.ref_name }}"
+          if gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[0].number' | grep -q .; then
+            echo "issue already open"
+            exit 0
+          fi
+          gh issue create --title "$title" --body "nginx ${{ steps.versions.outputs.nginx }} 이미지 빌드·테스트가 실패해 게시하지 않았습니다. 기존 태그는 그대로입니다.
+
+          실행 기록: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
