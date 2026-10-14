@@ -52,5 +52,9 @@
     <a th:href="@{/versions#drift}" th:text="#{nav.drift.link}">확인하기</a>
 </div>
 </th:block>
+<footer class="footer" th:fragment="footer">
+    <span>nginx manager</span>
+    <a th:href="${appVersion.releaseNotesUrl()}" th:text="${appVersion.label()}" th:title="#{footer.releaseNotes}" target="_blank" rel="noopener">v1.0.0</a>
+</footer>
 </body>
 </html>

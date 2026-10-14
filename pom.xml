@@ -13,11 +13,13 @@
 
     <groupId>net.nginxmanager</groupId>
     <artifactId>nginx-manager</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <!-- 버전은 git 태그(vX.Y.Z)가 기준이다. 릴리스 빌드가 -Drevision=X.Y.Z로 넘기고, 태그 없이 빌드하면 dev -->
+    <version>${revision}</version>
     <name>nginx-manager</name>
     <description>Web-based nginx management tool</description>
 
     <properties>
+        <revision>dev</revision>
         <java.version>21</java.version>
         <openfeign-querydsl.version>7.7</openfeign-querydsl.version>
         <sqlite-jdbc.version>3.53.4.0</sqlite-jdbc.version>

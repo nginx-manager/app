@@ -134,4 +134,15 @@ class DashboardTest extends ConfigRootTest {
             assertThat(log.getResult()).isEqualTo(AuditResult.FAILURE);
         });
     }
+
+    @Test
+    void footerShowsAppVersionOnlyAfterLogin() throws Exception {
+        mvc.perform(get("/").with(user("v").roles("VIEWER")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("<footer class=\"footer\">")))
+                .andExpect(content().string(containsString(">dev</a>")));
+        mvc.perform(get("/login"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("<footer"))));
+    }
 }
