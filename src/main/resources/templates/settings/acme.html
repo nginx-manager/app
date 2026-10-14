@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('인증서 발급 설정')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<main class="page">
+    <h1>Let's Encrypt 설정</h1>
+    <p class="notice" th:if="${notice}" th:text="${notice}">저장</p>
+    <p class="error" th:if="${error}" th:text="${error}">오류</p>
+    <p class="notice" th:if="${overrideDirectory}">
+        서버 설정으로 ACME 주소가 <code th:text="${overrideDirectory}">acme://</code>로 고정되어 있어 아래 환경 선택보다 우선합니다.
+    </p>
+    <section class="card">
+        <form th:action="@{/settings/acme}" method="post" class="row-form">
+            <fieldset>
+                <legend>환경</legend>
+                <label class="inline"><input type="radio" name="environment" value="PRODUCTION"
+                       th:checked="${settings.environment.name() == 'PRODUCTION'}"> 운영 (실제 인증서)</label>
+                <label class="inline"><input type="radio" name="environment" value="STAGING"
+                       th:checked="${settings.environment.name() == 'STAGING'}"> 스테이징 (시험용, 브라우저가 신뢰하지 않음)</label>
+            </fieldset>
+            <label>연락용 메일 (선택, 만료 안내를 Let's Encrypt에서 받음)
+                <input type="email" name="contactEmail" th:value="${settings.contactEmail}" maxlength="200">
+            </label>
+            <button type="submit">저장</button>
+        </form>
+        <p class="muted small">HTTP-01 방식으로 인증하므로 도메인이 이 서버의 80번 포트로 들어와야 합니다.</p>
+    </section>
+</main>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('알림 설정')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<main class="page">
+    <h1>알림 설정</h1>
+    <p class="muted">인증서 발급·갱신에 실패하거나 만료가 가까워지면 아래 채널로 알립니다.</p>
+    <p class="notice" th:if="${notice}" th:text="${notice}">완료</p>
+    <p class="error" th:if="${error}" th:text="${error}">오류</p>
+    <section class="card">
+        <p class="muted" th:if="${#lists.isEmpty(channels)}">등록된 채널이 없습니다.</p>
+        <table th:unless="${#lists.isEmpty(channels)}">
+            <thead><tr><th>종류</th><th>대상</th><th>상태</th><th></th></tr></thead>
+            <tbody>
+            <tr th:each="ch : ${channels}">
+                <td th:text="${ch.type.name() == 'EMAIL'} ? '메일' : '웹훅'">메일</td>
+                <td class="small" th:text="${ch.target}">ops@example.com</td>
+                <td>
+                    <span class="badge" th:classappend="${ch.enabled ? 'ok' : ''}" th:text="${ch.enabled ? '사용' : '중지'}">사용</span>
+                    <form th:action="@{/settings/notifications/{id}/enabled(id=${ch.id})}" method="post" class="inline">
+                        <input type="hidden" name="enabled" th:value="${!ch.enabled}">
+                        <button type="submit" class="link" th:text="${ch.enabled ? '중지' : '사용'}">중지</button>
+                    </form>
+                </td>
+                <td class="nowrap">
+                    <form th:action="@{/settings/notifications/{id}/test(id=${ch.id})}" method="post" class="inline">
+                        <button type="submit" class="link">테스트</button>
+                    </form>
+                    <form th:action="@{/settings/notifications/{id}/delete(id=${ch.id})}" method="post" class="inline">
+                        <button type="submit" class="link">삭제</button>
+                    </form>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+    <section class="card">
+        <h2>채널 추가</h2>
+        <form th:action="@{/settings/notifications}" method="post" class="row-form">
+            <label>종류
+                <select name="type">
+                    <option value="WEBHOOK">웹훅 (JSON POST, Slack 호환 text 필드 포함)</option>
+                    <option value="EMAIL">메일</option>
+                </select>
+            </label>
+            <label>대상 <input type="text" name="target" required maxlength="500" placeholder="https://hooks.example.com/... 또는 ops@example.com"></label>
+            <button type="submit">추가</button>
+        </form>
+        <p class="muted small">메일은 서버에 spring.mail.* (SMTP) 설정이 있어야 보낼 수 있습니다.</p>
+    </section>
+</main>
+</body>
+</html>

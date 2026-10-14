@@ -66,8 +66,16 @@ public class ApplyService {
         this.sync = sync;
     }
 
-    /** 적용이나 되돌리기가 기록할 버전의 출처. */
-    public record Origin(String actor, String message, VersionSource source, Long rolledBackToId) {
+    /**
+     * 적용이나 되돌리기가 기록할 버전의 출처.
+     *
+     * @param onSuccess 반영에 성공하면 같은 트랜잭션 안에서, 사이트 동기화보다 먼저 실행한다(인증서 활성화 등)
+     */
+    public record Origin(String actor, String message, VersionSource source, Long rolledBackToId, Runnable onSuccess) {
+
+        public Origin(String actor, String message, VersionSource source, Long rolledBackToId) {
+            this(actor, message, source, rolledBackToId, null);
+        }
     }
 
     /** @param actor 적용한 사용자. 시스템 작업이면 null */
@@ -170,7 +178,11 @@ public class ApplyService {
             ConfigVersion version = new ConfigVersion(author, origin.message(), origin.source(), result, detail)
                     .rolledBackTo(origin.rolledBackToId());
             if (result == VersionResult.SUCCESS) {
-                sync.sync(changes, false);
+                if (origin.onSuccess() != null) {
+                    origin.onSuccess().run();
+                }
+                // 사용자 적용만 초안을 비운다. 시스템 작업(인증서 등)은 사용자가 쓰던 초안을 건드리지 않는다
+                sync.sync(changes, origin.source() != VersionSource.APPLY && origin.source() != VersionSource.ROLLBACK);
                 // 성공한 버전은 되돌리기에 쓰도록 관리 중인 모든 파일의 내용을 남긴다
                 sync.snapshot(version);
             } else {
@@ -179,7 +191,15 @@ public class ApplyService {
             return versionRepository.save(version).getId();
         });
         List<String> paths = changes.stream().map(FileChange::path).toList();
-        AuditAction action = origin.source() == VersionSource.ROLLBACK ? AuditAction.ROLLBACK : AuditAction.APPLY;
+        if (result == VersionResult.SUCCESS) {
+            events.publishEvent(new ConfigAppliedEvent(versionId, origin.source(), paths));
+        }
+        AuditAction action = switch (origin.source()) {
+            case ROLLBACK -> AuditAction.ROLLBACK;
+            case CERT_ISSUE -> AuditAction.CERT_ISSUE;
+            case CERT_RENEW -> AuditAction.CERT_RENEW;
+            default -> AuditAction.APPLY;
+        };
         events.publishEvent(result == VersionResult.SUCCESS
                 ? AuditEvent.success(origin.actor(), action, "version:" + versionId)
                 : AuditEvent.failure(origin.actor(), action, "version:" + versionId, result.name()));

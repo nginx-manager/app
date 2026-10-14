@@ -2,6 +2,7 @@ package net.nginxmanager.site;
 
 import net.nginxmanager.audit.AuditAction;
 import net.nginxmanager.audit.AuditEvent;
+import net.nginxmanager.cert.CertificateRegistry;
 import net.nginxmanager.common.ConcurrentEditException;
 import net.nginxmanager.common.NotFoundException;
 import net.nginxmanager.config.ConfigFile;
@@ -18,15 +19,18 @@ public class SiteService {
     private final SiteRepository siteRepository;
     private final ConfigFileRepository configFileRepository;
     private final ConfigFileStore store;
-    private final SiteConfigRenderer renderer;
+    private final SiteRendering rendering;
+    private final CertificateRegistry certificateRegistry;
     private final ApplicationEventPublisher events;
 
     public SiteService(SiteRepository siteRepository, ConfigFileRepository configFileRepository,
-                       ConfigFileStore store, SiteConfigRenderer renderer, ApplicationEventPublisher events) {
+                       ConfigFileStore store, SiteRendering rendering, CertificateRegistry certificateRegistry,
+                       ApplicationEventPublisher events) {
         this.siteRepository = siteRepository;
         this.configFileRepository = configFileRepository;
         this.store = store;
-        this.renderer = renderer;
+        this.rendering = rendering;
+        this.certificateRegistry = certificateRegistry;
         this.events = events;
     }
 
@@ -38,10 +42,11 @@ public class SiteService {
             throw new DuplicateSiteException(domain);
         }
         ConfigFile file = configFileRepository.save(new ConfigFile(path, true));
-        file.stageContent(renderer.render(domain, form));
         Site site = new Site(domain, form.type(), file);
         site.applyForm(form);
+        site.linkCertificate(certificateFor(domain, form));
         siteRepository.save(site);
+        file.stageContent(rendering.render(domain, form, site.getCertificateId()));
         events.publishEvent(AuditEvent.success(actor, AuditAction.SITE_SAVE, "site:" + domain));
         return site;
     }
@@ -51,7 +56,8 @@ public class SiteService {
         Site site = load(siteId);
         requireVersion(site.getVersion(), form.version(), "site " + site.getPrimaryDomain());
         site.applyForm(form);
-        site.getConfigFile().stageContent(renderer.render(site.getPrimaryDomain(), form));
+        site.linkCertificate(certificateFor(site.getPrimaryDomain(), form));
+        site.getConfigFile().stageContent(rendering.render(site.getPrimaryDomain(), form, site.getCertificateId()));
         events.publishEvent(AuditEvent.success(actor, AuditAction.SITE_SAVE, "site:" + site.getPrimaryDomain()));
         return site;
     }
@@ -106,6 +112,39 @@ public class SiteService {
             file.discardDraft();
         }
         events.publishEvent(AuditEvent.success(actor, AuditAction.SITE_SAVE, "discard:" + file.getPath()));
+    }
+
+    /**
+     * 이미 서비스 중인 폼 사이트에 Let's Encrypt HTTPS를 켠다. 인증서가 없으면 설정은 그대로이고,
+     * 발급이 끝나면 HTTPS 설정이 자동으로 적용된다.
+     *
+     * @return 발급할 인증서 id
+     */
+    @Transactional
+    public long enableLetsEncrypt(long siteId, String actor) {
+        Site site = load(siteId);
+        if (site.getType() == SiteType.RAW) {
+            throw new IllegalStateException("raw sites manage TLS in their own config");
+        }
+        SiteForm form = rendering.formOf(site);
+        SiteForm https = new SiteForm(form.primaryDomain(), form.extraDomains(), form.type(), form.listenHttpPort(),
+                form.staticRoot(), form.proxyTarget(), form.version(), true, form.redirectHttpToHttps(), null);
+        long certificateId = certificateRegistry.letsEncryptFor(site.getPrimaryDomain(),
+                https.certificateDomains(site.getPrimaryDomain()));
+        site.applyForm(https);
+        site.enableHttps(certificateId);
+        events.publishEvent(AuditEvent.success(actor, AuditAction.SITE_SAVE, "site:" + site.getPrimaryDomain() + " https"));
+        return certificateId;
+    }
+
+    private Long certificateFor(String domain, SiteForm form) {
+        if (!form.httpsEnabled()) {
+            return null;
+        }
+        if (form.certificateId() != null) {
+            return certificateRegistry.requireUploaded(form.certificateId());
+        }
+        return certificateRegistry.letsEncryptFor(domain, form.certificateDomains(domain));
     }
 
     private Site load(long siteId) {

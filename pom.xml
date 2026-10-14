@@ -23,6 +23,7 @@
         <sqlite-jdbc.version>3.53.4.0</sqlite-jdbc.version>
         <archunit.version>1.4.1</archunit.version>
         <htmx.version>2.0.5</htmx.version>
+        <acme4j.version>5.1.0</acme4j.version>
         <java-diff-utils.version>4.17</java-diff-utils.version>
     </properties>
 
@@ -72,6 +73,15 @@
             <version>${openfeign-querydsl.version}</version>
         </dependency>
 
+        <dependency>
+            <groupId>org.shredzone.acme4j</groupId>
+            <artifactId>acme4j-client</artifactId>
+            <version>${acme4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
         <dependency>
             <groupId>io.github.java-diff-utils</groupId>
             <artifactId>java-diff-utils</artifactId>

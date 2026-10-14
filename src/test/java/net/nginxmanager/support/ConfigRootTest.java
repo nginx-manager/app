@@ -1,9 +1,12 @@
 package net.nginxmanager.support;
 
 import net.nginxmanager.audit.AuditLogRepository;
+import net.nginxmanager.cert.AcmeSettingsRepository;
+import net.nginxmanager.cert.TlsCertificateRepository;
 import net.nginxmanager.config.ConfigFileRepository;
 import net.nginxmanager.config.ConfigVersionRepository;
 import net.nginxmanager.history.DriftDetector;
+import net.nginxmanager.notify.NotificationChannelRepository;
 import net.nginxmanager.site.SiteRepository;
 import net.nginxmanager.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,11 +52,20 @@ public abstract class ConfigRootTest {
     protected AuditLogRepository auditLogRepository;
     @Autowired
     protected DriftDetector driftDetector;
+    @Autowired
+    protected TlsCertificateRepository certificateRepository;
+    @Autowired
+    protected NotificationChannelRepository channelRepository;
+    @Autowired
+    protected AcmeSettingsRepository acmeSettingsRepository;
 
     @BeforeEach
     void resetState() throws IOException {
         nginx.reset();
         siteRepository.deleteAll();
+        certificateRepository.deleteAll();
+        channelRepository.deleteAll();
+        acmeSettingsRepository.deleteAll();
         configFileRepository.deleteAll();
         // 되돌리기 버전이 이전 버전을 참조하므로 최신부터 지운다
         configVersionRepository.deleteAll(configVersionRepository.findAll(Sort.by(Sort.Direction.DESC, "id")));

@@ -6,7 +6,9 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.stream.Collectors;
 
 /**
@@ -24,7 +26,23 @@ public record SiteForm(
         int listenHttpPort,
         String staticRoot,
         String proxyTarget,
-        Long version) {
+        Long version,
+        Boolean httpsEnabled,
+        Boolean redirectHttpToHttps,
+        /** 업로드한 인증서. null이면 Let's Encrypt로 자동 발급한다. */
+        Long certificateId) {
+
+    /** 체크박스 값이 아예 없으면(폼 밖의 요청) HTTPS는 끄고, 켰을 때 HTTP는 HTTPS로 넘긴다. */
+    public SiteForm {
+        httpsEnabled = httpsEnabled != null && httpsEnabled;
+        redirectHttpToHttps = redirectHttpToHttps == null || redirectHttpToHttps;
+    }
+
+    /** HTTPS 없이 쓰던 폼. */
+    public SiteForm(String primaryDomain, String extraDomains, SiteType type, int listenHttpPort, String staticRoot,
+                    String proxyTarget, Long version) {
+        this(primaryDomain, extraDomains, type, listenHttpPort, staticRoot, proxyTarget, version, false, true, null);
+    }
 
     static final String DOMAIN =
             "(?=.{1,253}$)([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)*[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?";
@@ -33,7 +51,7 @@ public record SiteForm(
     private static final String PROXY_TARGET = "https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?(/[A-Za-z0-9._~/-]*)?";
 
     public static SiteForm empty() {
-        return new SiteForm("", "", SiteType.PROXY, 80, "", "", null);
+        return new SiteForm("", "", SiteType.PROXY, 80, "", "", null, false, true, null);
     }
 
     public String extraDomainsNormalized() {
@@ -58,6 +76,24 @@ public record SiteForm(
     @AssertTrue(message = "프록시 대상은 http://호스트:포트 형식이어야 합니다.")
     public boolean isProxyTargetValid() {
         return type != SiteType.PROXY || (proxyTarget != null && proxyTarget.matches(PROXY_TARGET));
+    }
+
+    @AssertTrue(message = "와일드카드 도메인(*.)은 Let's Encrypt 자동 발급(HTTP 인증)으로 받을 수 없습니다. 인증서를 업로드해 주세요.")
+    public boolean isLetsEncryptDomainsValid() {
+        String normalized = extraDomainsNormalized();
+        return !httpsEnabled || certificateId != null || normalized == null || !normalized.contains("*");
+    }
+
+    /** Let's Encrypt로 받을 도메인 목록(대표 도메인 먼저). */
+    public List<String> certificateDomains(String primary) {
+        List<String> domains = new ArrayList<>();
+        domains.add(primary);
+        String normalized = extraDomainsNormalized();
+        if (normalized != null) {
+            Arrays.stream(normalized.split(" ")).map(String::toLowerCase).filter(d -> !domains.contains(d))
+                    .forEach(domains::add);
+        }
+        return domains;
     }
 
     @AssertTrue(message = "원문 편집 사이트는 폼으로 만들 수 없습니다.")

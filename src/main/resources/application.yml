@@ -8,6 +8,14 @@ server:
 
 nginx-manager:
   data-dir: /data
+  acme:
+    # 비워 두면 화면의 Let's Encrypt 설정(운영/스테이징)을 따른다. 시험용 ACME 서버를 쓸 때만 지정한다
+    directory-url:
+    webroot: /var/lib/nginx-manager/acme-webroot
+    account-dir: ${nginx-manager.data-dir}/acme
+  cert:
+    # 갱신이 필요한 인증서를 찾는 주기
+    check-interval: PT6H
 
 spring:
   application:
@@ -42,6 +50,10 @@ nginx:
     health-timeout: 10s
 
 management:
+  health:
+    # 메일 서버는 알림 채널을 쓸 때만 필요하다. 연결이 안 돼도 서비스 상태로 보지 않는다
+    mail:
+      enabled: false
   endpoints:
     web:
       exposure:

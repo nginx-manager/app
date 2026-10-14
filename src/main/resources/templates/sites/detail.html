@@ -10,6 +10,7 @@
         <span th:unless="${site.enabled}" class="badge">비활성</span>
         <span th:if="${site.configFile.hasPendingChange()}" class="badge warn">적용 대기</span>
     </div>
+    <p class="notice" th:if="${notice}" th:text="${notice}">완료</p>
     <p class="notice" th:if="${param.saved}">초안을 저장했습니다. <a th:href="@{/apply}">적용 화면</a>에서 반영하세요.</p>
 
     <div class="columns">
@@ -38,7 +39,39 @@
                 <label>HTTP 포트
                     <input type="number" th:field="*{listenHttpPort}" th:disabled="${!currentUser.canEdit()}">
                 </label>
+                <fieldset>
+                    <legend>HTTPS</legend>
+                    <label class="inline"><input type="checkbox" th:disabled="${!currentUser.canEdit()}" th:field="*{httpsEnabled}"> HTTPS 사용 (443)</label>
+                    <label class="inline"><input type="checkbox" th:disabled="${!currentUser.canEdit()}" th:field="*{redirectHttpToHttps}"> HTTP 요청을 HTTPS로 넘기기</label>
+                    <label>인증서
+                        <select th:disabled="${!currentUser.canEdit()}" th:field="*{certificateId}">
+                            <option value="">Let's Encrypt 자동 발급</option>
+                            <option th:each="c : ${uploadedCertificates}" th:value="${c.id}" th:text="${c.name} + ' (업로드)'">wildcard</option>
+                        </select>
+                    </label>
+                    <span class="error" th:errors="*{letsEncryptDomainsValid}"></span>
+                    <p class="muted small">Let's Encrypt를 고르면 적용 후 인증서를 받아 자동으로 HTTPS 설정을 다시 적용합니다. 인증서를 받기 전까지는 HTTP로만 응답합니다.</p>
+                </fieldset>
                 <button type="submit" th:if="${currentUser.canEdit()}">초안 저장</button>
+            </form>
+        </section>
+        <section class="card" id="https" th:if="${site.type.name() != 'RAW'}">
+            <h2>HTTPS 인증서</h2>
+            <th:block th:if="${certificate}">
+                <p>
+                    <a th:href="@{/certs#cert-{id}(id=${certificate.id})}" th:text="${certificate.name}">app.local</a>
+                    <span th:if="${certificate.status.name() == 'ACTIVE'}" class="badge ok">발급됨</span>
+                    <span th:if="${certificate.status.name() == 'PENDING'}" class="badge warn">발급 대기</span>
+                    <span th:if="${certificate.isFailing()}" class="badge bad">실패</span>
+                </p>
+                <p class="small" th:if="${certificate.notAfter}" th:text="'만료 ' + ${#temporals.format(certificate.notAfter, 'yyyy-MM-dd')}">만료</p>
+                <p class="small error" th:if="${certificate.isFailing()}" th:text="${certificate.lastError}"></p>
+            </th:block>
+            <p class="muted" th:unless="${certificate}">HTTPS를 쓰지 않습니다.</p>
+            <form th:if="${currentUser.canEdit() and !site.httpsEnabled}" th:action="@{/certs/letsencrypt}" method="post">
+                <input type="hidden" name="siteId" th:value="${site.id}">
+                <button type="submit">HTTPS 켜기 (Let's Encrypt)</button>
+                <p class="muted small">인증서를 받아 HTTPS 설정까지 자동으로 적용합니다. 도메인이 이 서버로 연결돼 있어야 합니다.</p>
             </form>
         </section>
         <section class="card" th:if="${site.type.name() == 'RAW'}">
