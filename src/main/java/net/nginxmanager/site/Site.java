@@ -58,6 +58,23 @@ public class Site extends BaseEntity {
     @Column(name = "proxy_load_balancing", nullable = false, length = 20)
     private LoadBalancing proxyLoadBalancing = LoadBalancing.ROUND_ROBIN;
 
+    @Column(name = "redirect_target", length = 2048)
+    private String redirectTarget;
+
+    @Column(name = "redirect_code")
+    private Integer redirectCode;
+
+    @Column(name = "redirect_keep_path", nullable = false)
+    private boolean redirectKeepPath = true;
+
+    /** 모듈 옵션({@link SiteOptions}, Properties 형식). 비밀번호는 담지 않는다. null이면 모두 끔. */
+    @Column(name = "options", columnDefinition = "TEXT")
+    private String options;
+
+    /** 비밀번호 보호 사용자의 htpasswd 줄(이름:해시). 디스크 파일은 {@link Htpasswd#path}. */
+    @Column(name = "auth_htpasswd", columnDefinition = "TEXT")
+    private String authHtpasswd;
+
     @Column(nullable = false)
     private boolean enabled = true;
 
@@ -102,8 +119,56 @@ public class Site extends BaseEntity {
         this.proxyConnectTimeout = proxy ? form.proxyConnectTimeout() : null;
         this.proxyReadTimeout = proxy ? form.proxyReadTimeout() : null;
         this.proxyLoadBalancing = proxy ? form.proxyLoadBalancing() : LoadBalancing.ROUND_ROBIN;
+        boolean redirect = form.type() == SiteType.REDIRECT;
+        this.redirectTarget = redirect ? form.redirectTargetNormalized() : null;
+        this.redirectCode = redirect ? form.redirectCode() : null;
+        this.redirectKeepPath = !redirect || form.redirectKeepPath();
         this.httpsEnabled = form.httpsEnabled();
         this.redirectHttpToHttps = form.redirectHttpToHttps();
+        this.options = serialize(form.options().forType(form.type()).withoutPasswords());
+    }
+
+    /** 비밀번호 보호 사용자 해시를 바꾼다. 비어 있으면 null. */
+    void updateHtpasswd(String htpasswd) {
+        this.authHtpasswd = htpasswd == null || htpasswd.isEmpty() ? null : htpasswd;
+    }
+
+    public String getAuthHtpasswd() {
+        return authHtpasswd;
+    }
+
+    public SiteOptions getOptions() {
+        if (options == null) {
+            return SiteOptions.DEFAULTS;
+        }
+        Properties values = new Properties();
+        try {
+            values.load(new StringReader(options));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return SiteOptions.load(values, "");
+    }
+
+    private static String serialize(SiteOptions value) {
+        if (value.equals(SiteOptions.DEFAULTS)) {
+            return null;
+        }
+        Properties values = new Properties();
+        value.store(values, "");
+        return store(values);
+    }
+
+    private static String store(Properties values) {
+        StringWriter out = new StringWriter();
+        try {
+            values.store(out, null);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        // Properties.store가 첫 줄에 붙이는 날짜 주석은 비교에 방해가 되므로 뺀다
+        return out.toString().lines().filter(line -> !line.startsWith("#"))
+                .collect(java.util.stream.Collectors.joining("\n", "", "\n"));
     }
 
     /** 사이트 파일이 적용되었다: 지금 폼 값이 nginx에 반영된 값이다. */
@@ -121,13 +186,12 @@ public class Site extends BaseEntity {
         putIfPresent(values, "certificateId", certificateId);
         putIfPresent(values, "proxyConnectTimeout", proxyConnectTimeout);
         putIfPresent(values, "proxyReadTimeout", proxyReadTimeout);
-        StringWriter out = new StringWriter();
-        try {
-            values.store(out, null);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-        this.appliedSettings = out.toString();
+        putIfPresent(values, "redirectTarget", redirectTarget);
+        putIfPresent(values, "redirectCode", redirectCode);
+        values.setProperty("redirectKeepPath", Boolean.toString(redirectKeepPath));
+        putIfPresent(values, "authHtpasswd", authHtpasswd);
+        getOptions().store(values, "opt.");
+        this.appliedSettings = store(values);
     }
 
     /**
@@ -152,6 +216,11 @@ public class Site extends BaseEntity {
         certificateId = longOrNull(values.getProperty("certificateId"));
         proxyConnectTimeout = intOrNull(values.getProperty("proxyConnectTimeout"));
         proxyReadTimeout = intOrNull(values.getProperty("proxyReadTimeout"));
+        redirectTarget = values.getProperty("redirectTarget");
+        redirectCode = intOrNull(values.getProperty("redirectCode"));
+        redirectKeepPath = !"false".equals(values.getProperty("redirectKeepPath"));
+        authHtpasswd = values.getProperty("authHtpasswd");
+        options = serialize(SiteOptions.load(values, "opt."));
         return true;
     }
 
@@ -168,7 +237,9 @@ public class Site extends BaseEntity {
                 Boolean.parseBoolean(values.getProperty("redirectHttpToHttps")), uploadedCertificateId,
                 Boolean.parseBoolean(values.getProperty("proxyWebsocket")),
                 intOrNull(values.getProperty("proxyConnectTimeout")), intOrNull(values.getProperty("proxyReadTimeout")),
-                LoadBalancing.valueOf(values.getProperty("proxyLoadBalancing")));
+                LoadBalancing.valueOf(values.getProperty("proxyLoadBalancing")), values.getProperty("redirectTarget"),
+                intOrNull(values.getProperty("redirectCode")),
+                !"false".equals(values.getProperty("redirectKeepPath")), SiteOptions.load(values, "opt."));
     }
 
     /** 마지막으로 반영된 값에서 쓰던 인증서. 기록이 없으면 지금 값. */
@@ -231,7 +302,8 @@ public class Site extends BaseEntity {
     public SiteForm toForm(Long uploadedCertificateId) {
         return new SiteForm(primaryDomain, extraDomains == null ? "" : extraDomains, type, listenHttpPort,
                 staticRoot, proxyTarget, getVersion(), httpsEnabled, redirectHttpToHttps, uploadedCertificateId,
-                proxyWebsocket, proxyConnectTimeout, proxyReadTimeout, proxyLoadBalancing);
+                proxyWebsocket, proxyConnectTimeout, proxyReadTimeout, proxyLoadBalancing, redirectTarget,
+                redirectCode, redirectKeepPath, getOptions());
     }
 
     public boolean isHttpsEnabled() {
@@ -284,6 +356,18 @@ public class Site extends BaseEntity {
 
     public LoadBalancing getProxyLoadBalancing() {
         return proxyLoadBalancing;
+    }
+
+    public String getRedirectTarget() {
+        return redirectTarget;
+    }
+
+    public Integer getRedirectCode() {
+        return redirectCode;
+    }
+
+    public boolean isRedirectKeepPath() {
+        return redirectKeepPath;
     }
 
     public boolean isEnabled() {

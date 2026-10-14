@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ko" th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org">
+<body>
+<!-- 사이트 추가·수정 폼이 함께 쓰는 리디렉션 항목. th:object 안에서 넣는다 -->
+<th:block th:fragment="redirect(editable)">
+    <details class="redirect-options" th:open="${form?.type?.name() == 'REDIRECT'}">
+        <summary th:text="#{sites.redirect.title}">리디렉션 (유형이 리디렉션일 때)</summary>
+        <label><th:block th:text="#{sites.redirect.target}">보낼 주소</th:block>
+            <span class="hint" th:text="#{sites.redirect.target.hint}">요청을 넘길 주소입니다.</span>
+            <input type="text" th:field="*{redirectTarget}" placeholder="https://new.example.com" th:disabled="${!editable}">
+            <span class="error" th:errors="*{redirectTargetValid}"></span>
+            <span class="error" th:errors="*{redirectKeepPathValid}"></span>
+        </label>
+        <label><th:block th:text="#{sites.redirect.code}">응답 코드</th:block>
+            <select th:field="*{redirectCode}" th:disabled="${!editable}">
+                <option th:each="code : ${T(net.nginxmanager.site.SiteForm).REDIRECT_CODES}" th:value="${code}" th:text="#{|sites.redirect.code.${code}|}">301</option>
+            </select>
+            <span class="error" th:errors="*{redirectCodeValid}"></span>
+        </label>
+        <label class="inline"><input type="checkbox" th:field="*{redirectKeepPath}" th:disabled="${!editable}"> <th:block th:text="#{sites.redirect.keepPath}">요청 경로와 쿼리를 그대로 붙이기</th:block></label>
+        <p class="hint" th:text="#{sites.redirect.keepPath.hint}">켜면 /a?b=1 요청을 새 주소/a?b=1로 넘깁니다.</p>
+    </details>
+</th:block>
+
+<!-- 유형과 관계없이 켜는 모듈 설정(접근 제한, 속도 제한, 성능·보안) -->
+<th:block th:fragment="options(editable)">
+    <details class="site-options" th:open="${form?.options?.accessRestricted() == true or form?.options?.authEnabled() == true}">
+        <summary th:text="#{sites.opt.access.title}">접근 제한 (IP, 비밀번호)</summary>
+        <p class="hint" th:text="#{sites.opt.access.intro}">설명</p>
+        <label><th:block th:text="#{sites.opt.allowFrom}">허용할 주소</th:block>
+            <span class="hint" th:text="#{sites.opt.allowFrom.hint}">설명</span>
+            <textarea th:field="*{options.allowFrom}" rows="2" placeholder="10.0.0.0/8&#10;203.0.113.7" th:disabled="${!editable}"></textarea>
+            <span class="error" th:errors="*{options.allowFromValid}"></span>
+        </label>
+        <label><th:block th:text="#{sites.opt.denyFrom}">차단할 주소</th:block>
+            <span class="hint" th:text="#{sites.opt.denyFrom.hint}">설명</span>
+            <textarea th:field="*{options.denyFrom}" rows="2" placeholder="198.51.100.0/24" th:disabled="${!editable}"></textarea>
+            <span class="error" th:errors="*{options.denyFromValid}"></span>
+        </label>
+        <label><th:block th:text="#{sites.opt.authUsers}">비밀번호 보호 사용자</th:block>
+            <span class="hint" th:text="#{sites.opt.authUsers.hint}">설명</span>
+            <textarea th:field="*{options.authUsers}" rows="3" placeholder="kim:new-password&#10;lee" autocomplete="off" spellcheck="false" th:disabled="${!editable}"></textarea>
+            <span class="error" th:errors="*{options.authUsersValid}"></span>
+            <span class="error" th:errors="*{options.authUsers}"></span>
+        </label>
+        <label class="inline"><input type="checkbox" th:field="*{options.satisfyAny}" value="true" th:disabled="${!editable}"> <th:block th:text="#{sites.opt.satisfyAny}">허용 주소이거나 비밀번호가 맞으면 통과</th:block></label>
+        <p class="hint" th:text="#{sites.opt.satisfyAny.hint}">설명</p>
+    </details>
+
+    <details class="site-options" th:open="${form?.options?.rateLimit != null or form?.options?.connLimit != null}">
+        <summary th:text="#{sites.opt.limit.title}">요청 속도·동시 연결 제한</summary>
+        <p class="hint" th:text="#{sites.opt.limit.intro}">설명</p>
+        <label><th:block th:text="#{sites.opt.rateLimit}">IP당 초당 요청 수</th:block>
+            <span class="hint" th:text="#{sites.opt.rateLimit.hint}">설명</span>
+            <input type="number" th:field="*{options.rateLimit}" min="1" max="100000" th:disabled="${!editable}">
+            <span class="error" th:errors="*{options.rateLimit}"></span>
+        </label>
+        <label><th:block th:text="#{sites.opt.rateBurst}">버스트</th:block>
+            <span class="hint" th:text="#{sites.opt.rateBurst.hint}">설명</span>
+            <input type="number" th:field="*{options.rateBurst}" min="0" max="100000" th:disabled="${!editable}">
+            <span class="error" th:errors="*{options.rateBurst}"></span>
+        </label>
+        <label><th:block th:text="#{sites.opt.connLimit}">IP당 동시 연결 수</th:block>
+            <span class="hint" th:text="#{sites.opt.connLimit.hint}">설명</span>
+            <input type="number" th:field="*{options.connLimit}" min="1" max="100000" th:disabled="${!editable}">
+            <span class="error" th:errors="*{options.connLimit}"></span>
+        </label>
+    </details>
+
+    <details class="site-options">
+        <summary th:text="#{sites.opt.perf.title}">성능·보안 (압축, 헤더, HTTP/3, 실제 IP, 캐시)</summary>
+        <label class="inline"><input type="checkbox" th:field="*{options.gzip}" value="true" th:disabled="${!editable}"> <th:block th:text="#{sites.opt.gzip}">응답 압축 (gzip)</th:block></label>
+        <p class="hint" th:text="#{sites.opt.gzip.hint}">설명</p>
+        <label class="inline"><input type="checkbox" th:field="*{options.securityHeaders}" value="true" th:disabled="${!editable}"> <th:block th:text="#{sites.opt.securityHeaders}">보안 헤더</th:block></label>
+        <p class="hint" th:text="#{sites.opt.securityHeaders.hint}">설명</p>
+        <label class="inline"><input type="checkbox" th:field="*{options.hsts}" value="true" th:disabled="${!editable}"> <th:block th:text="#{sites.opt.hsts}">HSTS</th:block></label>
+        <p class="hint" th:text="#{sites.opt.hsts.hint}">설명</p>
+        <label class="inline"><input type="checkbox" th:field="*{options.http3}" value="true" th:disabled="${!editable}"> <th:block th:text="#{sites.opt.http3}">HTTP/3 (QUIC)</th:block></label>
+        <p class="hint" th:text="#{sites.opt.http3.hint}">설명</p>
+        <p class="hint error" th:if="${http3Ready != null and !http3Ready}" th:text="#{sites.opt.http3.notReady}">nginx.conf에 443 기본 서버가 없습니다.</p>
+        <span class="error" th:errors="*{httpsOptionsValid}"></span>
+        <label><th:block th:text="#{sites.opt.maxBodySize}">최대 요청 크기(MB)</th:block>
+            <span class="hint" th:text="#{sites.opt.maxBodySize.hint}">설명</span>
+            <input type="number" th:field="*{options.maxBodySizeMb}" min="0" max="10240" th:disabled="${!editable}">
+            <span class="error" th:errors="*{options.maxBodySizeMb}"></span>
+        </label>
+        <label><th:block th:text="#{sites.opt.realIpFrom}">믿을 프록시 주소 (실제 클라이언트 IP)</th:block>
+            <span class="hint" th:text="#{sites.opt.realIpFrom.hint}">설명</span>
+            <textarea th:field="*{options.realIpFrom}" rows="2" placeholder="10.0.0.0/8" th:disabled="${!editable}"></textarea>
+            <span class="error" th:errors="*{options.realIpFromValid}"></span>
+        </label>
+        <label><th:block th:text="#{sites.opt.realIpHeader}">실제 IP가 담긴 헤더</th:block>
+            <select th:field="*{options.realIpHeader}" th:disabled="${!editable}">
+                <option th:each="h : ${T(net.nginxmanager.site.SiteOptions.RealIpHeader).values()}" th:value="${h}" th:text="${h.header()}">X-Forwarded-For</option>
+            </select>
+        </label>
+        <label><th:block th:text="#{sites.opt.cacheMinutes}">프록시 캐시 유지 시간(분)</th:block>
+            <span class="hint" th:text="#{sites.opt.cacheMinutes.hint}">설명</span>
+            <input type="number" th:field="*{options.cacheMinutes}" min="1" max="525600" th:disabled="${!editable}">
+            <span class="error" th:errors="*{options.cacheMinutes}"></span>
+        </label>
+        <label class="inline"><input type="checkbox" th:field="*{options.autoindex}" value="true" th:disabled="${!editable}"> <th:block th:text="#{sites.opt.autoindex}">디렉터리 목록 보이기</th:block></label>
+        <p class="hint" th:text="#{sites.opt.autoindex.hint}">설명</p>
+    </details>
+</th:block>
+</body>
+</html>

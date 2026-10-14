@@ -64,6 +64,7 @@ public class SiteService {
         Site site = new Site(domain, form.type(), file);
         site.applyForm(form);
         site.linkCertificate(certificateFor(domain, form));
+        stageHtpasswd(site, form);
         siteRepository.save(site);
         file.stageContent(rendering.render(domain, form, site.getCertificateId()));
         events.publishEvent(AuditEvent.success(actor, AuditAction.SITE_SAVE, "site:" + domain));
@@ -81,6 +82,7 @@ public class SiteService {
             throw new IllegalStateException("raw sites are edited in the file editor");
         }
         requireUnusedDomains(site.getId(), site.getPrimaryDomain(), form);
+        stageHtpasswd(site, form);
         site.applyForm(form);
         site.linkCertificate(certificateFor(site.getPrimaryDomain(), form));
         site.getConfigFile().stageContent(rendering.render(site.getPrimaryDomain(), form, site.getCertificateId()));
@@ -140,6 +142,26 @@ public class SiteService {
     private void doDiscard(long configFileId, String actor) {
         ConfigFile file = configFileRepository.findById(configFileId)
                 .orElseThrow(() -> new NotFoundException("config file " + configFileId));
+        // 사이트 파일과 그 사이트의 비밀번호 파일은 한 번의 저장으로 함께 바뀌므로 함께 버린다
+        ConfigFile paired = pairedFile(file);
+        discardOne(file);
+        if (paired != null && paired.hasPendingChange()) {
+            discardOne(paired);
+        }
+        events.publishEvent(AuditEvent.success(actor, AuditAction.SITE_SAVE, "discard:" + file.getPath()));
+    }
+
+    private ConfigFile pairedFile(ConfigFile file) {
+        if (file.getPath().startsWith(Htpasswd.DIR)) {
+            String domain = file.getPath().substring(Htpasswd.DIR.length());
+            return siteRepository.findByPrimaryDomain(domain).map(Site::getConfigFile).orElse(null);
+        }
+        String domain = SitePaths.domainOf(file.getPath());
+        return domain == null ? null : configFileRepository.findByPath(Htpasswd.path(domain)).orElse(null);
+    }
+
+    private void discardOne(ConfigFile file) {
+        long configFileId = file.getId();
         if (!revertMove(file)) {
             boolean neverWritten = isNeverWritten(file);
             if (neverWritten && file.isDraftDelete()) {
@@ -155,7 +177,40 @@ public class SiteService {
                         .ifPresent(Site::restoreApplied);
             }
         }
-        events.publishEvent(AuditEvent.success(actor, AuditAction.SITE_SAVE, "discard:" + file.getPath()));
+    }
+
+    /**
+     * 폼의 비밀번호 보호 사용자로 htpasswd 파일 초안을 만든다. 비밀번호는 해시로만 파일과 사이트에 남는다.
+     * 사용자를 모두 지우면 파일 삭제 초안을 만든다.
+     */
+    private void stageHtpasswd(Site site, SiteForm form) {
+        String content;
+        try {
+            content = Htpasswd.merge(site.getAuthHtpasswd(), form.options().authEntries());
+        } catch (IllegalArgumentException e) {
+            throw new MissingPasswordException(e.getMessage());
+        }
+        String path = Htpasswd.path(site.getPrimaryDomain());
+        ConfigFile file = configFileRepository.findByPath(path).orElse(null);
+        String current = file != null && file.getDraftContent() != null ? file.getDraftContent()
+                : file != null && file.isDraftDelete() ? null : store.read(path);
+        if (java.util.Objects.equals(current, content)) {
+            site.updateHtpasswd(content);
+            return;
+        }
+        if (content != null) {
+            if (file == null) {
+                file = configFileRepository.save(new ConfigFile(path, true));
+            }
+            file.stageContent(content);
+        } else if (file != null) {
+            if (store.read(path) == null) {
+                configFileRepository.delete(file);
+            } else {
+                file.stageDelete();
+            }
+        }
+        site.updateHtpasswd(content);
     }
 
     /**

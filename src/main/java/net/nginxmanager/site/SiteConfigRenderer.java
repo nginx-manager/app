@@ -27,6 +27,7 @@ public class SiteConfigRenderer {
         if (form.type() == SiteType.PROXY) {
             proxyPrelude(out, primaryDomain, form);
         }
+        optionPrelude(out, primaryDomain, form);
         String serverNames = form.extraDomainsNormalized() == null
                 ? primaryDomain
                 : primaryDomain + " " + form.extraDomainsNormalized();
@@ -34,6 +35,7 @@ public class SiteConfigRenderer {
                 .append("    listen ").append(form.listenHttpPort()).append(";\n")
                 .append("    server_name ").append(serverNames).append(";\n\n");
         logs(out, primaryDomain);
+        serverOptions(out, form);
         out.append("    location ^~ /.well-known/acme-challenge/ {\n")
                 .append("        root /var/lib/nginx-manager/acme-webroot;\n")
                 .append("        default_type text/plain;\n")
@@ -43,19 +45,24 @@ public class SiteConfigRenderer {
                     .append("        return 301 https://$host$request_uri;\n")
                     .append("    }\n");
         } else {
-            content(out, primaryDomain, form);
+            content(out, primaryDomain, form, false);
         }
         out.append("}\n");
         if (https) {
             out.append("\nserver {\n")
-                    .append("    listen 443 ssl;\n")
-                    .append("    http2 on;\n")
+                    .append("    listen 443 ssl;\n");
+            if (form.options().http3()) {
+                // reuseport는 주소마다 한 번만 쓸 수 있어 nginx.conf의 443 기본 서버에 둔다
+                out.append("    listen 443 quic;\n");
+            }
+            out.append("    http2 on;\n")
                     .append("    server_name ").append(serverNames).append(";\n\n")
                     .append("    ssl_certificate ").append(tls.certPath()).append(";\n")
                     .append("    ssl_certificate_key ").append(tls.keyPath()).append(";\n")
                     .append("    ssl_protocols TLSv1.2 TLSv1.3;\n\n");
             logs(out, primaryDomain);
-            content(out, primaryDomain, form);
+            serverOptions(out, form);
+            content(out, primaryDomain, form, true);
             out.append("}\n");
         }
         return out.toString();
@@ -66,16 +73,150 @@ public class SiteConfigRenderer {
                 .append("    error_log /var/log/nginx/sites/").append(primaryDomain).append(".error.log;\n\n");
     }
 
-    private static void content(StringBuilder out, String primaryDomain, SiteForm form) {
+    private static void content(StringBuilder out, String primaryDomain, SiteForm form, boolean https) {
         switch (form.type()) {
-            case PROXY -> proxyLocation(out, primaryDomain, form);
-            case STATIC -> out
-                    .append("    root ").append(form.staticRoot()).append(";\n")
-                    .append("    index index.html;\n\n")
-                    .append("    location / {\n")
-                    .append("        try_files $uri $uri/ =404;\n")
-                    .append("    }\n");
+            case PROXY -> proxyLocation(out, primaryDomain, form, https);
+            case STATIC -> {
+                out.append("    root ").append(form.staticRoot()).append(";\n")
+                        .append("    index index.html;\n\n")
+                        .append("    location / {\n");
+                locationOptions(out, primaryDomain, form, https);
+                if (form.options().autoindex()) {
+                    out.append("        autoindex on;\n");
+                }
+                out.append("        try_files $uri $uri/ =404;\n")
+                        .append("    }\n");
+            }
+            case REDIRECT -> {
+                out.append("    location / {\n");
+                locationOptions(out, primaryDomain, form, https);
+                out.append("        return ").append(form.redirectCode()).append(' ')
+                        .append(form.redirectTargetNormalized())
+                        .append(form.redirectKeepPath() ? "$request_uri" : "").append(";\n")
+                        .append("    }\n");
+            }
             case RAW -> throw new IllegalArgumentException("raw sites are not rendered");
+        }
+    }
+
+    /**
+     * http 수준에 한 번만 둘 수 있는 지시어: 속도·연결 제한 영역, 프록시 캐시 저장소. 이름은 사이트마다 겹치지 않는다.
+     */
+    private static void optionPrelude(StringBuilder out, String primaryDomain, SiteForm form) {
+        SiteOptions options = form.options();
+        String id = identifier(primaryDomain);
+        boolean any = false;
+        if (options.rateLimit() != null) {
+            out.append("limit_req_zone $binary_remote_addr zone=req_").append(id).append(":10m rate=")
+                    .append(options.rateLimit()).append("r/s;\n");
+            any = true;
+        }
+        if (options.connLimit() != null) {
+            out.append("limit_conn_zone $binary_remote_addr zone=conn_").append(id).append(":10m;\n");
+            any = true;
+        }
+        if (form.type() == SiteType.PROXY && options.cacheMinutes() != null) {
+            out.append("proxy_cache_path /var/cache/nginx/site-").append(primaryDomain)
+                    .append(" levels=1:2 keys_zone=cache_").append(id)
+                    .append(":10m max_size=1g inactive=").append(Math.max(60, options.cacheMinutes()))
+                    .append("m use_temp_path=off;\n");
+            any = true;
+        }
+        if (any) {
+            out.append("\n");
+        }
+    }
+
+    /** server 블록 전체에 걸리는 설정: 요청 크기, 압축, 실제 클라이언트 IP. */
+    private static void serverOptions(StringBuilder out, SiteForm form) {
+        SiteOptions options = form.options();
+        boolean any = false;
+        if (options.maxBodySizeMb() != null) {
+            out.append("    client_max_body_size ").append(options.maxBodySizeMb()).append(options.maxBodySizeMb() == 0 ? "" : "m")
+                    .append(";\n");
+            any = true;
+        }
+        if (options.gzip()) {
+            out.append("    gzip on;\n")
+                    .append("    gzip_vary on;\n")
+                    .append("    gzip_proxied any;\n")
+                    .append("    gzip_comp_level 5;\n")
+                    .append("    gzip_min_length 1024;\n")
+                    .append("    gzip_types text/plain text/css text/xml text/javascript application/javascript")
+                    .append(" application/json application/xml application/rss+xml image/svg+xml;\n");
+            if (form.type() == SiteType.STATIC) {
+                out.append("    gzip_static on;\n");
+            }
+            any = true;
+        }
+        if (!options.realIpList().isEmpty()) {
+            for (String address : options.realIpList()) {
+                out.append("    set_real_ip_from ").append(address).append(";\n");
+            }
+            out.append("    real_ip_header ").append(options.realIpHeader().header()).append(";\n");
+            if (options.realIpHeader() == SiteOptions.RealIpHeader.X_FORWARDED_FOR) {
+                out.append("    real_ip_recursive on;\n");
+            }
+            any = true;
+        }
+        if (any) {
+            out.append("\n");
+        }
+    }
+
+    /**
+     * 사이트 내용(location /)에 거는 설정: 접근 제한, 비밀번호, 속도 제한, 응답 헤더. 인증서 발급 경로에는 걸지 않는다.
+     * add_header는 하위 블록에 하나라도 있으면 상위 것을 물려받지 않으므로 헤더는 모두 여기에 둔다.
+     */
+    private static void locationOptions(StringBuilder out, String primaryDomain, SiteForm form, boolean https) {
+        SiteOptions options = form.options();
+        String id = identifier(primaryDomain);
+        boolean access = options.accessRestricted();
+        boolean auth = options.authEnabled();
+        if (access && auth) {
+            out.append("        satisfy ").append(options.satisfyAny() ? "any" : "all").append(";\n");
+        }
+        for (String address : options.denyList()) {
+            out.append("        deny ").append(address).append(";\n");
+        }
+        for (String address : options.allowList()) {
+            out.append("        allow ").append(address).append(";\n");
+        }
+        if (!options.allowList().isEmpty()) {
+            out.append("        deny all;\n");
+        }
+        if (auth) {
+            out.append("        auth_basic \"").append(primaryDomain).append("\";\n")
+                    .append("        auth_basic_user_file ").append(Htpasswd.path(primaryDomain)).append(";\n");
+        }
+        if (options.rateLimit() != null) {
+            out.append("        limit_req zone=req_").append(id);
+            if (options.rateBurst() != null && options.rateBurst() > 0) {
+                out.append(" burst=").append(options.rateBurst()).append(" nodelay");
+            }
+            out.append(";\n        limit_req_status 429;\n");
+        }
+        if (options.connLimit() != null) {
+            out.append("        limit_conn conn_").append(id).append(' ').append(options.connLimit()).append(";\n")
+                    .append("        limit_conn_status 429;\n");
+        }
+        if (options.securityHeaders()) {
+            out.append("        add_header X-Content-Type-Options nosniff always;\n")
+                    .append("        add_header X-Frame-Options SAMEORIGIN always;\n")
+                    .append("        add_header Referrer-Policy strict-origin-when-cross-origin always;\n");
+        }
+        if (https && options.hsts()) {
+            out.append("        add_header Strict-Transport-Security \"max-age=31536000\" always;\n");
+        }
+        if (https && options.http3()) {
+            out.append("        add_header Alt-Svc 'h3=\":443\"; ma=86400' always;\n");
+        }
+        if (form.type() == SiteType.PROXY && options.cacheMinutes() != null) {
+            out.append("        proxy_cache cache_").append(id).append(";\n")
+                    .append("        proxy_cache_valid 200 301 302 ").append(options.cacheMinutes()).append("m;\n")
+                    .append("        proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;\n")
+                    .append("        proxy_cache_lock on;\n")
+                    .append("        add_header X-Cache-Status $upstream_cache_status always;\n");
         }
     }
 
@@ -105,7 +246,7 @@ public class SiteConfigRenderer {
         }
     }
 
-    private static void proxyLocation(StringBuilder out, String primaryDomain, SiteForm form) {
+    private static void proxyLocation(StringBuilder out, String primaryDomain, SiteForm form, boolean https) {
         List<String> targets = form.proxyTargets();
         String pass;
         if (targets.size() > 1) {
@@ -114,8 +255,9 @@ public class SiteConfigRenderer {
         } else {
             pass = targets.getFirst();
         }
-        out.append("    location / {\n")
-                .append("        proxy_pass ").append(pass).append(";\n")
+        out.append("    location / {\n");
+        locationOptions(out, primaryDomain, form, https);
+        out.append("        proxy_pass ").append(pass).append(";\n")
                 .append("        proxy_http_version 1.1;\n")
                 .append("        proxy_set_header Host $host;\n")
                 .append("        proxy_set_header X-Real-IP $remote_addr;\n")

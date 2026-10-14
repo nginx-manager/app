@@ -1,5 +1,6 @@
 package net.nginxmanager.site;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -19,6 +20,10 @@ import java.util.Locale;
  * @param proxyTarget 백엔드 주소. 공백·쉼표·줄바꿈으로 여러 개를 적으면 upstream으로 묶는다
  * @param proxyConnectTimeout 백엔드 연결 타임아웃(초). null이면 nginx 기본값(60초)
  * @param proxyReadTimeout 백엔드 응답(읽기·쓰기) 타임아웃(초). null이면 nginx 기본값(60초)
+ * @param redirectTarget 리디렉션 사이트가 보낼 주소
+ * @param redirectCode 리디렉션 응답 코드(301, 302, 307, 308)
+ * @param redirectKeepPath 요청 경로와 쿼리를 새 주소 뒤에 그대로 붙인다
+ * @param options 유형과 관계없이 켜고 끄는 모듈 설정(접근 제한, 압축, 헤더 등)
  */
 public record SiteForm(
         @Pattern(regexp = SiteForm.DOMAIN, message = "{msg.validation.domain}")
@@ -40,7 +45,12 @@ public record SiteForm(
         Integer proxyConnectTimeout,
         @Min(value = 1, message = "{msg.validation.timeout}") @Max(value = 3600, message = "{msg.validation.timeout}")
         Integer proxyReadTimeout,
-        LoadBalancing proxyLoadBalancing) {
+        LoadBalancing proxyLoadBalancing,
+        String redirectTarget,
+        Integer redirectCode,
+        Boolean redirectKeepPath,
+        @Valid
+        SiteOptions options) {
 
     /** 백엔드는 이 수까지 적을 수 있다. */
     static final int MAX_BACKENDS = 32;
@@ -51,6 +61,19 @@ public record SiteForm(
         redirectHttpToHttps = redirectHttpToHttps == null || redirectHttpToHttps;
         proxyWebsocket = proxyWebsocket != null && proxyWebsocket;
         proxyLoadBalancing = proxyLoadBalancing == null ? LoadBalancing.ROUND_ROBIN : proxyLoadBalancing;
+        redirectCode = redirectCode == null ? 301 : redirectCode;
+        redirectKeepPath = redirectKeepPath == null || redirectKeepPath;
+        options = options == null ? SiteOptions.DEFAULTS : options;
+    }
+
+    /** 프록시 세부 설정까지 정하는 폼(리디렉션·모듈 설정 없음). */
+    public SiteForm(String primaryDomain, String extraDomains, SiteType type, int listenHttpPort, String staticRoot,
+                    String proxyTarget, Long version, Boolean httpsEnabled, Boolean redirectHttpToHttps,
+                    Long certificateId, Boolean proxyWebsocket, Integer proxyConnectTimeout, Integer proxyReadTimeout,
+                    LoadBalancing proxyLoadBalancing) {
+        this(primaryDomain, extraDomains, type, listenHttpPort, staticRoot, proxyTarget, version, httpsEnabled,
+                redirectHttpToHttps, certificateId, proxyWebsocket, proxyConnectTimeout, proxyReadTimeout,
+                proxyLoadBalancing, null, null, null, null);
     }
 
     /** 프록시 세부 설정 없이 HTTPS까지 정하는 폼. */
@@ -70,7 +93,15 @@ public record SiteForm(
     /** 같은 폼에 HTTPS(Let's Encrypt)만 켠다. */
     public SiteForm withLetsEncrypt() {
         return new SiteForm(primaryDomain, extraDomains, type, listenHttpPort, staticRoot, proxyTarget, version, true,
-                redirectHttpToHttps, null, proxyWebsocket, proxyConnectTimeout, proxyReadTimeout, proxyLoadBalancing);
+                redirectHttpToHttps, null, proxyWebsocket, proxyConnectTimeout, proxyReadTimeout, proxyLoadBalancing,
+                redirectTarget, redirectCode, redirectKeepPath, options);
+    }
+
+    /** 같은 폼에 모듈 설정만 바꾼다. */
+    public SiteForm withOptions(SiteOptions newOptions) {
+        return new SiteForm(primaryDomain, extraDomains, type, listenHttpPort, staticRoot, proxyTarget, version,
+                httpsEnabled, redirectHttpToHttps, certificateId, proxyWebsocket, proxyConnectTimeout,
+                proxyReadTimeout, proxyLoadBalancing, redirectTarget, redirectCode, redirectKeepPath, newOptions);
     }
 
     static final String DOMAIN =
@@ -78,6 +109,10 @@ public record SiteForm(
     private static final String EXTRA_DOMAIN = "(\\*\\.)?" + DOMAIN;
     private static final String STATIC_ROOT = "/[A-Za-z0-9._/-]*";
     private static final String PROXY_TARGET = "https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?(/[A-Za-z0-9._~/-]*)?";
+    /** 리디렉션 주소. nginx 변수($)·따옴표·공백이 들어가지 않게 쓸 수 있는 문자를 좁힌다. */
+    private static final String REDIRECT_TARGET =
+            "https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?(/[A-Za-z0-9._~/%!&*+,=:@-]*)?(\\?[A-Za-z0-9._~/%!&*+,=:@?-]*)?";
+    public static final List<Integer> REDIRECT_CODES = List.of(301, 302, 307, 308);
 
     public static SiteForm empty() {
         return new SiteForm("", "", SiteType.PROXY, 80, "", "", null, false, true, null);
@@ -185,6 +220,36 @@ public record SiteForm(
     @AssertTrue(message = "{msg.validation.listenPort}")
     public boolean isListenPortFree() {
         return !RESERVED_PORTS.contains(listenHttpPort);
+    }
+
+    @AssertTrue(message = "{msg.validation.redirectTarget}")
+    public boolean isRedirectTargetValid() {
+        return type != SiteType.REDIRECT
+                || (redirectTarget != null && redirectTarget.strip().matches(REDIRECT_TARGET));
+    }
+
+    @AssertTrue(message = "{msg.validation.redirectCode}")
+    public boolean isRedirectCodeValid() {
+        return type != SiteType.REDIRECT || REDIRECT_CODES.contains(redirectCode);
+    }
+
+    /** 경로를 붙일 때는 주소가 /로 끝나지 않아야 //가 생기지 않는다. 쿼리가 있는 주소에는 경로를 붙일 수 없다. */
+    public String redirectTargetNormalized() {
+        if (redirectTarget == null) {
+            return null;
+        }
+        String target = redirectTarget.strip();
+        return redirectKeepPath ? target.replaceAll("/+$", "") : target;
+    }
+
+    @AssertTrue(message = "{msg.validation.redirectKeepPath}")
+    public boolean isRedirectKeepPathValid() {
+        return type != SiteType.REDIRECT || !redirectKeepPath || redirectTarget == null || !redirectTarget.contains("?");
+    }
+
+    @AssertTrue(message = "{msg.validation.httpsOnlyOption}")
+    public boolean isHttpsOptionsValid() {
+        return httpsEnabled || (!options.http3() && !options.hsts());
     }
 
     @AssertTrue(message = "{msg.validation.rawType}")
