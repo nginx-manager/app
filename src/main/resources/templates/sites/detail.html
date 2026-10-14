@@ -29,16 +29,14 @@
                     <label class="inline"><input type="radio" th:field="*{type}" value="PROXY" th:disabled="${!currentUser.canEdit()}"> 리버스 프록시</label>
                     <label class="inline"><input type="radio" th:field="*{type}" value="STATIC" th:disabled="${!currentUser.canEdit()}"> 정적 파일</label>
                 </fieldset>
-                <label>프록시 대상
-                    <input type="text" th:field="*{proxyTarget}" th:disabled="${!currentUser.canEdit()}">
-                    <span class="error" th:errors="*{proxyTargetValid}"></span>
-                </label>
+                <th:block th:replace="~{sites/proxy-fields :: fields(${currentUser.canEdit()})}"></th:block>
                 <label>문서 루트
                     <input type="text" th:field="*{staticRoot}" th:disabled="${!currentUser.canEdit()}">
                     <span class="error" th:errors="*{staticRootValid}"></span>
                 </label>
                 <label>HTTP 포트
                     <input type="number" th:field="*{listenHttpPort}" th:disabled="${!currentUser.canEdit()}">
+                    <span class="error" th:errors="*{listenPortFree}"></span>
                 </label>
                 <fieldset>
                     <legend>HTTPS</legend>

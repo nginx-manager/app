@@ -23,7 +23,7 @@ body.centered { min-height: 100vh; display: grid; place-items: center; }
 h1 { font-size: 1.4rem; margin: 0 0 1rem; }
 h2 { font-size: 1.1rem; margin: 0 0 .75rem; }
 label { display: block; margin-bottom: .75rem; font-size: .9rem; color: var(--muted); }
-input { display: block; width: 100%; box-sizing: border-box; margin-top: .25rem; padding: .5rem; border: 1px solid var(--line); border-radius: 6px; font: inherit; }
+input, textarea { display: block; width: 100%; box-sizing: border-box; margin-top: .25rem; padding: .5rem; border: 1px solid var(--line); border-radius: 6px; font: inherit; }
 button { padding: .5rem 1rem; border: 0; border-radius: 6px; background: var(--accent); color: #fff; font: inherit; cursor: pointer; }
 button.link { background: none; color: var(--muted); padding: 0; }
 form.inline { display: inline; }

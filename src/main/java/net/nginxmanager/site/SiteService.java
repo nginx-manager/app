@@ -129,8 +129,7 @@ public class SiteService {
             throw new IllegalStateException("raw sites manage TLS in their own config");
         }
         SiteForm form = rendering.formOf(site);
-        SiteForm https = new SiteForm(form.primaryDomain(), form.extraDomains(), form.type(), form.listenHttpPort(),
-                form.staticRoot(), form.proxyTarget(), form.version(), true, form.redirectHttpToHttps(), null);
+        SiteForm https = form.withLetsEncrypt();
         long certificateId = certificateRegistry.letsEncryptFor(site.getPrimaryDomain(),
                 https.certificateDomains(site.getPrimaryDomain()));
         site.applyForm(https);
