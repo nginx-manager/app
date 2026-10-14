@@ -20,6 +20,8 @@ nginx:
       token: test-token
 
 nginx-manager:
+  # 진행 중인 적용 기록(apply-journal.json)을 두는 곳
+  data-dir: ${java.io.tmpdir}/nm-test-data-${random.uuid}
   acme:
     webroot: ${java.io.tmpdir}/nm-test-acme-webroot
     account-dir: ${java.io.tmpdir}/nm-test-acme-accounts

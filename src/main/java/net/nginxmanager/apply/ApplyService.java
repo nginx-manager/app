@@ -19,7 +19,11 @@ import net.nginxmanager.user.User;
 import net.nginxmanager.user.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.event.EventListener;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -51,11 +55,12 @@ public class ApplyService {
     private final ApplicationEventPublisher events;
     private final ConfigSync sync;
     private final ApplyLock lock;
+    private final ApplyJournal journal;
 
     public ApplyService(ConfigFileRepository configFileRepository, ConfigVersionRepository versionRepository,
                         UserRepository userRepository, ConfigFileStore store, NginxRuntime runtime,
                         NginxRuntimeProperties properties, TransactionTemplate tx,
-                        ApplicationEventPublisher events, ConfigSync sync, ApplyLock lock) {
+                        ApplicationEventPublisher events, ConfigSync sync, ApplyLock lock, ApplyJournal journal) {
         this.configFileRepository = configFileRepository;
         this.versionRepository = versionRepository;
         this.userRepository = userRepository;
@@ -66,6 +71,7 @@ public class ApplyService {
         this.events = events;
         this.sync = sync;
         this.lock = lock;
+        this.journal = journal;
     }
 
     /**
@@ -126,9 +132,12 @@ public class ApplyService {
         }
 
         boolean[] reloaded = {false};
+        // 쓰기 전에 백업을 남긴다. 끝나기 전에 관리도구가 죽으면 다음 시작 때 이 백업으로 되돌린다
+        journal.begin(origin.actor(), backup);
+        ApplyResult result;
         try {
             changes.forEach(change -> store.write(change.path(), change.content()));
-            return verifyAndRecord(changes, origin, backup, reloaded);
+            result = verifyAndRecord(changes, origin, backup, reloaded);
         } catch (RuntimeException e) {
             // nginx -t 시간 초과, pid 파일 오류, DB 오류 등 예상하지 못한 실패: 검증되지 않은 파일을 남기지 않는다
             log.error("apply failed unexpectedly, restoring previous configuration", e);
@@ -140,9 +149,51 @@ public class ApplyService {
                     log.error("reload after restore failed", reloadFailure);
                 }
             }
+            journal.clear();
             events.publishEvent(AuditEvent.failure(origin.actor(), auditAction(origin), "apply", e.getMessage()));
             throw e;
         }
+        journal.clear();
+        return result;
+    }
+
+    /**
+     * 지난번 적용이 끝나기 전에 관리도구가 멈췄으면, 적어 둔 백업으로 파일을 되돌린다. nginx가 돌고 있으면
+     * 그사이 검증하지 않은 설정을 읽었을 수 있으므로 되돌린 설정을 검증해 reload한다. 초안은 그대로 남아 다시 적용할 수 있다.
+     *
+     * @return 되돌릴 적용이 있었으면 true
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    @Order(Ordered.HIGHEST_PRECEDENCE)
+    public boolean recoverInterruptedApply() {
+        return withLock(() -> {
+            Optional<ApplyJournal.Entry> pending = journal.pending();
+            if (pending.isEmpty()) {
+                return false;
+            }
+            ApplyJournal.Entry entry = pending.get();
+            log.warn("previous apply by {} started at {} did not finish; restoring {} files",
+                    entry.actor(), entry.startedAt(), entry.files().size());
+            restore(entry.files());
+            journal.clear();
+            String detail = "INTERRUPTED";
+            try {
+                if (runtime.status().state() == RuntimeStatus.State.RUNNING) {
+                    ValidationResult validation = runtime.validate();
+                    if (validation.ok()) {
+                        runtime.reload();
+                    } else {
+                        detail = "INTERRUPTED; restored configuration is invalid: " + validation.errors();
+                        log.error("restored configuration does not validate: {}", validation.output());
+                    }
+                }
+            } catch (NginxCommandException e) {
+                // 파일은 되돌렸다. nginx는 다음 reload·재시작 때 되돌린 설정을 읽는다
+                log.warn("could not reload after restoring interrupted apply: {}", e.getMessage());
+            }
+            events.publishEvent(AuditEvent.failure(entry.actor(), AuditAction.APPLY, "apply", detail));
+            return true;
+        });
     }
 
     private ApplyResult verifyAndRecord(List<FileChange> changes, Origin origin, Map<String, String> backup,
