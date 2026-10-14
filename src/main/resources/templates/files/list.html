@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('설정 파일')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<main class="page">
+    <h1>설정 파일</h1>
+    <section class="card">
+        <p th:if="${#lists.isEmpty(files)}" class="muted">관리 중인 설정 파일이 없습니다.</p>
+        <table th:unless="${#lists.isEmpty(files)}">
+            <thead><tr><th>경로</th><th></th></tr></thead>
+            <tbody>
+            <tr th:each="f : ${files}">
+                <td><a th:href="@{/files/{id}(id=${f.id})}" th:text="${f.path}">nginx.conf</a></td>
+                <td>
+                    <span th:if="${f.draftDelete}" class="badge warn">삭제 대기</span>
+                    <span th:if="${f.draftContent != null}" class="badge warn">적용 대기</span>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+</main>
+</body>
+</html>

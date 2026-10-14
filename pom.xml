@@ -23,6 +23,7 @@
         <sqlite-jdbc.version>3.53.4.0</sqlite-jdbc.version>
         <archunit.version>1.4.1</archunit.version>
         <htmx.version>2.0.5</htmx.version>
+        <java-diff-utils.version>4.17</java-diff-utils.version>
     </properties>
 
     <dependencies>
@@ -71,6 +72,11 @@
             <version>${openfeign-querydsl.version}</version>
         </dependency>
 
+        <dependency>
+            <groupId>io.github.java-diff-utils</groupId>
+            <artifactId>java-diff-utils</artifactId>
+            <version>${java-diff-utils.version}</version>
+        </dependency>
         <dependency>
             <groupId>org.webjars.npm</groupId>
             <artifactId>htmx.org</artifactId>

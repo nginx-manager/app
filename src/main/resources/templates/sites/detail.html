@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(${site.primaryDomain})}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<main class="page">
+    <div class="title-row">
+        <h1 th:text="${site.primaryDomain}">app.local</h1>
+        <span th:if="${site.enabled}" class="badge ok">활성</span>
+        <span th:unless="${site.enabled}" class="badge">비활성</span>
+        <span th:if="${site.configFile.hasPendingChange()}" class="badge warn">적용 대기</span>
+    </div>
+    <p class="notice" th:if="${param.saved}">초안을 저장했습니다. <a th:href="@{/apply}">적용 화면</a>에서 반영하세요.</p>
+
+    <div class="columns">
+        <section class="card" th:if="${site.type.name() != 'RAW'}">
+            <h2>설정</h2>
+            <form th:action="@{/sites/{id}(id=${site.id})}" th:object="${form}" method="post">
+                <input type="hidden" th:field="*{primaryDomain}">
+                <input type="hidden" th:field="*{version}">
+                <label>추가 도메인
+                    <input type="text" th:field="*{extraDomains}" th:disabled="${!currentUser.canEdit()}">
+                    <span class="error" th:errors="*{extraDomainsValid}"></span>
+                </label>
+                <fieldset>
+                    <legend>유형</legend>
+                    <label class="inline"><input type="radio" th:field="*{type}" value="PROXY" th:disabled="${!currentUser.canEdit()}"> 리버스 프록시</label>
+                    <label class="inline"><input type="radio" th:field="*{type}" value="STATIC" th:disabled="${!currentUser.canEdit()}"> 정적 파일</label>
+                </fieldset>
+                <label>프록시 대상
+                    <input type="text" th:field="*{proxyTarget}" th:disabled="${!currentUser.canEdit()}">
+                    <span class="error" th:errors="*{proxyTargetValid}"></span>
+                </label>
+                <label>문서 루트
+                    <input type="text" th:field="*{staticRoot}" th:disabled="${!currentUser.canEdit()}">
+                    <span class="error" th:errors="*{staticRootValid}"></span>
+                </label>
+                <label>HTTP 포트
+                    <input type="number" th:field="*{listenHttpPort}" th:disabled="${!currentUser.canEdit()}">
+                </label>
+                <button type="submit" th:if="${currentUser.canEdit()}">초안 저장</button>
+            </form>
+        </section>
+        <section class="card" th:if="${site.type.name() == 'RAW'}">
+            <h2>원문 편집 사이트</h2>
+            <p>이 사이트는 원문으로만 관리합니다. 폼이 설정을 다시 덮어쓰지 않습니다.</p>
+        </section>
+
+        <section class="card">
+            <div class="title-row">
+                <h2 th:text="${site.configFile.path}">conf.d/sites/app.local.conf</h2>
+                <a th:if="${currentUser.canEdit()}" th:href="@{/files/{id}(id=${site.configFile.id})}">원문 편집</a>
+            </div>
+            <pre class="code" th:text="${content}"></pre>
+            <form th:if="${currentUser.canEdit()}" th:action="@{/sites/{id}/enabled(id=${site.id})}" method="post">
+                <input type="hidden" name="version" th:value="${site.version}">
+                <input type="hidden" name="enabled" th:value="${!site.enabled}">
+                <button type="submit" class="secondary" th:text="${site.enabled} ? '비활성화' : '활성화'">비활성화</button>
+            </form>
+        </section>
+    </div>
+</main>
+</body>
+</html>

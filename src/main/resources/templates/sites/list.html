@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('사이트')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<main class="page">
+    <div class="title-row">
+        <h1>사이트</h1>
+        <a class="button" th:if="${currentUser.canEdit()}" th:href="@{/sites/new}">사이트 추가</a>
+    </div>
+    <section class="card">
+        <p th:if="${#lists.isEmpty(sites)}" class="muted">등록된 사이트가 없습니다.</p>
+        <table th:unless="${#lists.isEmpty(sites)}">
+            <thead>
+            <tr><th>도메인</th><th>유형</th><th>포트</th><th>상태</th><th></th></tr>
+            </thead>
+            <tbody>
+            <tr th:each="s : ${sites}">
+                <td>
+                    <a th:href="@{/sites/{id}(id=${s.id})}" th:text="${s.primaryDomain}">app.local</a>
+                    <div class="muted small" th:if="${s.extraDomains}" th:text="${s.extraDomains}">www.app.local</div>
+                </td>
+                <td th:switch="${s.type.name()}">
+                    <span th:case="'STATIC'">정적</span>
+                    <span th:case="'PROXY'">프록시</span>
+                    <span th:case="*">원문 편집</span>
+                </td>
+                <td th:text="${s.listenHttpPort}">80</td>
+                <td>
+                    <span th:if="${s.enabled}" class="badge ok">활성</span>
+                    <span th:unless="${s.enabled}" class="badge">비활성</span>
+                </td>
+                <td><span th:if="${s.pending}" class="badge warn">적용 대기</span></td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+</main>
+</body>
+</html>
