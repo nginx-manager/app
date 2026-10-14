@@ -1,7 +1,5 @@
 package net.nginxmanager.image;
 
-import org.testcontainers.containers.GenericContainer;
-
 import java.io.IOException;
 import java.net.CookieManager;
 import java.net.URI;
@@ -29,11 +27,7 @@ final class ManagerClient {
     private final HttpClient http = HttpClient.newBuilder().proxy(HttpClient.Builder.NO_PROXY)
             .cookieHandler(new CookieManager()).build();
 
-    ManagerClient(GenericContainer<?> container) {
-        this(() -> "http://" + container.getHost() + ":" + container.getMappedPort(9000));
-    }
-
-    /** 컨테이너를 다시 시작해 포트가 바뀌었을 때처럼 주소를 직접 정한다. */
+    /** 컨테이너를 다시 시작하면 포트가 바뀌므로 주소를 요청마다 읽는다. */
     ManagerClient(Supplier<String> baseUrl) {
         this.baseUrl = baseUrl;
     }

@@ -33,8 +33,12 @@ public class RuntimeController {
     public String start(Authentication authentication, RedirectAttributes redirect) {
         String actor = authentication.getName();
         String error = applyService.withLock(() -> {
-            if (runtime.status().state() == RuntimeStatus.State.RUNNING) {
+            RuntimeStatus.State state = runtime.status().state();
+            if (state == RuntimeStatus.State.RUNNING) {
                 return null;
+            }
+            if (state == RuntimeStatus.State.UNREACHABLE) {
+                return messages.get("msg.runtime.unreachable");
             }
             ValidationResult validation = runtime.validate();
             if (!validation.ok()) {

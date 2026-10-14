@@ -4,9 +4,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.utility.DockerImageName;
 
 import java.time.Duration;
 import java.util.HashSet;
@@ -22,28 +19,24 @@ import static org.awaitility.Awaitility.await;
 @Tag("image")
 class ImageProxyTest {
 
-    static GenericContainer<?> container;
+    static Stack stack;
     static ManagerClient client;
 
     @BeforeAll
     static void start() throws Exception {
-        container = new GenericContainer<>(DockerImageName.parse(System.getProperty("image.name", "nginx-manager/app:dev")))
-                .withExposedPorts(80, 9000)
-                .waitingFor(Wait.forHttp("/actuator/health").forPort(9000).forStatusCode(200)
-                        .withStartupTimeout(Duration.ofMinutes(2)));
-        container.start();
-        client = new ManagerClient(container).setupAndLogin();
+        stack = Stack.start();
+        client = stack.client().setupAndLogin();
     }
 
     @AfterAll
     static void stop() {
-        container.stop();
+        stack.close();
     }
 
     @Test
     void proxySpreadsRequestsOverSeveralBackends() throws Exception {
         for (int i = 1; i <= 2; i++) {
-            container.execInContainer("sh", "-c", "mkdir -p /tmp/b" + i + " && echo backend-" + i + " > /tmp/b" + i + "/index.html");
+            stack.nginxExec("sh", "-c", "mkdir -p /tmp/b" + i + " && echo backend-" + i + " > /tmp/b" + i + "/index.html");
             client.post("/sites/new", Map.of("primaryDomain", "b" + i + ".local", "extraDomains", "", "type", "STATIC",
                     "listenHttpPort", String.valueOf(18080 + i), "staticRoot", "/tmp/b" + i), "/sites/new");
         }
@@ -63,7 +56,7 @@ class ImageProxyTest {
     }
 
     private static String curl() throws Exception {
-        return container.execInContainer("curl", "--noproxy", "*", "-s", "-H", "Host: lb.local", "http://127.0.0.1/")
+        return stack.nginxExec("curl", "--noproxy", "*", "-s", "-H", "Host: lb.local", "http://127.0.0.1/")
                 .getStdout();
     }
     @Test
@@ -80,14 +73,14 @@ class ImageProxyTest {
         String editor = client.get("/files/" + link.group(1)).body();
         Matcher version = Pattern.compile("name=\"version\" value=\"(\\d+)\"").matcher(editor);
         assertThat(version.find()).isTrue();
-        String original = container.execInContainer("cat", "/etc/nginx/conf.d/sites/port.local.conf").getStdout();
+        String original = stack.nginxExec("cat", "/etc/nginx/conf.d/sites/port.local.conf").getStdout();
         client.post("/files/" + link.group(1), Map.of("content", original.replace("listen 18090;", "listen 8081;"),
                 "version", version.group(1)), "/files/" + link.group(1));
 
         String result = client.post("/apply", Map.of("message", "port clash"), "/apply").body();
 
         assertThat(result).contains("직전 설정으로 되돌렸습니다").contains("Address already in use");
-        assertThat(container.execInContainer("cat", "/etc/nginx/conf.d/sites/port.local.conf").getStdout())
+        assertThat(stack.nginxExec("cat", "/etc/nginx/conf.d/sites/port.local.conf").getStdout())
                 .contains("listen 18090;");
         assertThat(status("port.local", 18090)).isEqualTo("200");
         assertThat(result).doesNotContain("92#92");
@@ -97,7 +90,7 @@ class ImageProxyTest {
     }
 
     private static String status(String host, int port) throws Exception {
-        return container.execInContainer("curl", "--noproxy", "*", "-s", "-o", "/dev/null", "-w", "%{http_code}",
+        return stack.nginxExec("curl", "--noproxy", "*", "-s", "-o", "/dev/null", "-w", "%{http_code}",
                 "-H", "Host: " + host, "http://127.0.0.1:" + port + "/").getStdout();
     }
 }

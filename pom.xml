@@ -194,7 +194,7 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
-                    <!-- 빌드한 단일 이미지가 필요한 테스트는 -Pimage-test 로만 실행한다 -->
+                    <!-- 빌드한 두 이미지(nginx, 관리도구)가 필요한 테스트는 -Pimage-test 로만 실행한다 -->
                     <excludedGroups>image</excludedGroups>
                 </configuration>
             </plugin>

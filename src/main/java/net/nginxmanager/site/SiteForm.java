@@ -179,8 +179,8 @@ public record SiteForm(
         return domains;
     }
 
-    /** HTTPS(443), 관리 화면(9000), nginx 상태 확인(127.0.0.1:8081)이 쓰는 포트. */
-    static final List<Integer> RESERVED_PORTS = List.of(443, 8081, 9000);
+    /** HTTPS(443), 에이전트(7070), nginx 상태 확인(127.0.0.1:8081), 관리 화면(9000)이 쓰는 포트. */
+    static final List<Integer> RESERVED_PORTS = List.of(443, 7070, 8081, 9000);
 
     @AssertTrue(message = "{msg.validation.listenPort}")
     public boolean isListenPortFree() {

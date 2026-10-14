@@ -1,12 +1,15 @@
 # 보안 점검 (T081)
 
-2026-10-13, 007-upgrade-safety 기준으로 확인한 내용.
+2026-10-13, 007-upgrade-safety 기준으로 확인한 내용. 프로세스 실행 항목은 2026-10-14 컨테이너 분리에 맞춰 고쳤다.
 
 ## 프로세스 실행
 
-- 외부 프로세스는 `runtime/CommandRunner` 한 곳에서만 만든다(`ProcessBuilder`, 셸을 거치지 않음). 다른 곳에서 `ProcessBuilder`·`Runtime.exec`를 쓰지 않는다.
-- `CommandRunner`를 부르는 곳은 `LocalNginxRuntime`뿐이고, 인자는 상수다: `nginx -t`, `nginx -s reload`, `nginx -V`, `s6-svc -u <서비스 디렉터리>`. 실행 파일·서비스 경로는 서버 설정(`nginx.runtime.*`)에서만 온다. 사용자 입력은 명령 인자로 들어가지 않는다.
-- 컨테이너 안의 nginx와 관리도구는 비루트 `nginxm`으로 돈다. 관리도구가 nginx에 할 수 있는 일은 같은 사용자로서의 reload 신호와, s6 제어 권한(`s6-svperms -G nginxm`)으로 nginx 서비스를 올리는 것뿐이다.
+- nginx와 관리도구는 다른 컨테이너에서 돈다. 관리도구 컨테이너에는 nginx 실행 파일이 없고, 외부 프로세스를 만들지 않는다(`ProcessBuilder`·`Runtime.exec`를 쓰지 않는다).
+- nginx 명령은 nginx 컨테이너 안의 에이전트(`agent/`, Go)만 실행한다. 에이전트가 실행하는 명령은 고정된 인자뿐이다: `nginx -t`, `nginx -s reload`, `nginx -s reopen`, `nginx -V`, `s6-svc -u <서비스 디렉터리>`. 요청에서 받는 값은 대기 시간(`?timeout=`, 최대 60초)뿐이고 명령 인자로 들어가지 않는다. 셸을 거치지 않는다.
+- 관리도구에 Docker 소켓을 넘기지 않는다. 관리도구가 nginx에 할 수 있는 일은 에이전트 API의 위 명령뿐이다.
+- 에이전트는 `/healthz`(버전만 알려 줌)를 뺀 모든 요청에 토큰(`Authorization: Bearer`)을 요구하고 상수 시간으로 비교한다. 토큰은 에이전트가 처음 뜰 때 공유 볼륨(`/var/lib/nginx-manager/agent/token`, 0640)에 무작위 256비트로 만든다. `NGINX_AGENT_TOKEN`·`NGINX_RUNTIME_AGENT_TOKEN`으로 직접 정할 수도 있다.
+- 에이전트 포트(7070)는 호스트에 열지 않고 같은 Docker 네트워크에서만 쓴다. nginx 사이트가 에이전트(7070)·상태 확인(8081)·관리 화면(9000, `manager:9000`)으로 프록시하거나 그 포트로 listen하지 못하게 폼 검증에서 막는다.
+- 두 컨테이너의 프로세스는 같은 비루트 UID(10101, `nginxm`)로 돈다. 에이전트가 nginx에 할 수 있는 일은 같은 사용자로서의 신호와, s6 제어 권한(`s6-svperms -G nginxm`)으로 nginx 서비스를 올리는 것뿐이다. 관리도구 컨테이너는 `/data` 소유자를 맞출 때만 루트로 시작하고 바로 `setpriv`로 내려간다.
 
 ## 파일 경로
 

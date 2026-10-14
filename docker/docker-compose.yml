@@ -1,18 +1,42 @@
 # 실행 예시. docker compose -f docker/docker-compose.yml up -d
+#
+# nginx와 관리 화면이 컨테이너 두 개로 돈다. 관리 화면을 업데이트하거나 다시 띄워도 nginx는 계속 트래픽을 받는다.
+# - 두 이미지는 같은 버전으로 맞춘다. 아래 NGINX_MANAGER_VERSION 하나로 함께 바꾼다(예: 1.0.0).
+# - 관리 화면은 nginx 컨테이너 안의 에이전트(7070)에 nginx -t·reload를 요청한다. 에이전트는 호스트에 열지 않는다.
+# - 에이전트 토큰은 nginx 컨테이너가 처음 뜰 때 nm-shared 볼륨에 만들고 관리 화면이 읽는다. 따로 정할 것은 없다.
 services:
-  nginx-manager:
-    image: ghcr.io/nginx-manager/app:latest
+  nginx:
+    image: ghcr.io/nginx-manager/nginx:${NGINX_MANAGER_VERSION:-latest}
     restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
+    volumes:
+      - nm-conf:/etc/nginx                # nginx 설정, 인증서(certs/)
+      - nm-logs:/var/log/nginx            # 접근·오류 로그
+      - nm-shared:/var/lib/nginx-manager  # ACME 챌린지 파일, 에이전트 토큰
+    environment:
+      TZ: Asia/Seoul
+    # nginx가 연결을 정리할 시간을 준다
+    stop_grace_period: 40s
+
+  manager:
+    image: ghcr.io/nginx-manager/app:${NGINX_MANAGER_VERSION:-latest}
+    restart: unless-stopped
+    depends_on:
+      nginx:
+        condition: service_healthy
+    ports:
       # 관리 화면. 사내망에서만 쓰거나 127.0.0.1:9000:9000 처럼 묶어 두고 HTTPS 프록시 뒤에 둔다
       - "9000:9000"
     volumes:
-      - nm-conf:/etc/nginx        # nginx 설정, 인증서(certs/)
-      - nm-logs:/var/log/nginx    # 접근·오류 로그
-      - nm-data:/data             # 관리도구 DB, ACME 계정 키
+      # nginx와 같은 볼륨을 같은 경로에 둔다
+      - nm-conf:/etc/nginx
+      - nm-logs:/var/log/nginx
+      - nm-shared:/var/lib/nginx-manager
+      - nm-data:/data                     # 관리도구 DB, ACME 계정 키
     environment:
+      NGINX_RUNTIME_AGENT_URL: http://nginx:7070
       # 메일 알림을 쓸 때
       # SPRING_MAIL_HOST: smtp.example.com
       # SPRING_MAIL_PORT: "587"
@@ -21,8 +45,11 @@ services:
       # 관리 화면을 HTTPS 프록시 뒤에 둘 때
       # SERVER_SERVLET_SESSION_COOKIE_SECURE: "true"
       TZ: Asia/Seoul
+    # 진행 중인 적용(검증·reload·상태 확인·복구)이 끝날 시간을 준다
+    stop_grace_period: 40s
 
 volumes:
   nm-conf:
   nm-logs:
+  nm-shared:
   nm-data:

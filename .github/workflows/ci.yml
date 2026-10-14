@@ -18,6 +18,20 @@ jobs:
       - name: Unit and integration tests
         run: mvn -B verify
 
+  agent:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: agent/go.mod
+      - name: Agent tests
+        working-directory: agent
+        run: |
+          test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+          go vet ./...
+          go test ./...
+
   image:
     runs-on: ubuntu-24.04
     steps:
@@ -27,7 +41,11 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
-      - name: Build image
-        run: docker build -f docker/Dockerfile -t nginx-manager/app:ci .
+      - name: Build images
+        run: |
+          docker build -f docker/nginx/Dockerfile -t nginx-manager/nginx:ci . &
+          nginx=$!
+          docker build -f docker/manager/Dockerfile -t nginx-manager/app:ci .
+          wait $nginx
       - name: Image tests
-        run: mvn -B -Pimage-test test -Dimage.name=nginx-manager/app:ci
+        run: mvn -B -Pimage-test test -Dimage.name=nginx-manager/app:ci -Dnginx.image.name=nginx-manager/nginx:ci

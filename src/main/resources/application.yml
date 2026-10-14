@@ -54,13 +54,18 @@ spring:
 
 nginx:
   runtime:
-    binary: /usr/sbin/nginx
+    # nginx 컨테이너와 같은 볼륨을 같은 경로에 둔다(설정, 로그)
     config-root: /etc/nginx
-    pid-file: /run/nginx/nginx.pid
-    status-url: http://127.0.0.1:8081/nginx_status
+    log-dir: /var/log/nginx
     command-timeout: 30s
     # reload 뒤 nginx가 정상인지 확인하는 최대 시간. 넘기면 직전 설정으로 되돌린다
     health-timeout: 10s
+    agent:
+      # nginx 컨테이너 안의 에이전트. compose에서는 서비스 이름으로 찾는다
+      url: http://nginx:7070
+      # 토큰을 비우면 에이전트가 처음 뜰 때 공유 볼륨에 만들어 두는 파일에서 읽는다
+      token:
+      token-file: /var/lib/nginx-manager/agent/token
 
 management:
   health:
@@ -74,3 +79,7 @@ management:
   endpoint:
     health:
       show-details: never
+      # /actuator/health/liveness: 관리도구 자체가 살아 있는지(컨테이너 HEALTHCHECK).
+      # /actuator/health는 nginx 상태까지 본다
+      probes:
+        enabled: true

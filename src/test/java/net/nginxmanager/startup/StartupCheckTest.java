@@ -2,6 +2,7 @@ package net.nginxmanager.startup;
 
 import net.nginxmanager.apply.ApplyResult;
 import net.nginxmanager.apply.ApplyService;
+import net.nginxmanager.runtime.StartupCheckReport;
 import net.nginxmanager.audit.AuditAction;
 import net.nginxmanager.site.SiteForm;
 import net.nginxmanager.site.SiteService;
@@ -10,17 +11,13 @@ import net.nginxmanager.support.ConfigRootTest;
 import net.nginxmanager.user.Role;
 import net.nginxmanager.user.SetupState;
 import net.nginxmanager.user.User;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
@@ -32,15 +29,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 
-/** 업그레이드한 nginx가 기존 설정을 거부한 상태로 시작했을 때(FR-024, FR-025). */
+/** 업그레이드한 nginx 컨테이너가 기존 설정을 거부한 상태로 시작했을 때(FR-024, FR-025). */
 class StartupCheckTest extends ConfigRootTest {
-
-    static final Path CHECK_DIR = failedCheck();
-
-    @DynamicPropertySource
-    static void checkDir(DynamicPropertyRegistry registry) {
-        registry.add("nginx-manager.startup.check-dir", CHECK_DIR::toString);
-    }
 
     @Autowired
     StartupCheckService startupCheckService;
@@ -60,6 +50,21 @@ class StartupCheckTest extends ConfigRootTest {
         userRepository.save(new User("admin", "{noop}unused-password", Role.ADMIN));
         setupState.reset();
         nginx.running = false;
+        // nginx 컨테이너가 깨진 설정으로 새로 떴다
+        nginx.bootId = "boot-" + System.nanoTime();
+        nginx.startupCheck = new StartupCheckReport(false, """
+                nginx: [emerg] unknown directive "ssl_foo" in /etc/nginx/nginx.conf:12
+                nginx: configuration file /etc/nginx/nginx.conf test failed
+                """, Instant.parse("2026-10-13T01:00:00Z"));
+        startupCheckService.refreshIfRestarted();
+    }
+
+    /** 컨텍스트를 함께 쓰는 다른 테스트에 시작 검사 실패가 남지 않게 정상으로 다시 뜬 것으로 만든다. */
+    @AfterEach
+    void restartHealthy() {
+        nginx.bootId = "boot-" + System.nanoTime();
+        nginx.startupCheck = null;
+        startupCheckService.refreshIfRestarted();
     }
 
     @Test
@@ -132,20 +137,5 @@ class StartupCheckTest extends ConfigRootTest {
         mvc.perform(post("/runtime/start").with(csrf()).with(user("admin").roles("ADMIN")))
                 .andExpect(flash().attributeExists("notice"));
         assertThat(nginx.startCalls).isEqualTo(1);
-    }
-
-    private static Path failedCheck() {
-        try {
-            Path dir = Files.createTempDirectory("nm-startup-check");
-            Files.writeString(dir.resolve("result"), "failed\n");
-            Files.writeString(dir.resolve("checked-at"), "2026-10-13T01:00:00Z\n");
-            Files.writeString(dir.resolve("output"), """
-                    nginx: [emerg] unknown directive "ssl_foo" in /etc/nginx/nginx.conf:12
-                    nginx: configuration file /etc/nginx/nginx.conf test failed
-                    """);
-            return dir;
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
     }
 }

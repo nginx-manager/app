@@ -149,7 +149,12 @@ public class ApplyService {
         }
 
         // nginx가 내려가 있으면(시작 검사 실패 등) reload할 대상이 없다. 검증된 설정만 남기고, 시작은 사용자가 한다
-        if (runtime.status().state() != RuntimeStatus.State.RUNNING) {
+        RuntimeStatus.State state = runtime.status().state();
+        if (state == RuntimeStatus.State.UNREACHABLE) {
+            // 검증 뒤에 에이전트가 끊겼다. 상태를 모르는 채로 성공으로 남기지 않고 되돌린다
+            throw new NginxCommandException("nginx 에이전트에 연결할 수 없어 적용하지 못했습니다");
+        }
+        if (state != RuntimeStatus.State.RUNNING) {
             log.info("nginx is not running; configuration written without reload");
             return record(changes, origin, VersionResult.SUCCESS,
                     validation.output() + "\n" + RELOAD_SKIPPED,

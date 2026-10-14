@@ -171,7 +171,7 @@ class SiteConfigRendererTest {
     }
 
     @ParameterizedTest
-    @ValueSource(ints = {8081, 9000})
+    @ValueSource(ints = {7070, 8081, 9000})
     void rejectsPortsTheManagerUses(int port) {
         assertThat(validator.validate(new SiteForm("app.local", "", SiteType.PROXY, port, null, "http://a:1", null)))
                 .isNotEmpty();
@@ -191,7 +191,7 @@ class SiteConfigRendererTest {
     }
 
     @ParameterizedTest
-    @ValueSource(ints = {443, 8081, 9000})
+    @ValueSource(ints = {443, 7070, 8081, 9000})
     void reservedPortsCannotBeHttpPort(int port) {
         SiteForm form = new SiteForm("app.local", "", SiteType.PROXY, port, null, "http://10.0.0.1:8080", null);
 
@@ -200,7 +200,7 @@ class SiteConfigRendererTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"http://127.0.0.1:9000", "http://localhost:8081", "http://[::1]:9000",
-            "http://10.0.0.1:70000"})
+            "http://127.0.0.1:7070", "http://nginx:7070", "http://manager:9000", "http://10.0.0.1:70000"})
     void managerAndInvalidPortsAreRejectedAsProxyTarget(String target) {
         SiteForm form = new SiteForm("app.local", "", SiteType.PROXY, 80, null, target, null);
 

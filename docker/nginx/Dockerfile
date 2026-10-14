@@ -1,11 +1,17 @@
 # syntax=docker/dockerfile:1
-# nginx(오픈소스, 전체 모듈) + nginx-manager(Spring Boot)를 하나의 이미지로 만든다.
+# nginx 컨테이너: nginx(오픈소스, 전체 모듈) + 에이전트(agent/, 관리도구가 부르는 nginx -t·reload 등).
+# 관리 화면(Spring Boot)은 docker/manager/Dockerfile의 별도 이미지다. 두 컨테이너는 설정·로그 볼륨을 함께 쓴다.
 # 프로세스는 s6-overlay가 따로 감시·재시작한다.
+# docker build -f docker/nginx/Dockerfile -t nginx-manager/nginx:dev .
 
 # 베이스 이미지는 미러·사내 레지스트리로 바꿀 수 있게 인자로 둔다
 ARG BUILD_BASE_IMAGE=ubuntu:24.04
-ARG MAVEN_IMAGE=maven:3.9-eclipse-temurin-21
-ARG RUNTIME_BASE_IMAGE=eclipse-temurin:21-jre-noble
+ARG GO_IMAGE=golang:1.24
+ARG RUNTIME_BASE_IMAGE=ubuntu:24.04
+# 관리도구 릴리스 버전. 에이전트가 관리도구와 버전을 맞춰 보는 데 쓴다
+ARG APP_VERSION=dev
+# 관리도구 이미지와 같은 값이어야 두 컨테이너가 서로의 파일을 읽고 쓸 수 있다
+ARG NGINXM_UID=10101
 ARG NGINX_VERSION=1.31.6
 ARG NJS_VERSION=1.0.1
 ARG S6_OVERLAY_VERSION=3.2.3.2
@@ -82,16 +88,13 @@ RUN ./configure \
     && rm -rf /out/etc/nginx/*.default /out/usr/local/man /out/usr/local/share/man
 
 ############################################################
-# 2. 관리도구 빌드
+# 2. 에이전트 빌드
 ############################################################
-FROM ${MAVEN_IMAGE} AS app-build
+FROM ${GO_IMAGE} AS agent-build
+ARG APP_VERSION
 WORKDIR /src
-COPY pom.xml .
-COPY .mvn ./.mvn
-RUN mvn -B -q dependency:go-offline
-COPY src ./src
-RUN mvn -B -q package -DskipTests \
-    && cp target/nginx-manager-*.jar /src/app.jar
+COPY agent/ ./
+RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${APP_VERSION}" -o /out/nginx-agent .
 
 ############################################################
 # 3. 런타임
@@ -99,13 +102,16 @@ RUN mvn -B -q package -DskipTests \
 FROM ${RUNTIME_BASE_IMAGE}
 ARG S6_OVERLAY_VERSION
 ARG NGINX_VERSION
+ARG APP_VERSION
+ARG NGINXM_UID
 
-LABEL org.opencontainers.image.title="nginx-manager" \
+LABEL org.opencontainers.image.title="nginx-manager nginx" \
       org.opencontainers.image.source="https://github.com/nginx-manager/app" \
+      org.opencontainers.image.version="${APP_VERSION}" \
       net.nginxmanager.nginx-version="${NGINX_VERSION}"
 
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        ca-certificates curl xz-utils libcap2-bin \
+        ca-certificates curl xz-utils libcap2-bin procps \
         libpcre2-8-0 zlib1g libssl3t64 \
         libxml2 libxslt1.1 libgd3 libgeoip1t64 libperl5.38t64 perl libgoogle-perftools4t64 \
     && rm -rf /var/lib/apt/lists/*
@@ -115,31 +121,33 @@ RUN curl -fsSL "https://github.com/just-containers/s6-overlay/releases/download/
 
 COPY --from=nginx-build /out/ /
 
-# nginx와 관리도구는 같은 비루트 사용자로 돈다. 그래야 관리도구가 nginx 마스터에 reload 신호를 보낼 수 있다.
+# nginx와 에이전트는 같은 비루트 사용자로 돈다. 그래야 에이전트가 nginx 마스터에 reload 신호를 보낼 수 있다.
 # nginx 실행 파일에만 1024 미만 포트를 열 권한을 준다.
-RUN groupadd --system nginxm \
-    && useradd --system --gid nginxm --home-dir /data --shell /usr/sbin/nologin nginxm \
+RUN groupadd --system --gid ${NGINXM_UID} nginxm \
+    && useradd --system --uid ${NGINXM_UID} --gid nginxm --home-dir /var/lib/nginx-manager --shell /usr/sbin/nologin nginxm \
     && setcap cap_net_bind_service=+ep /usr/sbin/nginx \
     && mkdir -p /etc/nginx/conf.d/sites /etc/nginx/sites-disabled /etc/nginx/stream.d /etc/nginx/certs \
-                /var/log/nginx/sites /var/cache/nginx /var/lib/nginx-manager/acme-webroot /data /app \
-    && chown -R nginxm:nginxm /etc/nginx /var/log/nginx /var/cache/nginx /var/lib/nginx-manager /data
+                /var/log/nginx/sites /var/cache/nginx /var/lib/nginx-manager/acme-webroot /var/lib/nginx-manager/agent \
+    && chown -R nginxm:nginxm /etc/nginx /var/log/nginx /var/cache/nginx /var/lib/nginx-manager
 
 COPY --chown=nginxm:nginxm docker/nginx/nginx.conf /etc/nginx/nginx.conf
 # 빈 디렉터리를 /etc/nginx에 바인드 마운트해도 시작할 때 기본 설정을 채울 수 있도록 사본을 둔다
 RUN mkdir -p /usr/share/nginx-manager && cp -a /etc/nginx /usr/share/nginx-manager/defaults
-COPY docker/s6-overlay/ /etc/s6-overlay/
-COPY --from=app-build /src/app.jar /app/app.jar
+COPY docker/nginx/s6-overlay/ /etc/s6-overlay/
+COPY --from=agent-build /out/nginx-agent /usr/local/bin/nginx-agent
 
-# 멈출 때 진행 중인 적용(검증·reload·상태 확인·복구)이 끝날 시간을 준다. docker stop -t 40 과 함께 쓴다
+# 멈출 때 진행 중인 reload가 끝나고 nginx가 연결을 정리할(SIGQUIT) 시간을 준다
 ENV S6_KEEP_ENV=1 \
     S6_BEHAVIOUR_IF_STAGE2_FAILS=2 \
-    S6_SERVICES_GRACETIME=35000 \
-    JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=50"
+    S6_SERVICES_GRACETIME=35000
 
-VOLUME ["/etc/nginx", "/var/log/nginx", "/data"]
-EXPOSE 80 443 9000
+# /var/lib/nginx-manager: 관리도구 컨테이너와 함께 쓰는 ACME 챌린지 파일과 에이전트 토큰
+VOLUME ["/etc/nginx", "/var/log/nginx", "/var/lib/nginx-manager"]
+# 7070은 에이전트. 같은 Docker 네트워크의 관리도구만 부르며 호스트에 열지 않는다
+EXPOSE 80 443 7070
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=60s \
-    CMD curl --noproxy '*' -fsS http://127.0.0.1:9000/actuator/health || exit 1
+# 에이전트가 응답하면 정상으로 본다. 설정이 틀려 nginx가 내려가 있어도 관리도구가 붙어 고칠 수 있어야 한다
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s \
+    CMD curl --noproxy '*' -fsS http://127.0.0.1:7070/healthz || exit 1
 
 ENTRYPOINT ["/init"]
