@@ -2,6 +2,7 @@ package net.nginxmanager.site;
 
 import jakarta.validation.Valid;
 import net.nginxmanager.common.NotFoundException;
+import net.nginxmanager.cert.CertificateService;
 import net.nginxmanager.cert.CertificateSource;
 import net.nginxmanager.cert.TlsCertificate;
 import net.nginxmanager.cert.TlsCertificateRepository;
@@ -28,10 +29,12 @@ public class SiteController {
     private final SiteRendering rendering;
     private final ConfigFileStore store;
     private final TlsCertificateRepository certificateRepository;
+    private final CertificateService certificateService;
 
     public SiteController(SiteService siteService, SiteQueryRepository siteQueryRepository,
                           SiteRendering rendering, ConfigFileStore store,
-                          TlsCertificateRepository certificateRepository) {
+                          TlsCertificateRepository certificateRepository, CertificateService certificateService) {
+        this.certificateService = certificateService;
         this.siteService = siteService;
         this.siteQueryRepository = siteQueryRepository;
         this.rendering = rendering;
@@ -92,10 +95,8 @@ public class SiteController {
     @GetMapping("/{id}")
     public String detail(@PathVariable long id, Model model) {
         Site site = siteQueryRepository.findWithFile(id).orElseThrow(() -> new NotFoundException("site " + id));
-        model.addAttribute("site", site);
         model.addAttribute("form", rendering.formOf(site));
-        model.addAttribute("content", currentContent(site));
-        model.addAttribute("certificate", certificateOf(site));
+        addDetail(site, model);
         return "sites/detail";
     }
 
@@ -104,9 +105,7 @@ public class SiteController {
                          BindingResult bindingResult, Authentication authentication, Model model) {
         if (bindingResult.hasErrors()) {
             Site site = siteQueryRepository.findWithFile(id).orElseThrow(() -> new NotFoundException("site " + id));
-            model.addAttribute("site", site);
-            model.addAttribute("content", currentContent(site));
-            model.addAttribute("certificate", certificateOf(site));
+            addDetail(site, model);
             return "sites/detail";
         }
         try {
@@ -114,16 +113,12 @@ public class SiteController {
         } catch (DuplicateSiteException e) {
             bindingResult.rejectValue("extraDomains", "msg.site.domainTaken", new Object[] {e.getDomain()}, duplicateMessage(e));
             Site site = siteQueryRepository.findWithFile(id).orElseThrow(() -> new NotFoundException("site " + id));
-            model.addAttribute("site", site);
-            model.addAttribute("content", currentContent(site));
-            model.addAttribute("certificate", certificateOf(site));
+            addDetail(site, model);
             return "sites/detail";
         } catch (MissingPasswordException e) {
             rejectMissingPassword(bindingResult, e);
             Site site = siteQueryRepository.findWithFile(id).orElseThrow(() -> new NotFoundException("site " + id));
-            model.addAttribute("site", site);
-            model.addAttribute("content", currentContent(site));
-            model.addAttribute("certificate", certificateOf(site));
+            addDetail(site, model);
             return "sites/detail";
         }
         return "redirect:/sites/" + id + "?saved";
@@ -152,6 +147,19 @@ public class SiteController {
                 ? null
                 : rendering.render(form.primaryDomain().toLowerCase(Locale.ROOT), form, form.certificateId()));
         return "sites/form :: preview";
+    }
+
+    /**
+     * 상세 화면의 사이트·설정 원문·인증서 상태. siteLive는 nginx가 지금 이 사이트를 서비스하는지(적용했고 켜져 있는지)로,
+     * 서비스 중이어야 Let's Encrypt가 도메인을 확인할 수 있어 바로 발급할 수 있다.
+     */
+    private void addDetail(Site site, Model model) {
+        TlsCertificate certificate = certificateOf(site);
+        model.addAttribute("site", site);
+        model.addAttribute("content", currentContent(site));
+        model.addAttribute("certificate", certificate);
+        model.addAttribute("certificateRunning", certificate != null && certificateService.isRunning(certificate.getId()));
+        model.addAttribute("siteLive", site.isEnabled() && store.read(site.getConfigFile().getPath()) != null);
     }
 
     private TlsCertificate certificateOf(Site site) {

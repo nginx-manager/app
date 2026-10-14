@@ -311,32 +311,46 @@ public class SiteService {
     }
 
     /**
-     * 이미 서비스 중인 폼 사이트에 Let's Encrypt HTTPS를 켠다. 인증서가 없으면 설정은 그대로이고,
+     * 만들어 둔 폼 사이트에 Let's Encrypt HTTPS를 켠다. 인증서를 받기 전까지 설정은 HTTP 그대로이고,
      * 발급이 끝나면 HTTPS 설정이 자동으로 적용된다.
      *
-     * @return 발급할 인증서 id
+     * @return 발급할 인증서와, 지금 바로 발급을 시작해도 되는지. 아직 한 번도 적용하지 않은 사이트는 nginx가
+     *         인증 요청(/.well-known/acme-challenge/)에 응답하지 못하므로 적용한 뒤에 발급한다
+     * @throws IllegalStateException 원문 사이트이거나 와일드카드 도메인이 있으면
      */
-    public long enableLetsEncrypt(long siteId, String actor) {
+    public LetsEncryptRequest enableLetsEncrypt(long siteId, String actor) {
         return locked(() -> doEnableLetsEncrypt(siteId, actor));
     }
 
-    private long doEnableLetsEncrypt(long siteId, String actor) {
+    /** @param issueNow false면 사이트를 적용할 때 발급을 시작한다 */
+    public record LetsEncryptRequest(long certificateId, boolean issueNow) {
+    }
+
+    private LetsEncryptRequest doEnableLetsEncrypt(long siteId, String actor) {
         Site site = load(siteId);
         if (site.getType() == SiteType.RAW) {
             throw new IllegalStateException("raw sites manage TLS in their own config");
         }
         SiteForm form = rendering.formOf(site);
         SiteForm https = form.withLetsEncrypt();
+        if (!https.isLetsEncryptDomainsValid()) {
+            throw new WildcardLetsEncryptException();
+        }
         long certificateId = certificateRegistry.letsEncryptFor(site.getPrimaryDomain(),
                 https.certificateDomains(site.getPrimaryDomain()));
         site.applyForm(https);
         site.enableHttps(certificateId);
-        if (!site.getConfigFile().hasPendingChange()) {
+        ConfigFile file = site.getConfigFile();
+        boolean live = site.isEnabled() && store.read(file.getPath()) != null;
+        if (!live && file.getDraftContent() != null) {
+            // 아직 반영하지 않은 사이트: 초안도 HTTPS를 켠 값으로 바꿔 두면, 적용할 때 발급이 이어진다
+            file.stageContent(rendering.render(site));
+        } else if (!file.hasPendingChange()) {
             // 디스크의 설정은 인증서를 받기 전까지 그대로이므로 지금 값이 반영된 값이다. 발급이 끝나면 이 값으로 HTTPS를 더한다
             site.markApplied();
         }
         events.publishEvent(AuditEvent.success(actor, AuditAction.SITE_SAVE, "site:" + site.getPrimaryDomain() + " https"));
-        return certificateId;
+        return new LetsEncryptRequest(certificateId, live);
     }
 
     private Long certificateFor(String domain, SiteForm form) {

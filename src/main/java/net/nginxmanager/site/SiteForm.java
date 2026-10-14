@@ -24,6 +24,8 @@ import java.util.Locale;
  * @param redirectCode 리디렉션 응답 코드(301, 302, 307, 308)
  * @param redirectKeepPath 요청 경로와 쿼리를 새 주소 뒤에 그대로 붙인다
  * @param options 유형과 관계없이 켜고 끄는 모듈 설정(접근 제한, 압축, 헤더 등)
+ * @param certificateMode 화면에서 고른 인증서 방식. 주면 httpsEnabled·certificateId를 이 값에 맞추고,
+ *                        없으면(코드에서 만든 폼) httpsEnabled·certificateId로 정한다
  */
 public record SiteForm(
         @Pattern(regexp = SiteForm.DOMAIN, message = "{msg.validation.domain}")
@@ -50,20 +52,42 @@ public record SiteForm(
         Integer redirectCode,
         Boolean redirectKeepPath,
         @Valid
-        SiteOptions options) {
+        SiteOptions options,
+        CertificateMode certificateMode) {
 
     /** 백엔드는 이 수까지 적을 수 있다. */
     static final int MAX_BACKENDS = 32;
 
     /** 체크박스 값이 아예 없으면(폼 밖의 요청) HTTPS는 끄고, 켰을 때 HTTP는 HTTPS로 넘긴다. */
     public SiteForm {
+        if (certificateMode != null) {
+            httpsEnabled = certificateMode != CertificateMode.NONE;
+            if (certificateMode != CertificateMode.UPLOADED) {
+                certificateId = null;
+            }
+        }
         httpsEnabled = httpsEnabled != null && httpsEnabled;
+        if (certificateMode == null) {
+            certificateMode = !httpsEnabled ? CertificateMode.NONE
+                    : certificateId == null ? CertificateMode.LETS_ENCRYPT : CertificateMode.UPLOADED;
+        }
         redirectHttpToHttps = redirectHttpToHttps == null || redirectHttpToHttps;
         proxyWebsocket = proxyWebsocket != null && proxyWebsocket;
         proxyLoadBalancing = proxyLoadBalancing == null ? LoadBalancing.ROUND_ROBIN : proxyLoadBalancing;
         redirectCode = redirectCode == null ? 301 : redirectCode;
         redirectKeepPath = redirectKeepPath == null || redirectKeepPath;
         options = options == null ? SiteOptions.DEFAULTS : options;
+    }
+
+    /** 인증서 방식은 httpsEnabled·certificateId로 정하는 폼. */
+    public SiteForm(String primaryDomain, String extraDomains, SiteType type, int listenHttpPort, String staticRoot,
+                    String proxyTarget, Long version, Boolean httpsEnabled, Boolean redirectHttpToHttps,
+                    Long certificateId, Boolean proxyWebsocket, Integer proxyConnectTimeout, Integer proxyReadTimeout,
+                    LoadBalancing proxyLoadBalancing, String redirectTarget, Integer redirectCode,
+                    Boolean redirectKeepPath, SiteOptions options) {
+        this(primaryDomain, extraDomains, type, listenHttpPort, staticRoot, proxyTarget, version, httpsEnabled,
+                redirectHttpToHttps, certificateId, proxyWebsocket, proxyConnectTimeout, proxyReadTimeout,
+                proxyLoadBalancing, redirectTarget, redirectCode, redirectKeepPath, options, null);
     }
 
     /** 프록시 세부 설정까지 정하는 폼(리디렉션·모듈 설정 없음). */
@@ -194,6 +218,11 @@ public record SiteForm(
         }
         return PROTECTED_DIRS.stream().noneMatch(dir -> root.equals(dir) || root.startsWith(dir + "/")
                 || dir.startsWith(root + "/"));
+    }
+
+    @AssertTrue(message = "{msg.validation.certificateRequired}")
+    public boolean isUploadedCertificateChosen() {
+        return certificateMode != CertificateMode.UPLOADED || certificateId != null;
     }
 
     @AssertTrue(message = "{msg.validation.wildcardLetsEncrypt}")
