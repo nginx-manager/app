@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ko" th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(#{files.new.title})}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<main class="page">
+    <h1 th:text="#{files.new.title}">새 설정 파일</h1>
+    <p class="hint" th:text="#{files.new.help}">폼이 없는 모듈을 쓸 때 설정 루트 아래에 파일을 만듭니다.</p>
+    <section class="card">
+        <form th:action="@{/files/new}" method="post">
+            <label><th:block th:text="#{files.new.path}">경로 (/etc/nginx 기준)</th:block>
+                <span class="hint" th:text="#{files.new.path.hint}">예: stream.d/mqtt.conf, njs/auth.js</span>
+                <input type="text" name="path" th:value="${path}" placeholder="njs/hello.js" required>
+                <span class="error" th:if="${errorKey}" th:text="#{${errorKey}}"></span>
+            </label>
+            <label><th:block th:text="#{files.new.content}">내용</th:block>
+                <textarea name="content" class="editor" spellcheck="false" th:text="${content}"></textarea>
+            </label>
+            <button type="submit" th:text="#{files.new.submit}">초안으로 만들기</button>
+        </form>
+        <dl class="hint">
+            <dt>stream.d/*.conf</dt><dd th:text="#{files.new.where.stream}">설명</dd>
+            <dt>conf.d/sites/*.conf</dt><dd th:text="#{files.new.where.sites}">설명</dd>
+            <dt>njs/*.js</dt><dd th:text="#{files.new.where.njs}">설명</dd>
+            <dt>nginx.conf</dt><dd th:text="#{files.new.where.main}">설명</dd>
+        </dl>
+    </section>
+</main>
+<script th:src="@{/js/editor.bundle.js}" defer></script>
+</body>
+</html>

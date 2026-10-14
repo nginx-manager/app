@@ -7,6 +7,8 @@
     <h1 th:text="${file.path}">nginx.conf</h1>
     <p class="notice" th:if="${param.saved}"><span th:text="#{files.edit.saved.before}">초안을 저장했습니다.</span>
         <a th:href="@{/apply}" th:text="#{files.edit.saved.link}">적용 화면</a><span th:text="#{files.edit.saved.after}">에서 반영하세요.</span></p>
+    <p class="notice" th:if="${file.draftDelete}"><span th:text="#{files.edit.deleted.before}">이 파일을 지우는 초안이 있습니다.</span>
+        <a th:href="@{/apply}" th:text="#{files.edit.saved.link}">적용 화면</a><span th:text="#{files.edit.deleted.after}">에서 반영하거나 초안을 버리세요.</span></p>
     <p class="warning" th:if="${site != null and site.type.name() != 'RAW'}" th:text="#{files.edit.formSiteWarning}">
         폼으로 만든 사이트의 파일입니다. 여기서 저장하면 이 사이트는 원문 편집 전용으로 바뀌고, 폼으로 다시 고칠 수 없습니다.
     </p>
@@ -17,6 +19,11 @@
             <textarea name="content" class="editor" spellcheck="false" th:text="${content}"
                       th:readonly="${!currentUser.canEdit()}"></textarea>
             <button type="submit" th:if="${currentUser.canEdit()}" th:text="#{files.edit.submit}">초안 저장</button>
+        </form>
+        <form th:if="${currentUser.canEdit() and deletable}" th:action="@{/files/{id}/delete(id=${file.id})}" method="post">
+            <input type="hidden" name="version" th:value="${file.version}">
+            <button type="submit" class="secondary" th:text="#{files.edit.delete}">이 파일 지우기 (초안)</button>
+            <p class="hint" th:text="#{files.edit.delete.hint}">설명</p>
         </form>
     </section>
 </main>
