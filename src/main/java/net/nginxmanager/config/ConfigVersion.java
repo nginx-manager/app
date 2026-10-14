@@ -43,6 +43,10 @@ public class ConfigVersion extends BaseEntity {
     @Column(name = "validation_output", columnDefinition = "TEXT")
     private String validationOutput;
 
+    /** ROLLBACK일 때 대상 버전. 자기 참조 연관 대신 id만 둔다. */
+    @Column(name = "rolled_back_to_id")
+    private Long rolledBackToId;
+
     @OneToMany(mappedBy = "configVersion", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ConfigVersionFile> files = new ArrayList<>();
 
@@ -57,6 +61,20 @@ public class ConfigVersion extends BaseEntity {
         this.source = source;
         this.result = result;
         this.validationOutput = validationOutput;
+    }
+
+    public ConfigVersion rolledBackTo(Long versionId) {
+        this.rolledBackToId = versionId;
+        return this;
+    }
+
+    /** 성공한 버전은 그 시점의 관리 파일 전체를 담고 있어 되돌리기와 비교의 기준이 된다. */
+    public boolean isSnapshot() {
+        return result == VersionResult.SUCCESS;
+    }
+
+    public Long getRolledBackToId() {
+        return rolledBackToId;
     }
 
     public void addFile(String path, String content) {

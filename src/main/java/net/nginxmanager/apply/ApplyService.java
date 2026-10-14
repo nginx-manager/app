@@ -25,6 +25,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.Supplier;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -37,9 +39,6 @@ public class ApplyService {
 
     private static final Logger log = LoggerFactory.getLogger(ApplyService.class);
 
-    private record Change(String path, String content) {
-    }
-
     private final ReentrantLock lock = new ReentrantLock();
 
     private final ConfigFileRepository configFileRepository;
@@ -50,11 +49,12 @@ public class ApplyService {
     private final NginxRuntimeProperties properties;
     private final TransactionTemplate tx;
     private final ApplicationEventPublisher events;
+    private final ConfigSync sync;
 
     public ApplyService(ConfigFileRepository configFileRepository, ConfigVersionRepository versionRepository,
                         UserRepository userRepository, ConfigFileStore store, NginxRuntime runtime,
                         NginxRuntimeProperties properties, TransactionTemplate tx,
-                        ApplicationEventPublisher events) {
+                        ApplicationEventPublisher events, ConfigSync sync) {
         this.configFileRepository = configFileRepository;
         this.versionRepository = versionRepository;
         this.userRepository = userRepository;
@@ -63,29 +63,61 @@ public class ApplyService {
         this.properties = properties;
         this.tx = tx;
         this.events = events;
+        this.sync = sync;
+    }
+
+    /** 적용이나 되돌리기가 기록할 버전의 출처. */
+    public record Origin(String actor, String message, VersionSource source, Long rolledBackToId) {
     }
 
     /** @param actor 적용한 사용자. 시스템 작업이면 null */
     public ApplyResult applyPending(String actor, String message) {
+        return applyChanges(() -> tx.execute(status -> configFileRepository.findAll().stream()
+                        .filter(ConfigFile::hasPendingChange)
+                        .map(f -> new FileChange(f.getPath(), f.isDraftDelete() ? null : f.getDraftContent()))
+                        .toList()),
+                new Origin(actor, message, VersionSource.APPLY, null));
+    }
+
+    /**
+     * 초안 대신 주어진 변경을 같은 절차로 반영한다(되돌리기 등). 변경 계산도 잠금 안에서 한다.
+     */
+    public ApplyResult applyChanges(Supplier<List<FileChange>> changes, Origin origin) {
+        return withLock(() -> {
+            List<FileChange> computed = changes.get();
+            if (computed.isEmpty()) {
+                return ApplyResult.nothingToApply();
+            }
+            return apply(computed, origin);
+        });
+    }
+
+    /** 적용과 겹치면 안 되는 작업을 잠금 안에서 실행한다. 이미 적용 중이면 기다리지 않고 거절한다. */
+    public <T> T withLock(Supplier<T> work) {
         if (!lock.tryLock()) {
             throw new ApplyInProgressException();
         }
         try {
-            List<Change> changes = tx.execute(status -> configFileRepository.findAll().stream()
-                    .filter(ConfigFile::hasPendingChange)
-                    .map(f -> new Change(f.getPath(), f.isDraftDelete() ? null : f.getDraftContent()))
-                    .toList());
-            if (changes.isEmpty()) {
-                return ApplyResult.nothingToApply();
-            }
-            return apply(changes, actor, message);
+            return work.get();
         } finally {
             lock.unlock();
         }
     }
 
-    private ApplyResult apply(List<Change> changes, String actor, String message) {
-        List<String> paths = changes.stream().map(Change::path).toList();
+    /** 잠금을 얻으면 실행하고, 적용 중이면 건너뛴다. */
+    public <T> Optional<T> tryWithLock(Supplier<T> work) {
+        if (!lock.tryLock()) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.ofNullable(work.get());
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private ApplyResult apply(List<FileChange> changes, Origin origin) {
+        List<String> paths = changes.stream().map(FileChange::path).toList();
         Map<String, String> backup = new LinkedHashMap<>();
         for (String path : paths) {
             backup.put(path, store.read(path));
@@ -102,7 +134,7 @@ public class ApplyService {
         if (!validation.ok()) {
             restore(backup);
             log.info("Apply rejected by nginx -t: {}", validation.errors());
-            return record(changes, actor, message, VersionResult.VALIDATION_FAILED, validation.output(),
+            return record(changes, origin, VersionResult.VALIDATION_FAILED, validation.output(),
                     validation.errors());
         }
 
@@ -121,47 +153,36 @@ public class ApplyService {
             } catch (NginxCommandException e) {
                 log.error("reload after restore failed", e);
             }
-            return record(changes, actor, message, VersionResult.AUTO_RECOVERED, health.detail(), List.of());
+            return record(changes, origin, VersionResult.AUTO_RECOVERED, health.detail(), List.of());
         }
 
-        return record(changes, actor, message, VersionResult.SUCCESS, validation.output(), validation.errors());
+        return record(changes, origin, VersionResult.SUCCESS, validation.output(), validation.errors());
     }
 
     private void restore(Map<String, String> backup) {
         backup.forEach(store::write);
     }
 
-    private ApplyResult record(List<Change> changes, String actor, String message, VersionResult result,
+    private ApplyResult record(List<FileChange> changes, Origin origin, VersionResult result,
                                String detail, List<ValidationResult.ValidationMessage> messages) {
         Long versionId = tx.execute(status -> {
-            User author = actor == null ? null : userRepository.findByUsername(actor).orElse(null);
-            ConfigVersion version = new ConfigVersion(author, message, VersionSource.APPLY, result, detail);
+            User author = origin.actor() == null ? null : userRepository.findByUsername(origin.actor()).orElse(null);
+            ConfigVersion version = new ConfigVersion(author, origin.message(), origin.source(), result, detail)
+                    .rolledBackTo(origin.rolledBackToId());
             if (result == VersionResult.SUCCESS) {
-                markApplied(changes);
+                sync.sync(changes, false);
                 // 성공한 버전은 되돌리기에 쓰도록 관리 중인 모든 파일의 내용을 남긴다
-                configFileRepository.findAllByOrderByPathAsc()
-                        .forEach(f -> version.addFile(f.getPath(), store.read(f.getPath())));
+                sync.snapshot(version);
             } else {
                 changes.forEach(c -> version.addFile(c.path(), c.content()));
             }
             return versionRepository.save(version).getId();
         });
-        List<String> paths = changes.stream().map(Change::path).toList();
+        List<String> paths = changes.stream().map(FileChange::path).toList();
+        AuditAction action = origin.source() == VersionSource.ROLLBACK ? AuditAction.ROLLBACK : AuditAction.APPLY;
         events.publishEvent(result == VersionResult.SUCCESS
-                ? AuditEvent.success(actor, AuditAction.APPLY, "version:" + versionId)
-                : AuditEvent.failure(actor, AuditAction.APPLY, "version:" + versionId, result.name()));
+                ? AuditEvent.success(origin.actor(), action, "version:" + versionId)
+                : AuditEvent.failure(origin.actor(), action, "version:" + versionId, result.name()));
         return new ApplyResult(result, versionId, paths, messages, detail);
-    }
-
-    private void markApplied(List<Change> changes) {
-        for (Change change : changes) {
-            configFileRepository.findByPath(change.path()).ifPresent(file -> {
-                if (change.content() == null) {
-                    configFileRepository.delete(file);
-                } else {
-                    file.markApplied(ConfigFileStore.hash(change.content()));
-                }
-            });
-        }
     }
 }

@@ -1,10 +1,9 @@
 package net.nginxmanager.apply;
 
-import com.github.difflib.DiffUtils;
-import com.github.difflib.UnifiedDiffUtils;
 import net.nginxmanager.config.ConfigFile;
 import net.nginxmanager.config.ConfigFileRepository;
 import net.nginxmanager.config.ConfigFileStore;
+import net.nginxmanager.config.UnifiedDiff;
 import net.nginxmanager.site.SiteService;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
@@ -63,21 +62,7 @@ public class ApplyController {
         return configFileRepository.findAllByOrderByPathAsc().stream()
                 .filter(ConfigFile::hasPendingChange)
                 .map(f -> new PendingFile(f.getId(), f.getPath(), f.isDraftDelete(),
-                        diff(f.getPath(), store.read(f.getPath()), f.isDraftDelete() ? null : f.getDraftContent())))
+                        UnifiedDiff.of(f.getPath(), store.read(f.getPath()), f.isDraftDelete() ? null : f.getDraftContent())))
                 .toList();
-    }
-
-    static String diff(String path, String before, String after) {
-        List<String> original = lines(before);
-        List<String> revised = lines(after);
-        List<String> unified = UnifiedDiffUtils.generateUnifiedDiff(
-                before == null ? "/dev/null" : "a/" + path,
-                after == null ? "/dev/null" : "b/" + path,
-                original, DiffUtils.diff(original, revised), 3);
-        return String.join("\n", unified);
-    }
-
-    private static List<String> lines(String content) {
-        return content == null ? List.of() : content.lines().toList();
     }
 }

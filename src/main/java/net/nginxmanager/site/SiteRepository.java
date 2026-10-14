@@ -8,5 +8,7 @@ public interface SiteRepository extends JpaRepository<Site, Long> {
 
     boolean existsByPrimaryDomain(String primaryDomain);
 
+    Optional<Site> findByPrimaryDomain(String primaryDomain);
+
     Optional<Site> findByConfigFileId(Long configFileId);
 }

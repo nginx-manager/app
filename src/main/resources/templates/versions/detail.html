@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('버전 #' + ${version.id})}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<main class="page">
+    <div class="title-row">
+        <h1 th:text="'버전 #' + ${version.id}">버전 #3</h1>
+        <span class="badge" th:classappend="${version.snapshot ? 'ok' : 'bad'}" th:text="${version.result.label()}">적용됨</span>
+    </div>
+
+    <section class="card result" th:if="${param.unchanged}">
+        <p>서버의 설정이 이미 이 버전과 같아 바꿀 것이 없습니다.</p>
+    </section>
+    <section class="card result bad" th:if="${param.rejected != null and param.rejected[0] == 'PENDING_CHANGES'}">
+        <p>적용 대기 중인 변경이 있어 되돌리지 않았습니다. <a th:href="@{/apply}">적용 화면</a>에서 먼저 적용하거나 버리세요.</p>
+    </section>
+    <section class="card result bad" th:if="${param.rejected != null and param.rejected[0] == 'NOT_A_SNAPSHOT'}">
+        <p>실패한 버전으로는 되돌릴 수 없습니다.</p>
+    </section>
+    <section class="card result bad" th:if="${version.result.name() == 'VALIDATION_FAILED'}">
+        <h2>문법 검증에 실패해 반영하지 않았습니다</h2>
+        <p>서버의 설정은 그대로입니다.</p>
+        <pre class="code" th:text="${version.validationOutput}"></pre>
+    </section>
+    <section class="card result bad" th:if="${version.result.name() == 'AUTO_RECOVERED'}">
+        <h2>반영 후 nginx 상태가 나빠 직전 설정으로 되돌렸습니다</h2>
+        <p th:text="${version.validationOutput}">status endpoint unreachable</p>
+    </section>
+
+    <section class="card">
+        <dl class="facts">
+            <dt>시각</dt><dd th:text="${#temporals.format(version.createdAt, 'yyyy-MM-dd HH:mm:ss')}">2026-10-13</dd>
+            <dt>작성자</dt><dd th:text="${version.authorName ?: '시스템'}">admin</dd>
+            <dt>종류</dt>
+            <dd>
+                <span th:text="${version.source.label()}">적용</span>
+                <a th:if="${version.rolledBackToId != null}" th:href="@{/versions/{id}(id=${version.rolledBackToId})}"
+                   th:text="'버전 #' + ${version.rolledBackToId} + '(으)로'">버전 #1(으)로</a>
+            </dd>
+            <dt>메모</dt><dd th:text="${version.message ?: '-'}">메모</dd>
+        </dl>
+        <form th:if="${version.snapshot and currentUser.canEdit()}" th:action="@{/versions/{id}/rollback(id=${version.id})}"
+              method="post" class="actions">
+            <button type="submit">이 버전으로 되돌리기</button>
+            <span class="muted small">적용과 같이 문법 검증 → reload → 상태 확인을 거칩니다.</span>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2 th:text="${version.snapshot ? '이 시점의 설정 파일' : '적용하려던 파일'}">이 시점의 설정 파일</h2>
+        <details th:each="f : ${files}">
+            <summary>
+                <code th:text="${f.path}">nginx.conf</code>
+                <span th:if="${f.content == null}" class="badge warn">삭제</span>
+            </summary>
+            <pre class="code" th:if="${f.content != null}" th:text="${f.content}"></pre>
+        </details>
+    </section>
+</main>
+</body>
+</html>
