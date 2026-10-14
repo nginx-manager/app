@@ -1,13 +1,17 @@
 package net.nginxmanager.support;
 
+import net.nginxmanager.runtime.AgentInfo;
+import net.nginxmanager.runtime.AgentNginxRuntime;
 import net.nginxmanager.runtime.HealthResult;
 import net.nginxmanager.runtime.NginxRuntime;
 import net.nginxmanager.runtime.RuntimeStatus;
+import net.nginxmanager.runtime.StartupCheckReport;
 import net.nginxmanager.runtime.ValidationResult;
 import net.nginxmanager.runtime.ValidationResult.ValidationMessage;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.function.Supplier;
 
@@ -25,6 +29,11 @@ public class FakeNginxRuntime implements NginxRuntime {
     /** 설정하면 validate()가 이 래치가 풀릴 때까지 기다린다(동시 적용 테스트). */
     public CountDownLatch blockValidation;
     public CountDownLatch validationStarted;
+    public String bootId = "boot-1";
+    /** true면 에이전트에 연결하지 못한 것처럼 status()가 UNREACHABLE을 준다. */
+    public boolean unreachable;
+    public StartupCheckReport startupCheck;
+    public AgentInfo agent = connectedAgent("dev");
 
     public void reset() {
         validation = FakeNginxRuntime::valid;
@@ -37,6 +46,14 @@ public class FakeNginxRuntime implements NginxRuntime {
         startCalls = 0;
         blockValidation = null;
         validationStarted = null;
+        bootId = "boot-1";
+        unreachable = false;
+        startupCheck = null;
+        agent = connectedAgent("dev");
+    }
+
+    public static AgentInfo connectedAgent(String version) {
+        return new AgentInfo(true, version, AgentNginxRuntime.PROTOCOL, null);
     }
 
     public static ValidationResult valid() {
@@ -51,6 +68,9 @@ public class FakeNginxRuntime implements NginxRuntime {
 
     @Override
     public RuntimeStatus status() {
+        if (unreachable) {
+            return RuntimeStatus.unreachable();
+        }
         return new RuntimeStatus(running ? RuntimeStatus.State.RUNNING : RuntimeStatus.State.STOPPED, "1.31.6",
                 List.of(), running ? pid : null);
     }
@@ -90,5 +110,20 @@ public class FakeNginxRuntime implements NginxRuntime {
     public void start() {
         startCalls++;
         running = true;
+    }
+
+    @Override
+    public String bootId() {
+        return bootId;
+    }
+
+    @Override
+    public Optional<StartupCheckReport> startupCheck() {
+        return Optional.ofNullable(startupCheck);
+    }
+
+    @Override
+    public AgentInfo agent() {
+        return agent;
     }
 }

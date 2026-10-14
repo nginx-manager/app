@@ -40,6 +40,11 @@
         </form>
     </div>
 </nav>
+<div class="drift-banner runtime-banner" id="runtime-warning" th:if="${runtimeWarning != null}" th:switch="${runtimeWarning.kind.name()}">
+    <span th:case="'UNREACHABLE'"><strong th:text="#{nav.runtime.unreachable}">nginx 컨테이너에 연결할 수 없습니다.</strong> <span th:text="${runtimeWarning.detail}"></span></span>
+    <span th:case="'PROTOCOL'" th:text="#{nav.runtime.protocol(${runtimeWarning.agentVersion} ?: '?', ${runtimeWarning.appVersion})}">nginx 컨테이너와 관리도구가 서로 맞지 않습니다.</span>
+    <span th:case="*" th:text="#{nav.runtime.version(${runtimeWarning.agentVersion}, ${runtimeWarning.appVersion})}">버전이 다릅니다.</span>
+</div>
 <div class="drift-banner" th:if="${drift != null and !#lists.isEmpty(drift)}">
     <span th:text="#{nav.drift.before}">서버에서 직접 바뀐 설정 파일이</span>
     <strong th:text="${#lists.size(drift)}">1</strong><span th:text="#{nav.drift.after}">개 있습니다.</span>

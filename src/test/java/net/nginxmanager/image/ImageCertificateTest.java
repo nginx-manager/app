@@ -7,7 +7,6 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.utility.DockerImageName;
 
 import java.net.http.HttpResponse;
 import java.time.Duration;
@@ -26,7 +25,7 @@ class ImageCertificateTest {
 
     static Network network;
     static GenericContainer<?> pebble;
-    static GenericContainer<?> container;
+    static Stack stack;
     static ManagerClient client;
 
     @BeforeAll
@@ -40,19 +39,14 @@ class ImageCertificateTest {
                 .withEnv("PEBBLE_WFE_NONCEREJECT", "0")
                 .waitingFor(Wait.forLogMessage(".*ACME directory available.*", 1));
         pebble.start();
-        container = new GenericContainer<>(DockerImageName.parse(System.getProperty("image.name", "nginx-manager/app:dev")))
-                .withNetwork(network)
-                .withEnv("NGINX_MANAGER_ACME_DIRECTORY_URL", "acme://pebble/pebble:14000")
-                .withExposedPorts(80, 443, 9000)
-                .waitingFor(Wait.forHttp("/actuator/health").forPort(9000).forStatusCode(200)
-                        .withStartupTimeout(Duration.ofMinutes(2)));
-        container.start();
-        client = new ManagerClient(container).setupAndLogin();
+        stack = Stack.start(network,
+                manager -> manager.withEnv("NGINX_MANAGER_ACME_DIRECTORY_URL", "acme://pebble/pebble:14000"));
+        client = stack.client().setupAndLogin();
     }
 
     @AfterAll
     static void stop() {
-        container.stop();
+        stack.close();
         pebble.stop();
         network.close();
     }
@@ -72,7 +66,7 @@ class ImageCertificateTest {
         await().atMost(Duration.ofSeconds(10)).pollInterval(Duration.ofMillis(200))
                 .until(() -> curl("http://" + DOMAIN + "/").equals("301"));
         // curl -v가 보여 주는 서버 인증서 발급자
-        String handshake = container.execInContainer("curl", "--noproxy", "*", "-k", "-s", "-v", "-o", "/dev/null",
+        String handshake = stack.nginxExec("curl", "--noproxy", "*", "-k", "-s", "-v", "-o", "/dev/null",
                 "--resolve", DOMAIN + ":443:127.0.0.1", "https://" + DOMAIN + "/").getStderr();
         assertThat(handshake).containsIgnoringCase("issuer:").containsIgnoringCase("pebble");
 
@@ -82,7 +76,7 @@ class ImageCertificateTest {
     }
 
     private static String curl(String url) throws Exception {
-        return container.execInContainer("curl", "--noproxy", "*", "-k", "-s", "-o", "/dev/null", "-w", "%{http_code}",
+        return stack.nginxExec("curl", "--noproxy", "*", "-k", "-s", "-o", "/dev/null", "-w", "%{http_code}",
                 "--resolve", DOMAIN + ":443:127.0.0.1", "--resolve", DOMAIN + ":80:127.0.0.1", url).getStdout();
     }
 }

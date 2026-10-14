@@ -26,7 +26,7 @@ public class SecurityConfig {
         http
                 .addFilterBefore(new SetupRedirectFilter(setupState), UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/setup", "/login", "/css/**", "/js/**", "/webjars/**", "/actuator/health", "/error").permitAll()
+                        .requestMatchers("/setup", "/login", "/css/**", "/js/**", "/webjars/**", "/actuator/health", "/actuator/health/liveness", "/actuator/health/readiness", "/error").permitAll()
                         .requestMatchers("/users/**", "/audit/**", "/settings/**", "/runtime/**").hasRole("ADMIN")
                         // 본인 비밀번호 변경은 역할과 관계없이 허용한다
                         .requestMatchers("/account").authenticated()

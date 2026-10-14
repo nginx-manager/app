@@ -4,6 +4,7 @@ import net.nginxmanager.cert.CertificateStatus;
 import net.nginxmanager.cert.TlsCertificate;
 import net.nginxmanager.cert.TlsCertificateRepository;
 import net.nginxmanager.history.VersionQueryRepository;
+import net.nginxmanager.runtime.AgentInfo;
 import net.nginxmanager.runtime.NginxProcessWatcher;
 import net.nginxmanager.runtime.NginxRuntime;
 import net.nginxmanager.runtime.RuntimeStatus;
@@ -34,7 +35,7 @@ public class DashboardService {
                             List<VersionQueryRepository.VersionRow> recentVersions,
                             List<CertificateWarning> certificateWarnings, long databaseBytes,
                             StartupCheck failedStartupCheck, VersionChange versionChange, String appVersion,
-                            NginxProcessWatcher.ProcessEvent lastProcessEvent) {
+                            NginxProcessWatcher.ProcessEvent lastProcessEvent, AgentInfo agent) {
     }
 
     private final NginxRuntime runtime;
@@ -71,12 +72,12 @@ public class DashboardService {
         RuntimeStatus status = runtime.status();
         // 시작 검사 실패는 nginx가 아직 내려가 있는 동안만 보여 준다(다시 띄웠으면 해결된 것)
         StartupCheck failed = startupCheckService.check()
-                .filter(check -> !check.ok() && status.state() != RuntimeStatus.State.RUNNING)
+                .filter(check -> !check.ok() && status.state() == RuntimeStatus.State.STOPPED)
                 .orElse(null);
         return new Dashboard(status, siteRepository.count(), siteRepository.countByEnabledTrue(),
                 versionQueryRepository.findPage(0, RECENT_VERSIONS), warnings, databaseBytes(), failed,
                 startupCheckService.versionChange().orElse(null), startupCheckService.appVersion(),
-                processWatcher.lastEvent().orElse(null));
+                processWatcher.lastEvent().orElse(null), runtime.agent());
     }
 
     private static CertificateWarning warning(TlsCertificate c, Instant now) {

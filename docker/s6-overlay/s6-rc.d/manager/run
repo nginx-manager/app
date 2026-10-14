@@ -1,5 +1,0 @@
-#!/command/with-contenv sh
-# 관리도구가 죽어도 nginx는 계속 서비스한다.
-# DB와 키 파일을 다른 사용자가 읽지 못하게 한다
-umask 027
-exec s6-setuidgid nginxm java -jar /app/app.jar

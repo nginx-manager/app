@@ -20,8 +20,7 @@ class LogRotatorTest {
     private final FakeNginxRuntime runtime = new FakeNginxRuntime();
 
     private LogRotator rotator(int keep) {
-        NginxRuntimeProperties properties = new NginxRuntimeProperties(null, null, null, null, null, null,
-                logDir, null, null);
+        NginxRuntimeProperties properties = new NginxRuntimeProperties(null, null, null, logDir, null);
         // 0MB: 비어 있지 않은 파일은 모두 교체 대상
         return new LogRotator(runtime, properties, 0, keep);
     }
@@ -45,8 +44,7 @@ class LogRotatorTest {
     void leavesSmallLogsAlone() throws IOException {
         Path error = logDir.resolve("error.log");
         Files.writeString(error, "x", StandardCharsets.UTF_8);
-        NginxRuntimeProperties properties = new NginxRuntimeProperties(null, null, null, null, null, null,
-                logDir, null, null);
+        NginxRuntimeProperties properties = new NginxRuntimeProperties(null, null, null, logDir, null);
         new LogRotator(runtime, properties, 1, 5).rotateIfNeeded();
 
         assertThat(error).exists();

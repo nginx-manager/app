@@ -7,9 +7,6 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.utility.DockerImageName;
 
 import java.net.http.HttpResponse;
 import java.time.Duration;
@@ -30,23 +27,19 @@ class ImageApplyTest {
     static final Pattern FILE_LINK = Pattern.compile("href=\"/files/(\\d+)\">conf\\.d/sites/app\\.local\\.conf<");
     static final Pattern VERSION = Pattern.compile("name=\"version\" value=\"(\\d+)\"");
 
-    static GenericContainer<?> container;
+    static Stack stack;
     static String siteFileId;
     static ManagerClient client;
 
     @BeforeAll
     static void start() throws Exception {
-        container = new GenericContainer<>(DockerImageName.parse(System.getProperty("image.name", "nginx-manager/app:dev")))
-                .withExposedPorts(80, 9000)
-                .waitingFor(Wait.forHttp("/actuator/health").forPort(9000).forStatusCode(200)
-                        .withStartupTimeout(Duration.ofMinutes(2)));
-        container.start();
-        client = new ManagerClient(container).setupAndLogin();
+        stack = Stack.start();
+        client = stack.client().setupAndLogin();
     }
 
     @AfterAll
     static void stop() {
-        container.stop();
+        stack.close();
     }
 
     @Test
@@ -81,7 +74,7 @@ class ImageApplyTest {
         HttpResponse<String> applied = post("/apply", Map.of(), "/apply");
 
         assertThat(applied.body()).contains("no_such_flag");
-        assertThat(container.execInContainer("cat", "/etc/nginx/conf.d/sites/app.local.conf").getStdout())
+        assertThat(stack.nginxExec("cat", "/etc/nginx/conf.d/sites/app.local.conf").getStdout())
                 .doesNotContain("no_such_flag");
         assertThat(siteStatus()).isEqualTo("200");
     }
@@ -105,7 +98,7 @@ class ImageApplyTest {
     @Test
     @Order(4)
     void editsMadeOnTheServerAreDetectedAndImported() throws Exception {
-        container.execInContainer("sh", "-c", "echo '# edited by hand' >> /etc/nginx/nginx.conf");
+        stack.nginxExec("sh", "-c", "echo '# edited by hand' >> /etc/nginx/nginx.conf");
 
         assertThat(get("/versions").body()).contains("서버에서 직접 바뀐 설정").contains("nginx.conf");
         HttpResponse<String> imported = post("/drift/import", Map.of(), "/versions");
@@ -116,7 +109,7 @@ class ImageApplyTest {
     }
 
     private static String siteStatus() throws Exception {
-        return container.execInContainer("curl", "--noproxy", "*", "-s", "-o", "/dev/null", "-w", "%{http_code}",
+        return stack.nginxExec("curl", "--noproxy", "*", "-s", "-o", "/dev/null", "-w", "%{http_code}",
                 "-H", "Host: app.local", "http://127.0.0.1/").getStdout();
     }
 

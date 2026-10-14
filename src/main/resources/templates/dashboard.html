@@ -48,7 +48,7 @@
     <div class="stats" id="stats">
         <a class="stat" th:href="@{/}" th:classappend="${status.state.name() == 'RUNNING'} ? 'ok' : 'bad'">
             <span class="stat-label" th:text="#{dashboard.stats.nginx}">nginx</span>
-            <strong class="stat-value" th:text="${status.state.name() == 'RUNNING'} ? #{dashboard.facts.running} : #{dashboard.facts.stopped}">실행 중</strong>
+            <strong class="stat-value" th:text="${status.state.name() == 'RUNNING'} ? #{dashboard.facts.running} : (${status.state.name() == 'UNREACHABLE'} ? #{dashboard.facts.unreachable} : #{dashboard.facts.stopped})">실행 중</strong>
             <span class="stat-sub" th:text="${status.version} ?: #{dashboard.unknown}">1.31.6</span>
         </a>
         <a class="stat" th:href="@{/sites}">
@@ -75,8 +75,9 @@
                 <dt th:text="#{dashboard.facts.state}">상태</dt>
                 <dd>
                     <span th:if="${status.state.name() == 'RUNNING'}" class="badge ok" th:text="#{dashboard.facts.running}">실행 중</span>
-                    <span th:unless="${status.state.name() == 'RUNNING'}" class="badge bad" th:text="#{dashboard.facts.stopped}">중지됨</span>
-                    <form th:if="${status.state.name() != 'RUNNING' and currentUser.isAdmin()}"
+                    <span th:if="${status.state.name() == 'STOPPED'}" class="badge bad" th:text="#{dashboard.facts.stopped}">중지됨</span>
+                    <span th:if="${status.state.name() == 'UNREACHABLE'}" class="badge bad" th:text="#{dashboard.facts.unreachable}">연결 안 됨</span>
+                    <form th:if="${status.state.name() == 'STOPPED' and currentUser.isAdmin()}"
                           th:action="@{/runtime/start}" method="post" class="inline">
                         <button type="submit" th:text="#{dashboard.facts.start}">nginx 시작</button>
                     </form>
@@ -94,6 +95,8 @@
                 </th:block>
                 <dt th:text="#{dashboard.facts.appVersion}">관리도구</dt>
                 <dd th:text="${dashboard.appVersion}">0.1.0</dd>
+                <dt th:text="#{dashboard.facts.agentVersion}">nginx 컨테이너</dt>
+                <dd id="agent-version" th:text="${dashboard.agent.version} ?: #{dashboard.unknown}">0.1.0</dd>
                 <dt th:text="#{dashboard.facts.masterPid}">마스터 PID</dt>
                 <dd th:text="${status.masterPid} ?: '-'">1</dd>
                 <dt th:text="#{dashboard.facts.sites}">사이트</dt>

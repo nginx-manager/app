@@ -1,6 +1,6 @@
 # nginx manager
 
-브라우저에서 nginx를 관리하는 도구입니다. nginx(오픈소스, 전체 모듈 빌드)와 관리도구(Spring Boot)가 Docker 이미지 하나에 들어 있습니다.
+브라우저에서 nginx를 관리하는 도구입니다. nginx(오픈소스, 전체 모듈 빌드)와 관리 화면(Spring Boot)이 서로 다른 컨테이너에서 돌기 때문에, 관리 화면을 업데이트하거나 다시 띄워도 nginx는 트래픽을 계속 받습니다.
 
 명세와 설계는 [nginx-manager/docs](https://github.com/nginx-manager/docs)의 `specs/001-nginx-web-manager/`에 있습니다(Spec Kit).
 
@@ -15,68 +15,90 @@
 
 ## 실행
 
-```bash
-docker run -d --name nginx-manager \
-  -p 80:80 -p 443:443 -p 9000:9000 \
-  -v nm-conf:/etc/nginx -v nm-logs:/var/log/nginx -v nm-data:/data \
-  ghcr.io/nginx-manager/app:latest
-```
+[docker/docker-compose.yml](docker/docker-compose.yml)을 받아 띄웁니다. 컨테이너 두 개와 볼륨, 에이전트 토큰이 모두 들어 있어 따로 정할 것은 없습니다.
 
-Compose로 띄우려면 [docker/docker-compose.yml](docker/docker-compose.yml)을 씁니다.
+```bash
+curl -fsSLO https://raw.githubusercontent.com/nginx-manager/app/main/docker/docker-compose.yml
+docker compose up -d
+```
 
 `http://<호스트>:9000`에 접속하면 최초 관리자 계정을 만드는 화면이 나옵니다. 관리 화면은 인터넷에 그대로 열지 말고 사내망·VPN에서 쓰거나 HTTPS 프록시 뒤에 두세요([보안 점검](docs/security.md)).
 
-| 볼륨 | 내용 |
-|------|------|
-| `/etc/nginx` | nginx 설정, 인증서(`certs/`) |
-| `/var/log/nginx` | 접근·오류 로그(사이트별 로그는 `sites/`) |
-| `/data` | 관리도구 DB(SQLite), ACME 계정 키 |
+| 컨테이너 | 이미지 | 하는 일 |
+|----------|--------|---------|
+| `nginx` | `ghcr.io/nginx-manager/nginx` | nginx(80/443)와 에이전트. 에이전트는 관리 화면의 요청으로 `nginx -t`·reload만 실행합니다. |
+| `manager` | `ghcr.io/nginx-manager/app` | 관리 화면(9000). 설정 파일은 볼륨으로 직접 쓰고, 검증·reload는 에이전트에 맡깁니다. |
+
+| 볼륨 | 마운트 | 내용 |
+|------|--------|------|
+| `nm-conf` | 둘 다 `/etc/nginx` | nginx 설정, 인증서(`certs/`) |
+| `nm-logs` | 둘 다 `/var/log/nginx` | 접근·오류 로그(사이트별 로그는 `sites/`) |
+| `nm-shared` | 둘 다 `/var/lib/nginx-manager` | Let's Encrypt 챌린지 파일, 에이전트 토큰 |
+| `nm-data` | manager `/data` | 관리도구 DB(SQLite), ACME 계정 키 |
+
+공유 볼륨은 두 컨테이너에서 **같은 경로**에 둡니다(`nginx -t` 오류의 파일 경로가 화면의 파일과 맞아야 합니다). 두 이미지의 프로세스는 같은 UID(10101)로 돌아 서로의 파일을 읽고 씁니다.
 
 처음 시작할 때 `/etc/nginx`에 이미 있는 설정을 가져와 첫 버전으로 남깁니다. 이미지를 바꿔도 볼륨의 데이터는 그대로입니다.
 
 ### 설정(환경 변수)
 
+관리도구(`manager`) 컨테이너:
+
 | 변수 | 기본값 | 설명 |
 |------|--------|------|
+| `NGINX_RUNTIME_AGENT_URL` | `http://nginx:7070` | 에이전트 주소. compose의 nginx 서비스 이름을 바꾸면 함께 바꿉니다. |
+| `NGINX_RUNTIME_AGENT_TOKEN` | (비움) | 비우면 공유 볼륨의 토큰 파일을 읽습니다. 직접 정하면 nginx 컨테이너의 `NGINX_AGENT_TOKEN`과 같게 둡니다. |
 | `NGINX_MANAGER_ACME_DIRECTORY_URL` | (비움) | 지정하면 화면의 Let's Encrypt 운영/스테이징 선택 대신 이 ACME 서버를 씁니다. |
 | `NGINX_MANAGER_CERT_CHECK_INTERVAL` | `PT6H` | 갱신할 인증서를 찾는 주기 |
 | `SPRING_MAIL_HOST`, `SPRING_MAIL_PORT`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD` | | 메일 알림을 쓸 때 SMTP 서버 |
 | `SERVER_SERVLET_SESSION_COOKIE_SECURE` | `false` | 관리 화면을 HTTPS 뒤에 두면 `true` |
 
-Let's Encrypt는 HTTP-01 방식으로 인증하므로 도메인이 이 컨테이너의 80 포트로 들어와야 합니다. 처음에는 화면의 설정에서 스테이징으로 시험해 보는 것을 권합니다.
+nginx 컨테이너:
+
+| 변수 | 기본값 | 설명 |
+|------|--------|------|
+| `NGINX_AGENT_TOKEN` | (비움) | 비우면 처음 뜰 때 `/var/lib/nginx-manager/agent/token`에 무작위 토큰을 만들어 씁니다. |
+| `NGINX_AGENT_LISTEN` | `:7070` | 에이전트가 듣는 주소 |
+
+Let's Encrypt는 HTTP-01 방식으로 인증하므로 도메인이 nginx 컨테이너의 80 포트로 들어와야 합니다. 처음에는 화면의 설정에서 스테이징으로 시험해 보는 것을 권합니다.
 
 ## 업그레이드와 되돌리기
 
-이미지 태그는 `<관리도구 버전>-nginx<nginx 버전>`(예: `0.1.0-nginx1.31.6`)과 `latest`입니다. nginx 새 릴리스가 나오면 이미지가 자동으로 다시 빌드·테스트·게시되고, 이전 태그는 그대로 남습니다.
+두 이미지는 **같은 버전**으로 맞춥니다. compose 파일은 `NGINX_MANAGER_VERSION` 하나로 두 이미지의 태그를 함께 정합니다(기본 `latest`).
 
 ```bash
-docker pull ghcr.io/nginx-manager/app:latest
-docker rm -f nginx-manager
-docker run -d --name nginx-manager ... ghcr.io/nginx-manager/app:latest   # 같은 볼륨으로
+NGINX_MANAGER_VERSION=1.0.0 docker compose pull
+NGINX_MANAGER_VERSION=1.0.0 docker compose up -d
 ```
 
-- 새 이미지는 시작할 때 nginx를 띄우기 전에 볼륨의 설정을 검증합니다. 새 nginx가 설정을 받아들이지 않으면 nginx는 띄우지 않고 관리 화면만 뜹니다. 대시보드가 문제의 파일·줄과 이전/현재 버전을 보여 줍니다.
-- 고치는 방법은 둘입니다. 화면에서 설정을 고쳐 적용한 뒤 대시보드의 "nginx 시작"을 누르거나, 이전 태그로 컨테이너를 다시 띄웁니다(볼륨은 그대로 씁니다).
+- 관리 화면만 바꾸면 nginx는 끊기지 않습니다(`docker compose up -d manager`).
+- 버전이 다르거나 에이전트에 연결할 수 없으면 모든 화면 위에 경고가 뜹니다. 관리도구와 에이전트가 서로 알아들을 수 없는 판이면 에이전트가 요청을 거절하고 화면이 그 사실을 알립니다.
+- nginx 이미지 태그는 `<관리도구 버전>-nginx<nginx 버전>`(예: `1.0.0-nginx1.31.6`), `<관리도구 버전>`, `latest`입니다. nginx 새 릴리스가 나오면 nginx 이미지만 자동으로 다시 빌드·테스트·게시되고, 이전 태그는 그대로 남습니다.
+- 새 nginx 이미지는 시작할 때 nginx를 띄우기 전에 볼륨의 설정을 검증합니다. 새 nginx가 설정을 받아들이지 않으면 nginx는 띄우지 않고 에이전트만 뜹니다. 관리 화면이 이를 알아채 대시보드에 문제의 파일·줄과 이전/현재 버전을 보여 줍니다.
+- 고치는 방법은 둘입니다. 화면에서 설정을 고쳐 적용한 뒤 대시보드의 "nginx 시작"을 누르거나, nginx 컨테이너를 이전 태그로 다시 띄웁니다(볼륨은 그대로 씁니다).
 - 버전이 바뀌면 대시보드와 감사 로그에 남습니다.
 
 설정 자체를 되돌릴 때는 이력 화면에서 원하는 버전의 "되돌리기"를 씁니다.
 
 ## 구성
 
-- 컨테이너 안에서 [s6-overlay](https://github.com/just-containers/s6-overlay)가 nginx와 관리도구를 각각 감시하고, 죽으면 다시 띄웁니다. 관리도구가 멈춰도 nginx는 계속 서비스합니다.
-- 두 프로세스 모두 비루트 사용자 `nginxm`으로 돕니다. nginx 실행 파일에만 80/443 포트를 열 권한을 줍니다.
-- 관리도구는 nginx를 고정된 명령(`nginx -t`, `nginx -s reload`, `nginx -V`, `s6-svc -u`)으로만 다룹니다.
+- nginx 컨테이너 안에서 [s6-overlay](https://github.com/just-containers/s6-overlay)가 nginx와 에이전트를 각각 감시하고, 죽으면 다시 띄웁니다.
+- 관리도구는 nginx를 에이전트 API(`agent/`)로만 다룹니다. 에이전트는 고정된 명령(`nginx -t`, `nginx -s reload`, `nginx -s reopen`, `nginx -V`, `s6-svc -u`)만 실행하고, 토큰 없는 요청은 거절합니다. 관리도구에 Docker 소켓을 넘기지 않습니다.
+- 두 컨테이너의 프로세스는 모두 비루트 사용자 `nginxm`(UID 10101)으로 돕니다. nginx 실행 파일에만 80/443 포트를 열 권한을 줍니다.
 - 인증서는 발급·갱신마다 `/etc/nginx/certs/<이름>/<시각>/`에 새로 쓰고 설정의 경로만 바꿔 적용합니다. 그래서 인증서 교체도 이력에 남고 되돌릴 수 있습니다.
 
 ## 개발
 
-Java 21, Maven 3.9, Docker가 필요합니다.
+Java 21, Maven 3.9, Go 1.24, Docker가 필요합니다.
 
 ```bash
 mvn verify                       # 단위·통합 테스트(실제 ACME 발급 테스트는 Docker로 Pebble을 띄움)
 mvn spotless:apply               # 포맷 맞추기(verify가 검사함). 컴파일 때는 Error Prone이 흔한 실수를 막습니다
-docker build -f docker/Dockerfile -t nginx-manager/app:dev .
-mvn -Pimage-test test -Dimage.name=nginx-manager/app:dev   # 이미지 테스트(실제 nginx로 적용·HTTPS·업그레이드 시나리오)
+(cd agent && go test ./...)      # 에이전트 테스트
+docker build -f docker/nginx/Dockerfile -t nginx-manager/nginx:dev .
+docker build -f docker/manager/Dockerfile -t nginx-manager/app:dev .
+# 이미지 테스트: 두 컨테이너를 compose와 같은 구성으로 띄워 적용·HTTPS·업그레이드 시나리오를 실제 nginx로 확인
+mvn -Pimage-test test -Dimage.name=nginx-manager/app:dev -Dnginx.image.name=nginx-manager/nginx:dev
 ```
 
 원문 편집기 번들(`src/main/resources/static/js/editor.bundle.js`)은 저장소에 함께 둡니다. 바꿀 때만 다시 만듭니다.
@@ -91,4 +113,4 @@ cd frontend && npm ci && npm run build
 - 연관관계는 모두 `fetch = LAZY`, `open-in-view=false`입니다.
 - 목록 조회마다 `QueryCounter.assertConstantQueries`로 데이터 건수와 상관없이 쿼리 수가 같은지 확인합니다.
 
-릴리스: `v<버전>` 태그를 밀면 그 버전과 최신 nginx로 이미지를 게시합니다. 이후 nginx 릴리스는 매일 확인해 자동으로 게시합니다.
+릴리스: `v<버전>` 태그를 밀면 그 버전과 최신 nginx로 두 이미지를 게시합니다. 이후 nginx 릴리스는 매일 확인해 nginx 이미지만 자동으로 게시합니다. 에이전트 API를 바꾸면 `agent/server.go`의 `Protocol`과 `AgentNginxRuntime.PROTOCOL`을 함께 올립니다.

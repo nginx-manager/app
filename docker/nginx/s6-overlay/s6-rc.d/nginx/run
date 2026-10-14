@@ -6,7 +6,7 @@ mkdir -p /run/nginx /var/log/nginx/sites
 chown nginxm:nginxm /run/nginx /var/log/nginx/sites
 # 마스터가 갑자기 죽으면 워커가 남아 80/443을 계속 잡고 있어 새 nginx가 뜨지 못한다. 남은 nginx 프로세스를 정리한다.
 pkill -KILL -u nginxm -f '^nginx: ' 2>/dev/null || true
-# 관리도구(nginxm)가 내려간 nginx를 화면에서 다시 띄울 수 있도록(s6-svc -u) 제어 권한을 준다.
+# 에이전트(nginxm)가 관리 화면의 요청으로 내려간 nginx를 다시 띄울 수 있도록(s6-svc -u) 제어 권한을 준다.
 s6-svperms -G nginxm . 2>/dev/null || true
 # 설정이 이 nginx와 맞지 않으면(업그레이드 직후 등) 띄우지 않고 내려 둔다.
 # 관리 화면에서 설정을 고친 뒤 "nginx 시작"으로 다시 띄운다.
