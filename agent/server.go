@@ -22,6 +22,8 @@ const (
 	headerAgentProtocol  = "X-Nginx-Agent-Protocol"
 	headerAgentVersion   = "X-Nginx-Agent-Version"
 	maxTimeout           = 60 * time.Second
+	// defaultTimeout은 timeout이 없거나 잘못됐을 때 쓴다(관리도구 nginx.runtime.health-timeout 기본값과 같다)
+	defaultTimeout = 10 * time.Second
 )
 
 // Server는 관리도구가 부르는 HTTP API다. /healthz를 뺀 모든 요청은 토큰이 있어야 한다.
@@ -93,6 +95,7 @@ func (s *Server) guard(next http.Handler) http.Handler {
 			writeJSON(w, http.StatusUnauthorized, errorResponse{Error: "missing or wrong agent token"})
 			return
 		}
+		// 관리도구는 늘 프로토콜 헤더를 보내지만 계약은 다른 판만 거부하므로, 헤더가 없으면(curl로 직접 부를 때 등) 받아들인다
 		if p := r.Header.Get(headerProtocol); p != "" && p != strconv.Itoa(Protocol) {
 			writeJSON(w, http.StatusConflict, errorResponse{
 				Error:         "nginx-manager protocol " + p + " is not supported by this agent",
@@ -105,9 +108,11 @@ func (s *Server) guard(next http.Handler) http.Handler {
 	})
 }
 
+// authorized는 Bearer 토큰을 확인한다. 인증 방식 이름은 대소문자를 가리지 않는다(RFC 7235).
 func (s *Server) authorized(r *http.Request) bool {
-	got, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
-	return ok && s.Token != "" && subtle.ConstantTimeCompare([]byte(got), []byte(s.Token)) == 1
+	scheme, got, ok := strings.Cut(r.Header.Get("Authorization"), " ")
+	return ok && strings.EqualFold(scheme, "Bearer") && s.Token != "" &&
+		subtle.ConstantTimeCompare([]byte(got), []byte(s.Token)) == 1
 }
 
 func (s *Server) noteManagerVersion(v string) {
@@ -205,11 +210,12 @@ func (s *Server) command(w http.ResponseWriter, run func() error) {
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
-// timeoutParam은 ?timeout=10s 값이다. 없거나 잘못되면 0, 너무 길면 maxTimeout으로 줄인다.
+// timeoutParam은 ?timeout=10s 값이다. 없거나 잘못되면 defaultTimeout, 너무 길면 maxTimeout으로 줄인다.
+// 0을 주면 한 번만 확인한다.
 func timeoutParam(r *http.Request) time.Duration {
 	d, err := time.ParseDuration(r.URL.Query().Get("timeout"))
 	if err != nil || d < 0 {
-		return 0
+		return defaultTimeout
 	}
 	return min(d, maxTimeout)
 }

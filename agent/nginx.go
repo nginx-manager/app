@@ -65,6 +65,8 @@ func (n *Nginx) run(name string, args ...string) (CommandResult, error) {
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &out
+	// 시간이 넘어 죽인 뒤에도 자식 프로세스가 출력을 붙잡고 있으면 Wait가 끝나지 않으므로 오래 기다리지 않는다
+	cmd.WaitDelay = time.Second
 	err := cmd.Run()
 	if ctx.Err() != nil {
 		return CommandResult{}, fmt.Errorf("%s timed out after %s", name, n.CommandTimeout)
@@ -109,6 +111,8 @@ func (n *Nginx) Reload(timeout time.Duration) error {
 	if master != 0 {
 		before = n.children(master)
 	}
+	// 이전 실패가 남긴 [emerg]를 이번 원인으로 보이지 않도록 reload 전 error.log 크기를 적어 둔다
+	logOffset := n.errorLogSize()
 	result, err := n.run(n.Binary, "-s", "reload")
 	if err != nil {
 		return err
@@ -116,7 +120,8 @@ func (n *Nginx) Reload(timeout time.Duration) error {
 	if result.ExitCode != 0 {
 		return fmt.Errorf("nginx reload failed: %s", strings.TrimSpace(result.Output))
 	}
-	if master == 0 || len(before) == 0 {
+	// 마스터가 없으면 위에서 reload가 실패한다. 워커가 하나도 없던 마스터는 어떤 워커든 생기면 새 워커다.
+	if master == 0 {
 		return nil
 	}
 	deadline := time.Now().Add(timeout)
@@ -131,7 +136,7 @@ func (n *Nginx) Reload(timeout time.Duration) error {
 		}
 		time.Sleep(reloadPollInterval)
 	}
-	if cause := n.lastEmergency(); cause != "" {
+	if cause := n.lastEmergency(logOffset); cause != "" {
 		return fmt.Errorf("nginx가 새 설정을 불러오지 못하고 이전 설정을 계속 씁니다: %s", cause)
 	}
 	return errors.New("nginx가 새 설정을 불러오지 못하고 이전 설정을 계속 씁니다.")
@@ -228,8 +233,18 @@ func (n *Nginx) children(parent int) map[int]bool {
 	return found
 }
 
-// lastEmergency는 error.log 끝부분에서 마지막 [emerg] 줄이다. 없거나 읽을 수 없으면 빈 문자열이다.
-func (n *Nginx) lastEmergency() string {
+// errorLogSize는 지금 error.log의 크기다. 없거나 읽을 수 없으면 0이다.
+func (n *Nginx) errorLogSize() int64 {
+	info, err := os.Stat(n.ErrorLog)
+	if err != nil {
+		return 0
+	}
+	return info.Size()
+}
+
+// lastEmergency는 error.log에서 since 뒤에 쓰인 부분(최대 끝 16KB)의 마지막 [emerg] 줄이다. 없거나 읽을 수 없으면 빈 문자열이다.
+// 그 사이 로그가 회전돼 since보다 작아졌으면 처음부터 읽는다.
+func (n *Nginx) lastEmergency(since int64) string {
 	file, err := os.Open(n.ErrorLog)
 	if err != nil {
 		return ""
@@ -239,10 +254,10 @@ func (n *Nginx) lastEmergency() string {
 	if err != nil {
 		return ""
 	}
-	start := info.Size() - errorLogTail
-	if start < 0 {
-		start = 0
+	if since > info.Size() {
+		since = 0
 	}
+	start := max(info.Size()-errorLogTail, since)
 	tail := make([]byte, info.Size()-start)
 	if _, err := file.ReadAt(tail, start); err != nil && !errors.Is(err, io.EOF) {
 		return ""

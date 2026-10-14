@@ -12,6 +12,9 @@ import net.nginxmanager.site.SiteType;
 import net.nginxmanager.support.ConfigRootTest;
 import net.nginxmanager.support.FakeNginxRuntime;
 import net.nginxmanager.support.TestCertificates;
+import net.nginxmanager.user.Role;
+import net.nginxmanager.user.SetupState;
+import net.nginxmanager.user.User;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,6 +23,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
+import org.springframework.test.web.servlet.MockMvc;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -33,6 +37,10 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.net.InetAddress;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 
 /** 갱신이 실패해도 지금 인증서로 계속 서비스하고, 실패를 기록하고 알린다. */
 @Import(RenewFailureTest.ScriptedAcme.class)
@@ -80,6 +88,10 @@ class RenewFailureTest extends ConfigRootTest {
     CertificateService certificateService;
     @Autowired
     CertificateScheduler scheduler;
+    @Autowired
+    MockMvc mvc;
+    @Autowired
+    SetupState setupState;
 
     HttpServer webhook;
     final List<String> received = new CopyOnWriteArrayList<>();
@@ -177,5 +189,33 @@ class RenewFailureTest extends ConfigRootTest {
         assertThat(nginx.reloadCalls).isEqualTo(reloads);
         assertThat(received).isEmpty();
         assertThat(certificateRepository.findById(cert.getId()).orElseThrow().getLastExpiryNoticeAt()).isNull();
+    }
+
+    @Test
+    void firstIssuanceFailureKeepsTheSiteOnHttpAndShowsWhyAndWhen() throws Exception {
+        acme.failure = new AcmeClient.AcmeFailure("발급 한도에 걸렸습니다", Instant.now().plusSeconds(7200), null);
+        siteService.create(new SiteForm(DOMAIN, "", SiteType.STATIC, 80, "/srv/www/shop", null,
+                null, true, true, null), "editor");
+
+        assertThat(applyService.applyPending("editor", "https").succeeded()).isTrue();
+        long id = certificateRepository.findByName(DOMAIN).orElseThrow().getId();
+        org.awaitility.Awaitility.await().until(() -> !certificateService.isRunning(id)
+                && certificateRepository.findById(id).orElseThrow().getFailureCount() == 1);
+
+        TlsCertificate cert = certificateRepository.findById(id).orElseThrow();
+        assertThat(cert.getStatus()).isEqualTo(CertificateStatus.PENDING);
+        assertThat(cert.getLastError()).contains("발급 한도");
+        // 사이트는 HTTP 그대로 서비스한다
+        assertThat(readFile(PATH)).contains("listen 80;").doesNotContain("listen 443");
+        org.awaitility.Awaitility.await().untilAsserted(() -> assertThat(received).singleElement()
+                .satisfies(body -> assertThat(body).contains("\"event\":\"CERT_ISSUE_FAILED\"").contains(DOMAIN)));
+
+        userRepository.save(new User("admin", "{noop}unused-password", Role.ADMIN));
+        setupState.reset();
+        mvc.perform(get("/").with(user("admin").roles("ADMIN")))
+                .andExpect(content().string(containsString("발급·갱신 실패")));
+        mvc.perform(get("/certs").with(user("admin").roles("ADMIN")))
+                .andExpect(content().string(containsString("발급 한도에 걸렸습니다")))
+                .andExpect(content().string(containsString("이후 다시 시도합니다")));
     }
 }

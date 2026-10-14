@@ -37,7 +37,7 @@ docker compose up -d
 | `nm-conf` | 둘 다 `/etc/nginx` | nginx 설정, 인증서(`certs/`) |
 | `nm-logs` | 둘 다 `/var/log/nginx` | 접근·오류 로그(사이트별 로그는 `sites/`) |
 | `nm-shared` | 둘 다 `/var/lib/nginx-manager` | Let's Encrypt 챌린지 파일, 에이전트 토큰 |
-| `nm-data` | manager `/data` | 관리도구 DB(SQLite), ACME 계정 키 |
+| `nm-data` | manager `/data` | 관리도구 DB(SQLite), ACME 계정 키, 진행 중인 적용 기록 |
 
 공유 볼륨은 두 컨테이너에서 **같은 경로**에 둡니다(`nginx -t` 오류의 파일 경로가 화면의 파일과 맞아야 합니다). 두 이미지의 프로세스는 같은 UID(10101)로 돌아 서로의 파일을 읽고 씁니다.
 

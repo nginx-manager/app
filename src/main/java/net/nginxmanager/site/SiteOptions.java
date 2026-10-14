@@ -63,7 +63,10 @@ public record SiteOptions(
 
     private static final Pattern IPV4 = Pattern.compile(
             "((25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)\\.){3}(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)(/(3[0-2]|[12]?\\d))?");
-    private static final Pattern IPV6 = Pattern.compile("[0-9A-Fa-f:]*:[0-9A-Fa-f:.]*(/(12[0-8]|1[01]\\d|[1-9]?\\d))?");
+    private static final Pattern IPV6_PREFIX = Pattern.compile("12[0-8]|1[01]\\d|[1-9]?\\d");
+    private static final Pattern IPV6_GROUP = Pattern.compile("[0-9A-Fa-f]{1,4}");
+    private static final Pattern IPV4_PLAIN = Pattern.compile(
+            "((25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)\\.){3}(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)");
 
     /** 체크박스 값이 없으면 끈 것으로 본다. */
     public SiteOptions {
@@ -173,7 +176,44 @@ public record SiteOptions(
     }
 
     static boolean isAddress(String value) {
-        return IPV4.matcher(value).matches() || (value.contains(":") && IPV6.matcher(value).matches());
+        return IPV4.matcher(value).matches() || isIpv6(value);
+    }
+
+    /** nginx가 받는 IPv6 주소(또는 CIDR)인지 본다. "::"는 한 번만, 16비트 묶음은 8개(생략하면 7개 이하)다. */
+    static boolean isIpv6(String value) {
+        int slash = value.indexOf('/');
+        String address = slash < 0 ? value : value.substring(0, slash);
+        if (slash >= 0 && !IPV6_PREFIX.matcher(value.substring(slash + 1)).matches()) {
+            return false;
+        }
+        int compressed = address.indexOf("::");
+        if (!address.contains(":") || (compressed >= 0 && address.indexOf("::", compressed + 1) >= 0)) {
+            return false;
+        }
+        String[] halves = compressed < 0 ? new String[] {address} : new String[] {
+                address.substring(0, compressed), address.substring(compressed + 2)};
+        int groups = 0;
+        for (int h = 0; h < halves.length; h++) {
+            if (halves[h].isEmpty()) {
+                continue;
+            }
+            String[] parts = halves[h].split(":", -1);
+            for (int i = 0; i < parts.length; i++) {
+                boolean last = h == halves.length - 1 && i == parts.length - 1;
+                if (last && parts[i].contains(".")) {
+                    // ::ffff:10.0.0.1 처럼 끝의 IPv4는 묶음 두 개다
+                    if (!IPV4_PLAIN.matcher(parts[i]).matches()) {
+                        return false;
+                    }
+                    groups += 2;
+                } else if (IPV6_GROUP.matcher(parts[i]).matches()) {
+                    groups++;
+                } else {
+                    return false;
+                }
+            }
+        }
+        return compressed < 0 ? groups == 8 : groups <= 7;
     }
 
     static List<String> addresses(String value) {

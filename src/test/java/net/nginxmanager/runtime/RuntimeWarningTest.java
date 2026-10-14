@@ -1,6 +1,8 @@
 package net.nginxmanager.runtime;
 
 import net.nginxmanager.apply.ApplyService;
+import net.nginxmanager.audit.AuditAction;
+import net.nginxmanager.audit.AuditResult;
 import net.nginxmanager.common.AppVersion;
 import net.nginxmanager.site.SiteForm;
 import net.nginxmanager.site.SiteService;
@@ -15,14 +17,19 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.Duration;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -109,5 +116,35 @@ class RuntimeWarningTest extends ConfigRootTest {
         assertThatThrownBy(() -> applyService.applyPending("admin", "끊김")).isInstanceOf(NginxCommandException.class);
         assertThat(nginx.reloadCalls).isZero();
         assertThat(CONFIG_ROOT.resolve("conf.d/sites/gone.local.conf")).doesNotExist();
+    }
+
+    @Test
+    void unreachableAgentBlocksApplyWithoutWritingAnything() throws Exception {
+        siteService.create(new SiteForm("blocked.local", "", SiteType.PROXY, 80, null, "http://127.0.0.1:8080", null),
+                "admin");
+        nginx.agent = new AgentInfo(false, null, null, "Connection refused");
+        nginx.unreachable = true;
+
+        mvc.perform(get("/").with(user("admin").roles("ADMIN")))
+                .andExpect(content().string(containsString("nginx 컨테이너(에이전트)에 연결할 수 없습니다")));
+        mvc.perform(get("/apply").with(user("admin").roles("ADMIN")))
+                .andExpect(content().string(containsString("nginx에 연결할 수 없어 지금은 적용할 수 없습니다")))
+                .andExpect(content().string(not(containsString("action=\"/apply\""))));
+
+        // 화면을 열어 둔 채 끊긴 경우: 버튼이 남아 있어도 파일을 쓰지 않고 이유를 보여 준다
+        mvc.perform(post("/apply").with(csrf()).with(user("admin").roles("ADMIN")).header("HX-Request", "true"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("적용하지 못했습니다")));
+
+        assertThat(nginx.validateCalls).isZero();
+        assertThat(CONFIG_ROOT.resolve("conf.d/sites/blocked.local.conf")).doesNotExist();
+        assertThat(configFileRepository.findByPath("conf.d/sites/blocked.local.conf"))
+                .hasValueSatisfying(f -> assertThat(f.hasPendingChange()).isTrue());
+        await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
+                assertThat(auditLogRepository.findAll()).anySatisfy(l -> {
+                    assertThat(l.getAction()).isEqualTo(AuditAction.APPLY);
+                    assertThat(l.getResult()).isEqualTo(AuditResult.FAILURE);
+                    assertThat(l.getUsername()).isEqualTo("admin");
+                }));
     }
 }

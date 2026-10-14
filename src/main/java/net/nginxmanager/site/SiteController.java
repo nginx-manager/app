@@ -86,6 +86,9 @@ public class SiteController {
         } catch (DuplicateSiteException e) {
             bindingResult.rejectValue("primaryDomain", "msg.site.domainTaken", new Object[] {e.getDomain()}, duplicateMessage(e));
             return "sites/form";
+        } catch (PortInUseException e) {
+            rejectPort(bindingResult, e);
+            return "sites/form";
         } catch (MissingPasswordException e) {
             rejectMissingPassword(bindingResult, e);
             return "sites/form";
@@ -115,6 +118,14 @@ public class SiteController {
             Site site = siteQueryRepository.findWithFile(id).orElseThrow(() -> new NotFoundException("site " + id));
             addDetail(site, model);
             return "sites/detail";
+        } catch (PortInUseException e) {
+            rejectPort(bindingResult, e);
+            Site site = siteQueryRepository.findWithFile(id).orElseThrow(() -> new NotFoundException("site " + id));
+            addDetail(site, model);
+            return "sites/detail";
+        } catch (RawSiteFormException e) {
+            // 폼을 연 사이 원문 편집기로 고쳐졌다. 폼 값으로 덮어쓰지 않는다
+            return "redirect:/sites/" + id + "?rawOnly";
         } catch (MissingPasswordException e) {
             rejectMissingPassword(bindingResult, e);
             Site site = siteQueryRepository.findWithFile(id).orElseThrow(() -> new NotFoundException("site " + id));
@@ -127,6 +138,11 @@ public class SiteController {
     private static void rejectMissingPassword(BindingResult bindingResult, MissingPasswordException e) {
         bindingResult.rejectValue("options.authUsers", "msg.site.authPasswordRequired",
                 new Object[] {e.getUsername()}, "새 사용자에는 비밀번호가 필요합니다: " + e.getUsername());
+    }
+
+    private static void rejectPort(BindingResult bindingResult, PortInUseException e) {
+        bindingResult.rejectValue("listenHttpPort", "msg.stream.portTaken",
+                new Object[] {String.valueOf(e.getPort()), e.getUsedBy()}, "포트가 이미 쓰입니다: " + e.getPort());
     }
 
     private static String duplicateMessage(DuplicateSiteException e) {

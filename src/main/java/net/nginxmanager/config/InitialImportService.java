@@ -61,6 +61,7 @@ public class InitialImportService implements ApplicationRunner {
             String domain = SitePaths.domainOf(path);
             if (domain != null && !siteRepository.existsByPrimaryDomain(domain)) {
                 Site site = new Site(domain, SiteType.RAW, file);
+                site.readRawListenPort(content);
                 if (path.startsWith(SitePaths.DISABLED_DIR)) {
                     site.markImportedDisabled();
                 }

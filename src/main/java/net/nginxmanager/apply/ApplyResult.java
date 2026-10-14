@@ -31,4 +31,15 @@ public record ApplyResult(VersionResult result, Long versionId, List<String> cha
     public boolean nothingChanged() {
         return result == null;
     }
+
+    /**
+     * 검증 오류가 이번에 바꾼 파일이 아닌 곳을 가리킨다(다른 사이트 설정 등). nginx는 절대 경로로, 변경은 설정 루트 기준으로 적는다.
+     */
+    public boolean isOutsideChange(ValidationMessage message) {
+        if (message.file() == null) {
+            return false;
+        }
+        String file = message.file();
+        return changedPaths.stream().noneMatch(p -> file.equals(p) || file.endsWith("/" + p));
+    }
 }
