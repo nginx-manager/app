@@ -70,6 +70,39 @@ class SiteServiceTest extends ConfigRootTest {
     }
 
     @Test
+    void discardingARawEditOfAnAppliedFormSiteMakesItAFormSiteAgain() {
+        Site site = siteService.create(proxy("app.local", "http://a:1", null), "editor");
+        assertThat(applyService.applyPending("editor", "first").succeeded()).isTrue();
+        ConfigFile file = configFileRepository.findByPath("conf.d/sites/app.local.conf").orElseThrow();
+        siteService.editRaw(file.getId(), "server { listen 81; }\n", file.getVersion(), "editor");
+        assertThat(siteRepository.findById(site.getId()).orElseThrow().getType()).isEqualTo(SiteType.RAW);
+
+        siteService.discard(file.getId(), "editor");
+
+        Site restored = siteRepository.findById(site.getId()).orElseThrow();
+        assertThat(restored.getType()).isEqualTo(SiteType.PROXY);
+        assertThat(restored.getProxyTarget()).isEqualTo("http://a:1");
+        // 폼으로 다시 고칠 수 있다
+        siteService.update(site.getId(), proxy("app.local", "http://b:2", restored.getVersion()), "editor");
+    }
+
+    @Test
+    void discardingARawEditKeepsARawSiteWhoseRawContentWasApplied() {
+        Site site = siteService.create(proxy("app.local", "http://a:1", null), "editor");
+        assertThat(applyService.applyPending("editor", "first").succeeded()).isTrue();
+        ConfigFile file = configFileRepository.findByPath("conf.d/sites/app.local.conf").orElseThrow();
+        siteService.editRaw(file.getId(), "server { listen 81; }\n", file.getVersion(), "editor");
+        assertThat(applyService.applyPending("editor", "raw").succeeded()).isTrue();
+        file = configFileRepository.findById(file.getId()).orElseThrow();
+        siteService.editRaw(file.getId(), "server { listen 82; }\n", file.getVersion(), "editor");
+
+        siteService.discard(file.getId(), "editor");
+
+        assertThat(siteRepository.findById(site.getId()).orElseThrow().getType()).isEqualTo(SiteType.RAW);
+        assertThat(readFile("conf.d/sites/app.local.conf")).isEqualTo("server { listen 81; }\n");
+    }
+
+    @Test
     void disablingMovesFileToDisabledDirectory() {
         writeFile("conf.d/sites/app.local.conf", "server { listen 80; }\n");
         ConfigFile live = configFileRepository.save(new ConfigFile("conf.d/sites/app.local.conf", false));

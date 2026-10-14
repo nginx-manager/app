@@ -49,9 +49,7 @@ public class Acme4jClient implements AcmeClient {
     @Override
     public Issued issue(List<String> domains, X509Certificate replaces) throws AcmeFailure {
         AcmeSettings settings = settingsRepository.findFirstByOrderByIdAsc().orElseGet(AcmeSettings::new);
-        String directory = properties.directoryUrl() != null && !properties.directoryUrl().isBlank()
-                ? properties.directoryUrl()
-                : settings.getEnvironment().directory();
+        String directory = directory(settings);
         List<Path> challengeFiles = new ArrayList<>();
         try {
             Session session = new Session(directory);
@@ -137,6 +135,13 @@ public class Acme4jClient implements AcmeClient {
         Path file = dir.resolve(token);
         Files.writeString(file, content, StandardCharsets.US_ASCII);
         return file;
+    }
+
+    /** 환경 변수로 정한 ACME 서버가 있으면 그것을, 없으면 화면에서 고른 운영/스테이징을 쓴다(FR-030). */
+    String directory(AcmeSettings settings) {
+        return properties.directoryUrl() != null && !properties.directoryUrl().isBlank()
+                ? properties.directoryUrl()
+                : settings.getEnvironment().directory();
     }
 
     /** ACME 서버마다 계정 키 하나를 볼륨에 둔다. 없으면 만든다. */

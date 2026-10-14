@@ -7,6 +7,7 @@ import net.nginxmanager.cert.CertificatePaths;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -170,6 +171,17 @@ class SiteModuleOptionsTest {
         assertThat(violations(proxy(false, options("allowFrom", "10.0.0.0/33")))).contains("options.allowFromValid");
         assertThat(violations(proxy(false, options("denyFrom", "all")))).contains("options.denyFromValid");
         assertThat(violations(proxy(false, options("realIpFrom", "10.0.0.1; deny all")))).contains("options.realIpFromValid");
+    }
+
+    @Test
+    void ipv6AddressesAreCheckedLikeNginxDoes() {
+        assertThat(List.of("::1", "::", "2001:db8::/32", "fe80::1:2", "1:2:3:4:5:6:7:8", "::ffff:10.0.0.1",
+                "2001:DB8:0:0:0:0:0:1/128", "1::8"))
+                .allSatisfy(a -> assertThat(SiteOptions.isAddress(a)).as(a).isTrue());
+        // nginx -t가 거부하는 값은 저장할 때 막는다
+        assertThat(List.of(":", "1::2::3", "::::/64", "1:2:3:4:5:6:7:8:9", "1:2:3", "12345::", "::1/129",
+                "::ffff:10.0.0.256", "2001:db8::/", "fe80::1%eth0"))
+                .allSatisfy(a -> assertThat(SiteOptions.isAddress(a)).as(a).isFalse());
     }
 
     @Test

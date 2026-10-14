@@ -1,6 +1,7 @@
 package net.nginxmanager.cert;
 
 import net.nginxmanager.apply.ApplyService;
+import net.nginxmanager.config.ConfigFile;
 import net.nginxmanager.site.CertificateMode;
 import net.nginxmanager.site.Site;
 import net.nginxmanager.site.SiteForm;
@@ -212,5 +213,53 @@ class OptionalLetsEncryptTest extends ConfigRootTest {
                 .andExpect(flash().attribute("error", containsString("와일드카드")));
         assertThat(siteRepository.findById(site.getId()).orElseThrow().isHttpsEnabled()).isFalse();
         assertThat(certificateRepository.findAll()).isEmpty();
+    }
+
+    @Test
+    void liveSiteWithAnUnappliedEditGetsHttpsWithoutThatEdit() throws Exception {
+        mvc.perform(newSite("NONE")).andExpect(status().is3xxRedirection());
+        assertThat(applyService.applyPending("ed", "http only").succeeded()).isTrue();
+        Site site = siteRepository.findByPrimaryDomain(DOMAIN).orElseThrow();
+        // 저장만 하고 아직 적용하지 않은 편집
+        siteService.update(site.getId(), new SiteForm(DOMAIN, "", SiteType.PROXY, 80, null, "http://10.0.0.2:3000",
+                site.getVersion()), "ed");
+
+        mvc.perform(post("/certs/letsencrypt").with(csrf()).with(user("ed").roles("EDITOR"))
+                        .param("siteId", site.getId().toString()))
+                .andExpect(flash().attribute("notice", containsString("발급을 시작했습니다")));
+
+        TlsCertificate cert = await().until(() -> certificateRepository.findByName(DOMAIN).orElseThrow(),
+                c -> c.getStatus() == CertificateStatus.ACTIVE && !certificateService.isRunning(c.getId()));
+        // HTTPS는 바로 서비스되고, 적용하지 않은 편집은 여전히 초안에만 있다
+        assertThat(readFile(PATH)).contains("listen 443 ssl;", "ssl_certificate " + cert.getCertPath() + ";",
+                "10.0.0.1:3000").doesNotContain("10.0.0.2:3000");
+        assertThat(configFileRepository.findByPath(PATH).orElseThrow().getDraftContent())
+                .contains("10.0.0.2:3000", "ssl_certificate " + cert.getCertPath() + ";");
+
+        assertThat(applyService.applyPending("ed", "edit").succeeded()).isTrue();
+        assertThat(readFile(PATH)).contains("listen 443 ssl;", "10.0.0.2:3000");
+    }
+
+    @Test
+    void rawSitesAreRefusedWithAMessage() throws Exception {
+        siteService.create(new SiteForm(DOMAIN, "", SiteType.PROXY, 80, null, "http://10.0.0.1:3000", null), "ed");
+        ConfigFile file = configFileRepository.findByPath(PATH).orElseThrow();
+        siteService.editRaw(file.getId(), "server { listen 80; server_name " + DOMAIN + "; }\n", file.getVersion(), "ed");
+        Site site = siteRepository.findByPrimaryDomain(DOMAIN).orElseThrow();
+
+        mvc.perform(post("/certs/letsencrypt").with(csrf()).with(user("ed").roles("EDITOR"))
+                        .param("siteId", site.getId().toString()))
+                .andExpect(redirectedUrl("/sites/" + site.getId() + "#https"))
+                .andExpect(flash().attribute("error", containsString("원문 편집 사이트")));
+        assertThat(certificateRepository.findAll()).isEmpty();
+
+        // 폼을 열어 둔 사이 원문 편집 사이트가 되었으면 폼 값으로 덮어쓰지 않고 이유를 보여 준다
+        mvc.perform(post("/sites/" + site.getId()).with(csrf()).with(user("ed").roles("EDITOR"))
+                        .param("primaryDomain", DOMAIN).param("type", "PROXY").param("listenHttpPort", "80")
+                        .param("proxyTarget", "http://10.0.0.9:3000").param("version", Long.toString(site.getVersion())))
+                .andExpect(redirectedUrl("/sites/" + site.getId() + "?rawOnly"));
+        mvc.perform(get("/sites/" + site.getId() + "?rawOnly").with(user("ed").roles("EDITOR")))
+                .andExpect(content().string(containsString("원문 편집기로 고친 사이트라")));
+        assertThat(configFileRepository.findByPath(PATH).orElseThrow().getDraftContent()).doesNotContain("10.0.0.9");
     }
 }

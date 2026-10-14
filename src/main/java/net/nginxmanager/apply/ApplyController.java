@@ -4,6 +4,8 @@ import net.nginxmanager.config.ConfigFile;
 import net.nginxmanager.config.ConfigFileRepository;
 import net.nginxmanager.config.ConfigFileStore;
 import net.nginxmanager.config.UnifiedDiff;
+import net.nginxmanager.runtime.NginxCommandException;
+import net.nginxmanager.runtime.RuntimeCompatibility;
 import net.nginxmanager.site.SiteService;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
@@ -28,27 +30,36 @@ public class ApplyController {
     private final ConfigFileRepository configFileRepository;
     private final ConfigFileStore store;
     private final SiteService siteService;
+    private final RuntimeCompatibility compatibility;
 
     public ApplyController(ApplyService applyService, ConfigFileRepository configFileRepository,
-                           ConfigFileStore store, SiteService siteService) {
+                           ConfigFileStore store, SiteService siteService, RuntimeCompatibility compatibility) {
         this.applyService = applyService;
         this.configFileRepository = configFileRepository;
         this.store = store;
         this.siteService = siteService;
+        this.compatibility = compatibility;
     }
 
     @GetMapping
     public String pending(Model model) {
         model.addAttribute("pending", pendingFiles());
+        model.addAttribute("applyBlocked", applyBlocked());
         return "apply/pending";
     }
 
     @PostMapping
     public String apply(@RequestParam(defaultValue = "") String message, Authentication authentication,
                         @RequestHeader(value = "HX-Request", required = false) String htmx, Model model) {
-        ApplyResult result = applyService.applyPending(authentication.getName(), message.isBlank() ? null : message);
-        model.addAttribute("result", result);
+        try {
+            model.addAttribute("result",
+                    applyService.applyPending(authentication.getName(), message.isBlank() ? null : message));
+        } catch (NginxCommandException e) {
+            // 에이전트에 연결할 수 없거나 명령이 실패했다. 파일은 되돌렸고 초안은 그대로다
+            model.addAttribute("failure", e.getMessage());
+        }
         model.addAttribute("pending", pendingFiles());
+        model.addAttribute("applyBlocked", applyBlocked());
         return htmx != null ? "apply/pending :: result" : "apply/pending";
     }
 
@@ -56,6 +67,11 @@ public class ApplyController {
     public String discard(@PathVariable long fileId, Authentication authentication) {
         siteService.discard(fileId, authentication.getName());
         return "redirect:/apply";
+    }
+
+    /** 에이전트에 연결할 수 없거나 API 판이 다르면 적용 버튼을 감춘다. 릴리스 판만 다르면 적용은 된다. */
+    private boolean applyBlocked() {
+        return compatibility.current().map(w -> w.kind() != RuntimeCompatibility.Kind.VERSION).orElse(false);
     }
 
     private List<PendingFile> pendingFiles() {

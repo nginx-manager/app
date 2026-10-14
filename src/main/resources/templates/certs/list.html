@@ -34,6 +34,8 @@
                     <span th:if="${c.isFailing()}" class="badge bad" th:title="${c.lastError}"
                           th:text="#{certs.list.status.failed(${c.failureCount})}">실패</span>
                     <div class="small error" th:if="${c.isFailing()}" th:text="${c.lastError}"></div>
+                    <div class="small muted" th:if="${c.isFailing() and c.retryAfter != null and c.retryAfter.isAfter(now)}"
+                         th:text="#{certs.list.retryAfter(${#temporals.format(c.retryAfter, 'yyyy-MM-dd HH:mm')})}">2026-10-14 12:00 이후 다시 시도합니다</div>
                 </td>
                 <td class="nowrap" th:text="${c.notAfter != null} ? ${#temporals.format(c.notAfter, 'yyyy-MM-dd')} : '-'">2026-12-01</td>
                 <td class="nowrap" th:text="${c.autoRenew and c.nextRenewalAt != null} ? ${#temporals.format(c.nextRenewalAt, 'yyyy-MM-dd HH:mm')} : '-'">-</td>

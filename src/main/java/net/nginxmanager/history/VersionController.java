@@ -4,6 +4,7 @@ import net.nginxmanager.apply.ApplyResult;
 import net.nginxmanager.common.NotFoundException;
 import net.nginxmanager.config.ConfigVersion;
 import net.nginxmanager.config.ConfigVersionFile;
+import net.nginxmanager.runtime.NginxCommandException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -78,6 +79,8 @@ public class VersionController {
             return "redirect:/versions/" + result.versionId();
         } catch (RollbackRejectedException e) {
             return "redirect:/versions/" + id + "?rejected=" + e.getReason();
+        } catch (NginxCommandException e) {
+            return "redirect:/versions/" + id + "?rejected=UNREACHABLE";
         }
     }
 

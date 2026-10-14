@@ -114,6 +114,12 @@ public class ApplyService {
 
     private ApplyResult apply(List<FileChange> changes, Origin origin) {
         List<String> paths = changes.stream().map(FileChange::path).toList();
+        if (runtime.status().state() == RuntimeStatus.State.UNREACHABLE) {
+            // 검증할 수 없는 설정을 공유 볼륨에 쓰지 않는다. nginx가 다시 뜨면 그 파일을 그대로 읽는다
+            NginxCommandException e = new NginxCommandException("nginx 에이전트에 연결할 수 없어 적용하지 못했습니다");
+            events.publishEvent(AuditEvent.failure(origin.actor(), auditAction(origin), "apply", e.getMessage()));
+            throw e;
+        }
         Map<String, String> backup = new LinkedHashMap<>();
         for (String path : paths) {
             backup.put(path, store.read(path));
@@ -134,6 +140,7 @@ public class ApplyService {
                     log.error("reload after restore failed", reloadFailure);
                 }
             }
+            events.publishEvent(AuditEvent.failure(origin.actor(), auditAction(origin), "apply", e.getMessage()));
             throw e;
         }
     }
@@ -211,15 +218,19 @@ public class ApplyService {
         if (result == VersionResult.SUCCESS) {
             events.publishEvent(new ConfigAppliedEvent(versionId, origin.source(), paths));
         }
-        AuditAction action = switch (origin.source()) {
+        AuditAction action = auditAction(origin);
+        events.publishEvent(result == VersionResult.SUCCESS
+                ? AuditEvent.success(origin.actor(), action, "version:" + versionId)
+                : AuditEvent.failure(origin.actor(), action, "version:" + versionId, result.name()));
+        return new ApplyResult(result, versionId, paths, messages, detail);
+    }
+
+    private static AuditAction auditAction(Origin origin) {
+        return switch (origin.source()) {
             case ROLLBACK -> AuditAction.ROLLBACK;
             case CERT_ISSUE -> AuditAction.CERT_ISSUE;
             case CERT_RENEW -> AuditAction.CERT_RENEW;
             default -> AuditAction.APPLY;
         };
-        events.publishEvent(result == VersionResult.SUCCESS
-                ? AuditEvent.success(origin.actor(), action, "version:" + versionId)
-                : AuditEvent.failure(origin.actor(), action, "version:" + versionId, result.name()));
-        return new ApplyResult(result, versionId, paths, messages, detail);
     }
 }

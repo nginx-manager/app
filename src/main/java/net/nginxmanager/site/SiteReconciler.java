@@ -74,6 +74,7 @@ public class SiteReconciler {
             ConfigFile file = enabled.orElseGet(disabled::orElseThrow);
             site = new Site(domain, SiteType.RAW, file);
             site.moveTo(file, enabled.isPresent());
+            site.readRawListenPort(store.read(file.getPath()));
             siteRepository.save(site);
             return;
         }
@@ -84,6 +85,7 @@ public class SiteReconciler {
         } else {
             site.moveTo(site.getConfigFile(), current.equals(enabledPath));
         }
+        site.readRawListenPort(store.read(site.getConfigFile().getPath()));
         if (site.getType() != SiteType.RAW) {
             String disk = store.read(site.getConfigFile().getPath());
             if (sameConfig(rendering.render(site), disk)) {
@@ -93,6 +95,17 @@ public class SiteReconciler {
                 // 폼으로 만들 수 없는 내용이 되었다(되돌리기, 외부 변경)
                 site.switchToRaw();
             }
+        }
+    }
+
+    /**
+     * 원문 편집기로 고쳐 원문 사이트가 된 폼 사이트의 초안을 버렸을 때, 디스크가 마지막으로 반영된 폼 값 그대로면
+     * 다시 폼 사이트로 되돌린다. 원문 내용을 적용한 적이 있으면 원문 사이트로 남는다.
+     */
+    void restoreFormIfUnchanged(Site site) {
+        if (site.getType() == SiteType.RAW && site.hasAppliedForm()
+                && sameConfig(rendering.renderApplied(site), store.read(site.getConfigFile().getPath()))) {
+            site.restoreApplied();
         }
     }
 

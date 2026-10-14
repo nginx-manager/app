@@ -13,6 +13,7 @@
     </div>
     <p class="notice" th:if="${notice}" th:text="${notice}">완료</p>
     <p class="error" th:if="${error}" th:text="${error}">오류</p>
+    <p class="error" th:if="${param.rawOnly}" th:text="#{sites.detail.rawOnly}">원문 편집기로 고친 사이트라 폼으로 저장하지 않았습니다.</p>
     <p class="notice" th:if="${param.saved}"><th:block th:text="#{sites.detail.saved.before}">초안을 저장했습니다.</th:block> <a th:href="@{/apply}" th:text="#{sites.detail.saved.link}">적용 화면</a><th:block th:text="#{sites.detail.saved.after}">에서 반영하세요.</th:block></p>
 
     <div class="columns">
@@ -44,6 +45,7 @@
                 <label><th:block th:text="#{sites.field.httpPort}">HTTP 포트</th:block>
                     <span class="hint" th:text="#{sites.field.httpPort.hint}">보통 80입니다.</span>
                     <input type="number" th:field="*{listenHttpPort}" th:disabled="${!currentUser.canEdit()}">
+                    <span class="error" th:errors="*{listenHttpPort}"></span>
                     <span class="error" th:errors="*{listenPortFree}"></span>
                 </label>
                 <th:block th:replace="~{sites/https-fields :: fields(${currentUser.canEdit()})}"></th:block>

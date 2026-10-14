@@ -16,6 +16,9 @@
         <p><span th:text="#{versions.detail.rejected.pending.before}">적용 대기 중인 변경이 있어 되돌리지 않았습니다.</span>
             <a th:href="@{/apply}" th:text="#{versions.detail.rejected.pending.link}">적용 화면</a><span th:text="#{versions.detail.rejected.pending.after}">에서 먼저 적용하거나 버리세요.</span></p>
     </section>
+    <section class="card result bad" th:if="${param.rejected != null and param.rejected[0] == 'UNREACHABLE'}">
+        <p th:text="#{versions.detail.rejected.unreachable}">nginx에 연결할 수 없어 되돌리지 않았습니다.</p>
+    </section>
     <section class="card result bad" th:if="${param.rejected != null and param.rejected[0] == 'NOT_A_SNAPSHOT'}">
         <p th:text="#{versions.detail.rejected.notSnapshot}">실패한 버전으로는 되돌릴 수 없습니다.</p>
     </section>

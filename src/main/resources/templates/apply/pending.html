@@ -22,6 +22,7 @@
                     <li th:each="m : ${result.messages}">
                         <code th:if="${m.file != null}" th:text="${m.file} + ':' + ${m.line}">conf.d/sites/a.conf:7</code>
                         <span th:text="${m.message}">unknown directive</span>
+                        <span th:if="${result.isOutsideChange(m)}" class="badge warn" th:text="#{apply.result.validationFailed.outside}">이번 초안이 바꾸지 않은 파일</span>
                     </li>
                 </ul>
                 <pre class="code" th:text="${result.detail}"></pre>
@@ -34,6 +35,11 @@
                 <p th:text="#{apply.empty}">적용할 변경이 없습니다.</p>
             </section>
         </th:block>
+        <section class="card result bad" th:if="${failure != null}">
+            <h2 th:text="#{apply.result.failed.title}">적용하지 못했습니다</h2>
+            <p th:text="#{apply.result.failed.body}">서버 설정과 초안은 그대로입니다. nginx 컨테이너가 돌고 있는지 확인한 뒤 다시 적용하세요.</p>
+            <p class="muted" th:text="${failure}">nginx 에이전트에 연결할 수 없어 적용하지 못했습니다</p>
+        </section>
     </div>
 
     <section class="card">
@@ -49,7 +55,8 @@
             </div>
             <pre class="code diff" th:text="${p.diff}"></pre>
         </div>
-        <form th:if="${currentUser.canEdit() and !#lists.isEmpty(pending)}" th:action="@{/apply}" method="post"
+        <p th:if="${currentUser.canEdit() and !#lists.isEmpty(pending) and applyBlocked}" class="hint warn" th:text="#{apply.form.blocked}">nginx에 연결할 수 없어 지금은 적용할 수 없습니다. 연결되면 다시 적용하세요.</p>
+        <form th:if="${currentUser.canEdit() and !#lists.isEmpty(pending) and !applyBlocked}" th:action="@{/apply}" method="post"
               hx-post="/apply" hx-target="#result" hx-swap="outerHTML" hx-disabled-elt="find button">
             <label><th:block th:text="#{apply.form.message}">변경 메모 (선택)</th:block>
                 <input type="text" name="message" maxlength="500" placeholder="예: app 백엔드 포트 변경" th:placeholder="#{apply.form.message.placeholder}">

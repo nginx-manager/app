@@ -2,7 +2,7 @@ spring:
   datasource:
     # 테스트는 컨텍스트마다 새 임시 파일 DB를 운영과 같은 WAL 모드로 쓴다.
     # 공유 캐시 메모리 DB는 테이블 단위로 잠겨, 백그라운드 작업(인증서 발급)과 읽기가 겹치면 바로 실패한다
-    url: jdbc:sqlite:${java.io.tmpdir}/nm-test-${random.uuid}.db?journal_mode=WAL&foreign_keys=on&busy_timeout=5000
+    url: jdbc:sqlite:${java.io.tmpdir}/nm-test-${random.uuid}.db?journal_mode=WAL&foreign_keys=on&busy_timeout=5000&transaction_mode=IMMEDIATE
     hikari:
       minimum-idle: 1
   jpa:

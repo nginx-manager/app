@@ -16,6 +16,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.function.Supplier;
 
@@ -34,10 +35,13 @@ public class SiteService {
     private final ApplicationEventPublisher events;
     private final ApplyLock applyLock;
     private final TransactionTemplate tx;
+    private final List<OtherTcpPorts> otherTcpPorts;
+    private final SiteReconciler reconciler;
 
     public SiteService(SiteRepository siteRepository, ConfigFileRepository configFileRepository,
                        ConfigFileStore store, SiteRendering rendering, CertificateRegistry certificateRegistry,
-                       ApplicationEventPublisher events, ApplyLock applyLock, TransactionTemplate tx) {
+                       ApplicationEventPublisher events, ApplyLock applyLock, TransactionTemplate tx,
+                       List<OtherTcpPorts> otherTcpPorts, SiteReconciler reconciler) {
         this.siteRepository = siteRepository;
         this.configFileRepository = configFileRepository;
         this.store = store;
@@ -46,6 +50,8 @@ public class SiteService {
         this.events = events;
         this.applyLock = applyLock;
         this.tx = tx;
+        this.otherTcpPorts = otherTcpPorts;
+        this.reconciler = reconciler;
     }
 
     private <T> T locked(Supplier<T> work) {
@@ -63,6 +69,7 @@ public class SiteService {
             throw new DuplicateSiteException(domain);
         }
         requireUnusedDomains(null, domain, form);
+        requireFreePort(form.listenHttpPort());
         ConfigFile file = configFileRepository.save(new ConfigFile(path, true));
         Site site = new Site(domain, form.type(), file);
         site.applyForm(form);
@@ -82,9 +89,12 @@ public class SiteService {
         Site site = load(siteId);
         requireVersion(site.getVersion(), form.version(), "site " + site.getPrimaryDomain());
         if (site.getType() == SiteType.RAW) {
-            throw new IllegalStateException("raw sites are edited in the file editor");
+            throw new RawSiteFormException();
         }
         requireUnusedDomains(site.getId(), site.getPrimaryDomain(), form);
+        if (form.listenHttpPort() != site.getListenHttpPort()) {
+            requireFreePort(form.listenHttpPort());
+        }
         stageHtpasswd(site, form);
         site.applyForm(form);
         site.linkCertificate(certificateFor(site.getPrimaryDomain(), form));
@@ -225,9 +235,14 @@ public class SiteService {
             } else {
                 file.discardDraft();
                 // 폼 저장은 사이트 값도 바꿔 두므로, 초안을 버리면 마지막으로 반영된 값으로 되돌린다
-                siteRepository.findByConfigFileId(configFileId)
-                        .filter(site -> site.getType() != SiteType.RAW)
-                        .ifPresent(Site::restoreApplied);
+                siteRepository.findByConfigFileId(configFileId).ifPresent(site -> {
+                    if (site.getType() != SiteType.RAW) {
+                        site.restoreApplied();
+                    } else {
+                        // 원문 편집을 버렸다: 디스크가 폼으로 만든 그대로면 폼 사이트로 돌아간다
+                        reconciler.restoreFormIfUnchanged(site);
+                    }
+                });
             }
         }
     }
@@ -329,7 +344,7 @@ public class SiteService {
     private LetsEncryptRequest doEnableLetsEncrypt(long siteId, String actor) {
         Site site = load(siteId);
         if (site.getType() == SiteType.RAW) {
-            throw new IllegalStateException("raw sites manage TLS in their own config");
+            throw new RawSiteLetsEncryptException();
         }
         SiteForm form = rendering.formOf(site);
         SiteForm https = form.withLetsEncrypt();
@@ -348,6 +363,10 @@ public class SiteService {
         } else if (!file.hasPendingChange()) {
             // 디스크의 설정은 인증서를 받기 전까지 그대로이므로 지금 값이 반영된 값이다. 발급이 끝나면 이 값으로 HTTPS를 더한다
             site.markApplied();
+        } else if (live) {
+            // 서비스 중인 사이트에 적용하지 않은 편집이 있다: 반영된 값에만 HTTPS를 켜 두면 발급이 끝날 때 편집과 따로 적용된다.
+            // 초안은 발급이 끝나면 새 인증서 경로로 다시 만들어진다
+            site.markAppliedHttps(certificateId);
         }
         events.publishEvent(AuditEvent.success(actor, AuditAction.SITE_SAVE, "site:" + site.getPrimaryDomain() + " https"));
         return new LetsEncryptRequest(certificateId, live);
@@ -361,6 +380,14 @@ public class SiteService {
             return certificateRegistry.requireUploaded(form.certificateId());
         }
         return certificateRegistry.letsEncryptFor(domain, form.certificateDomains(domain));
+    }
+
+    private void requireFreePort(int port) {
+        for (OtherTcpPorts ports : otherTcpPorts) {
+            ports.usedBy(port).ifPresent(usedBy -> {
+                throw new PortInUseException(port, usedBy);
+            });
+        }
     }
 
     /**

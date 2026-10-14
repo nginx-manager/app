@@ -195,6 +195,21 @@ public class Site extends BaseEntity {
     }
 
     /**
+     * 반영된 값에 HTTPS(이 인증서)를 켠다. 적용하지 않은 편집은 반영된 값에 넣지 않는다.
+     * 인증서를 받으면 이 값으로 HTTPS 설정을 만들어 바로 적용하므로, 사용자의 초안과 따로 HTTPS가 켜진다.
+     */
+    void markAppliedHttps(long certificateId) {
+        Properties values = applied();
+        if (values == null) {
+            markApplied();
+            return;
+        }
+        values.setProperty("httpsEnabled", "true");
+        values.setProperty("certificateId", Long.toString(certificateId));
+        this.appliedSettings = store(values);
+    }
+
+    /**
      * 버린 초안의 폼 값을 마지막으로 반영된 값으로 되돌린다.
      *
      * @return 반영된 값이 기록되어 있어 되돌렸으면 true
@@ -222,6 +237,12 @@ public class Site extends BaseEntity {
         authHtpasswd = values.getProperty("authHtpasswd");
         options = serialize(SiteOptions.load(values, "opt."));
         return true;
+    }
+
+    /** 폼으로 만든 값이 반영된 기록이 있다(원문 사이트로 바뀌기 전). */
+    boolean hasAppliedForm() {
+        Properties values = applied();
+        return values != null && !SiteType.RAW.name().equals(values.getProperty("type"));
     }
 
     /** 마지막으로 반영된 폼 값. 기록이 없으면(이전 버전에서 만든 사이트) 지금 값을 쓴다. */
@@ -291,6 +312,16 @@ public class Site extends BaseEntity {
 
     void switchToRaw() {
         this.type = SiteType.RAW;
+    }
+
+    /**
+     * 원문 사이트는 폼 값이 없으므로, 목록에 보이고 포트 충돌을 볼 HTTP 포트를 설정 파일의 listen에서 읽는다.
+     * 원문 사이트가 아니거나 읽을 listen이 없으면 그대로 둔다.
+     */
+    public void readRawListenPort(String content) {
+        if (type == SiteType.RAW && content != null) {
+            RawListen.httpPort(content).ifPresent(port -> this.listenHttpPort = port);
+        }
     }
 
     void moveTo(ConfigFile file, boolean enabled) {

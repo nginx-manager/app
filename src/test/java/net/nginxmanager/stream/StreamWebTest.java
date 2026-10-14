@@ -2,6 +2,7 @@ package net.nginxmanager.stream;
 
 import net.nginxmanager.apply.ApplyService;
 import net.nginxmanager.config.ConfigFile;
+import net.nginxmanager.site.Site;
 import net.nginxmanager.site.SiteForm;
 import net.nginxmanager.site.SiteService;
 import net.nginxmanager.site.SiteType;
@@ -171,6 +172,33 @@ class StreamWebTest extends ConfigRootTest {
         mvc.perform(create("TCP", 443, "10.0.0.7:443")).andExpect(status().isOk());
 
         assertThat(streamProxyRepository.count()).isEqualTo(2);
+    }
+
+    @Test
+    void sitesCannotTakeAPortATcpStreamUses() throws Exception {
+        createApplied();
+        mvc.perform(create("UDP", 8053, "10.0.0.7:53")).andExpect(status().is3xxRedirection());
+
+        // 반대 방향도 막는다: nginx -t는 통과하지만 reload에서 포트를 열지 못한다
+        mvc.perform(post("/sites/new").with(csrf()).with(user("ed").roles("EDITOR"))
+                        .param("primaryDomain", "db.local").param("type", "PROXY").param("listenHttpPort", "5432")
+                        .param("proxyTarget", "http://10.0.0.1:3000"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(PATH)));
+        assertThat(siteRepository.count()).isZero();
+
+        Site site = siteService.create(new SiteForm("db.local", "", SiteType.PROXY, 80, null, "http://10.0.0.1:3000",
+                null), "ed");
+        mvc.perform(post("/sites/" + site.getId()).with(csrf()).with(user("ed").roles("EDITOR"))
+                        .param("primaryDomain", "db.local").param("type", "PROXY").param("listenHttpPort", "5432")
+                        .param("proxyTarget", "http://10.0.0.1:3000").param("version", Long.toString(site.getVersion())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(PATH)));
+        assertThat(siteRepository.findById(site.getId()).orElseThrow().getListenHttpPort()).isEqualTo(80);
+
+        // UDP 스트림과 같은 번호는 TCP 사이트가 써도 된다
+        siteService.create(new SiteForm("dns.local", "", SiteType.PROXY, 8053, null, "http://10.0.0.1:3000", null),
+                "ed");
     }
 
     @Test

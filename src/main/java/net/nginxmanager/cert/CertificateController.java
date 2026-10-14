@@ -6,6 +6,7 @@ import net.nginxmanager.site.Site;
 import net.nginxmanager.site.SiteRepository;
 import net.nginxmanager.site.SiteService;
 import net.nginxmanager.site.SiteType;
+import net.nginxmanager.site.RawSiteLetsEncryptException;
 import net.nginxmanager.site.WildcardLetsEncryptException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
@@ -99,6 +100,9 @@ public class CertificateController {
             request = siteService.enableLetsEncrypt(siteId, authentication.getName());
         } catch (WildcardLetsEncryptException e) {
             redirect.addFlashAttribute("error", messages.get("msg.validation.wildcardLetsEncrypt"));
+            return back;
+        } catch (RawSiteLetsEncryptException e) {
+            redirect.addFlashAttribute("error", messages.get("msg.validation.rawLetsEncrypt"));
             return back;
         }
         if (request.issueNow()) {
