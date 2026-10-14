@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="ko" th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org">
+<body>
+<!-- 스트림 추가·수정 폼이 함께 쓰는 항목(프로토콜·포트 제외). th:object 안에서 넣는다 -->
+<th:block th:fragment="fields(editable)">
+    <label><th:block th:text="#{streams.field.backends}">백엔드 (호스트:포트, 여러 개면 줄마다 하나)</th:block>
+        <span class="hint" th:text="#{streams.field.backends.hint}">설명</span>
+        <textarea th:field="*{backends}" rows="3" placeholder="10.0.0.5:5432" th:disabled="${!editable}"></textarea>
+        <span class="error" th:errors="*{backendsValid}"></span>
+        <span class="error" th:errors="*{backendsNotManager}"></span>
+    </label>
+    <label><th:block th:text="#{streams.field.loadBalancing}">백엔드가 여럿일 때 나누는 방식</th:block>
+        <span class="hint" th:text="#{streams.field.loadBalancing.hint}">설명</span>
+        <select th:field="*{loadBalancing}" th:disabled="${!editable}">
+            <option th:each="lb : ${T(net.nginxmanager.stream.StreamBalancing).values()}" th:value="${lb}" th:text="#{|enum.StreamBalancing.${lb.name()}|}">차례대로</option>
+        </select>
+    </label>
+    <label><th:block th:text="#{streams.field.connectTimeout}">연결 타임아웃(초, 비우면 60)</th:block>
+        <span class="hint" th:text="#{streams.field.connectTimeout.hint}">설명</span>
+        <input type="number" th:field="*{connectTimeout}" min="1" max="3600" th:disabled="${!editable}">
+        <span class="error" th:errors="*{connectTimeout}"></span>
+    </label>
+    <label><th:block th:text="#{streams.field.idleTimeout}">유휴 타임아웃(초, 비우면 600)</th:block>
+        <span class="hint" th:text="#{streams.field.idleTimeout.hint}">설명</span>
+        <input type="number" th:field="*{idleTimeout}" min="1" max="86400" th:disabled="${!editable}">
+        <span class="error" th:errors="*{idleTimeout}"></span>
+    </label>
+    <label><th:block th:text="#{streams.field.note}">메모</th:block>
+        <span class="hint" th:text="#{streams.field.note.hint}">설명</span>
+        <input type="text" th:field="*{note}" maxlength="200" th:disabled="${!editable}">
+    </label>
+</th:block>
+</body>
+</html>

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ko" th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(|${stream.protocol} ${stream.listenPort}|)}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<main class="page">
+    <div class="title-row">
+        <h1 th:text="|${stream.protocol} ${stream.listenPort}|">TCP 5432</h1>
+        <span th:if="${file != null and file.draftDelete}" class="badge warn" th:text="#{files.list.badge.pendingDelete}">삭제 대기</span>
+        <span th:if="${file != null and file.draftContent != null}" class="badge warn" th:text="#{sites.status.pending}">적용 대기</span>
+    </div>
+    <p class="notice" th:if="${param.saved}"><th:block th:text="#{sites.detail.saved.before}">초안을 저장했습니다.</th:block> <a th:href="@{/apply}" th:text="#{sites.detail.saved.link}">적용 화면</a><th:block th:text="#{sites.detail.saved.after}">에서 반영하세요.</th:block></p>
+
+    <div class="columns">
+        <section class="card" th:unless="${stream.raw}">
+            <h2 th:text="#{sites.detail.settings}">설정</h2>
+            <form th:action="@{/streams/{id}(id=${stream.id})}" th:object="${form}" method="post">
+                <input type="hidden" th:field="*{version}">
+                <input type="hidden" th:field="*{protocol}">
+                <input type="hidden" th:field="*{listenPort}">
+                <th:block th:replace="~{streams/fields :: fields(${currentUser.canEdit()})}"></th:block>
+                <button type="submit" th:if="${currentUser.canEdit()}" th:text="#{sites.field.saveDraft}">초안 저장</button>
+            </form>
+            <p class="muted small" th:text="#{streams.detail.fixedPort}">프로토콜과 포트는 바꿀 수 없습니다.</p>
+        </section>
+        <section class="card" th:if="${stream.raw}">
+            <h2 th:text="#{sites.detail.raw.title}">원문 편집</h2>
+            <p th:text="#{streams.detail.raw.body}">이 스트림은 원문으로만 관리합니다.</p>
+        </section>
+
+        <section class="card">
+            <div class="title-row">
+                <h2 th:text="${stream.configPath}">stream.d/tcp-5432.conf</h2>
+                <a th:if="${currentUser.canEdit() and file != null}" th:href="@{/files/{id}(id=${file.id})}" th:text="#{sites.detail.editRaw}">원문 편집</a>
+            </div>
+            <pre class="code" th:text="${content}"></pre>
+            <p class="hint" th:text="#{streams.detail.ports(${#strings.toString(stream.listenPort)}, ${stream.protocol.name() == 'UDP'} ? '/udp' : '')}">ports</p>
+            <form th:if="${currentUser.canEdit() and !(file != null and file.draftDelete)}" th:action="@{/streams/{id}/delete(id=${stream.id})}" method="post">
+                <input type="hidden" name="version" th:value="${stream.version}">
+                <button type="submit" class="secondary" th:text="#{streams.detail.delete}">스트림 지우기 (초안)</button>
+            </form>
+        </section>
+    </div>
+</main>
+</body>
+</html>

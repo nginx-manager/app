@@ -7,9 +7,11 @@ import net.nginxmanager.cert.CertificateRegistry;
 import net.nginxmanager.common.ConcurrentEditException;
 import net.nginxmanager.common.NotFoundException;
 import net.nginxmanager.config.ConfigFile;
+import net.nginxmanager.config.ConfigFileDiscardedEvent;
 import net.nginxmanager.config.ConfigFileRepository;
 import net.nginxmanager.config.ConfigFileStore;
 import net.nginxmanager.config.NewFilePath;
+import net.nginxmanager.config.RawEditedEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -125,6 +127,7 @@ public class SiteService {
                 .orElseThrow(() -> new NotFoundException("config file " + configFileId));
         requireVersion(file.getVersion(), expectedVersion, "file " + file.getPath());
         file.stageContent(normalizeNewlines(content));
+        events.publishEvent(new RawEditedEvent(file.getPath()));
         siteRepository.findByConfigFileId(configFileId)
                 .filter(site -> site.getType() != SiteType.RAW)
                 .ifPresent(Site::switchToRaw);
@@ -213,6 +216,7 @@ public class SiteService {
         long configFileId = file.getId();
         if (!revertMove(file)) {
             boolean neverWritten = isNeverWritten(file);
+            events.publishEvent(new ConfigFileDiscardedEvent(file.getPath(), neverWritten));
             if (neverWritten && file.isDraftDelete()) {
                 configFileRepository.delete(file);
             } else if (neverWritten) {

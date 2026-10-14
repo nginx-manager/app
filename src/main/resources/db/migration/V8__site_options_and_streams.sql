@@ -17,6 +17,8 @@ CREATE TABLE stream_proxy (
     idle_timeout    INTEGER,
     note            VARCHAR(200),
     raw             BOOLEAN      NOT NULL DEFAULT 0,
+    -- 마지막으로 nginx에 반영된 폼 값. 초안을 버리면 이 값으로 되돌린다
+    applied_settings TEXT,
     config_path     VARCHAR(255) NOT NULL UNIQUE,
     created_at      TIMESTAMP    NOT NULL,
     updated_at      TIMESTAMP    NOT NULL,

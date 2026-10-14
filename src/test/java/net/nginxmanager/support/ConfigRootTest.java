@@ -8,6 +8,7 @@ import net.nginxmanager.config.ConfigVersionRepository;
 import net.nginxmanager.history.DriftDetector;
 import net.nginxmanager.notify.NotificationChannelRepository;
 import net.nginxmanager.site.SiteRepository;
+import net.nginxmanager.stream.StreamProxyRepository;
 import net.nginxmanager.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -58,11 +59,14 @@ public abstract class ConfigRootTest {
     protected NotificationChannelRepository channelRepository;
     @Autowired
     protected AcmeSettingsRepository acmeSettingsRepository;
+    @Autowired
+    protected StreamProxyRepository streamProxyRepository;
 
     @BeforeEach
     void resetState() throws IOException {
         nginx.reset();
         siteRepository.deleteAll();
+        streamProxyRepository.deleteAll();
         certificateRepository.deleteAll();
         channelRepository.deleteAll();
         acmeSettingsRepository.deleteAll();
