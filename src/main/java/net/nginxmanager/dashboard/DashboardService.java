@@ -4,6 +4,7 @@ import net.nginxmanager.cert.CertificateStatus;
 import net.nginxmanager.cert.TlsCertificate;
 import net.nginxmanager.cert.TlsCertificateRepository;
 import net.nginxmanager.history.VersionQueryRepository;
+import net.nginxmanager.runtime.NginxProcessWatcher;
 import net.nginxmanager.runtime.NginxRuntime;
 import net.nginxmanager.runtime.RuntimeStatus;
 import net.nginxmanager.site.SiteRepository;
@@ -32,7 +33,8 @@ public class DashboardService {
     public record Dashboard(RuntimeStatus status, long siteCount, long enabledSiteCount,
                             List<VersionQueryRepository.VersionRow> recentVersions,
                             List<CertificateWarning> certificateWarnings, long databaseBytes,
-                            StartupCheck failedStartupCheck, VersionChange versionChange, String appVersion) {
+                            StartupCheck failedStartupCheck, VersionChange versionChange, String appVersion,
+                            NginxProcessWatcher.ProcessEvent lastProcessEvent) {
     }
 
     private final NginxRuntime runtime;
@@ -41,18 +43,21 @@ public class DashboardService {
     private final TlsCertificateRepository certificateRepository;
     private final JdbcClient jdbc;
     private final StartupCheckService startupCheckService;
+    private final NginxProcessWatcher processWatcher;
     private final Clock clock;
 
     public DashboardService(NginxRuntime runtime, SiteRepository siteRepository,
                             VersionQueryRepository versionQueryRepository,
                             TlsCertificateRepository certificateRepository, JdbcClient jdbc,
-                            StartupCheckService startupCheckService, Clock clock) {
+                            StartupCheckService startupCheckService, NginxProcessWatcher processWatcher,
+                            Clock clock) {
         this.runtime = runtime;
         this.siteRepository = siteRepository;
         this.versionQueryRepository = versionQueryRepository;
         this.certificateRepository = certificateRepository;
         this.jdbc = jdbc;
         this.startupCheckService = startupCheckService;
+        this.processWatcher = processWatcher;
         this.clock = clock;
     }
 
@@ -70,7 +75,8 @@ public class DashboardService {
                 .orElse(null);
         return new Dashboard(status, siteRepository.count(), siteRepository.countByEnabledTrue(),
                 versionQueryRepository.findPage(0, RECENT_VERSIONS), warnings, databaseBytes(), failed,
-                startupCheckService.versionChange().orElse(null), startupCheckService.appVersion());
+                startupCheckService.versionChange().orElse(null), startupCheckService.appVersion(),
+                processWatcher.lastEvent().orElse(null));
     }
 
     private static CertificateWarning warning(TlsCertificate c, Instant now) {

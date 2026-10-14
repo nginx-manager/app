@@ -1,0 +1,28 @@
+# 실행 예시. docker compose -f docker/docker-compose.yml up -d
+services:
+  nginx-manager:
+    image: ghcr.io/nginx-manager/app:latest
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      # 관리 화면. 사내망에서만 쓰거나 127.0.0.1:9000:9000 처럼 묶어 두고 HTTPS 프록시 뒤에 둔다
+      - "9000:9000"
+    volumes:
+      - nm-conf:/etc/nginx        # nginx 설정, 인증서(certs/)
+      - nm-logs:/var/log/nginx    # 접근·오류 로그
+      - nm-data:/data             # 관리도구 DB, ACME 계정 키
+    environment:
+      # 메일 알림을 쓸 때
+      # SPRING_MAIL_HOST: smtp.example.com
+      # SPRING_MAIL_PORT: "587"
+      # SPRING_MAIL_USERNAME: nginx-manager@example.com
+      # SPRING_MAIL_PASSWORD: change-me
+      # 관리 화면을 HTTPS 프록시 뒤에 둘 때
+      # SERVER_SERVLET_SESSION_COOKIE_SECURE: "true"
+      TZ: Asia/Seoul
+
+volumes:
+  nm-conf:
+  nm-logs:
+  nm-data:

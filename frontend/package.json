@@ -1,0 +1,23 @@
+{
+  "name": "nginx-manager-editor",
+  "private": true,
+  "description": "원문 편집기 번들. 빌드 결과(src/main/resources/static/js/editor.bundle.js)는 저장소에 함께 둔다.",
+  "scripts": {
+    "build": "esbuild editor.js --bundle --minify --format=iife --legal-comments=linked --outfile=../src/main/resources/static/js/editor.bundle.js"
+  },
+  "devDependencies": {
+    "@codemirror/commands": "6.8.1",
+    "@codemirror/language": "6.11.3",
+    "@codemirror/legacy-modes": "6.5.2",
+    "@codemirror/state": "6.5.2",
+    "@codemirror/view": "6.38.6",
+    "codemirror": "6.0.2",
+    "esbuild": "0.25.10",
+    "@codemirror/lint": "6.8.5"
+  },
+  "overrides": {
+    "@codemirror/lint": "6.8.5",
+    "@codemirror/autocomplete": "6.18.6",
+    "@codemirror/search": "6.5.11"
+  }
+}

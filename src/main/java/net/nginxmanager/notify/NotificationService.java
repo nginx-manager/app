@@ -56,7 +56,8 @@ public class NotificationService {
             Thread.currentThread().interrupt();
             return new Delivery(channel, "중단됨");
         } catch (Exception e) {
-            log.warn("notification to {} {} failed: {}", channel.getType(), channel.getTarget(), e.getMessage());
+            // 웹훅 URL에는 토큰이 들어 있는 경우가 많아 로그에는 호스트까지만 남긴다
+            log.warn("notification to {} {} failed: {}", channel.getType(), redact(channel), e.getMessage());
             return new Delivery(channel, e.getMessage());
         }
     }
@@ -85,6 +86,18 @@ public class NotificationService {
                 HttpResponse.BodyHandlers.discarding());
         if (response.statusCode() >= 300) {
             throw new IOException("웹훅 응답 " + response.statusCode());
+        }
+    }
+
+    static String redact(NotificationChannel channel) {
+        if (channel.getType() != ChannelType.WEBHOOK) {
+            return channel.getTarget();
+        }
+        try {
+            URI uri = URI.create(channel.getTarget());
+            return uri.getScheme() + "://" + uri.getHost() + "/…";
+        } catch (IllegalArgumentException e) {
+            return "(webhook)";
         }
     }
 

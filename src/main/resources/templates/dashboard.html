@@ -63,6 +63,15 @@
                 </dd>
                 <dt>버전</dt>
                 <dd th:text="${status.version} ?: '알 수 없음'">1.31.6</dd>
+                <th:block th:if="${dashboard.lastProcessEvent}">
+                    <dt>마지막 재시작</dt>
+                    <dd id="last-restart">
+                        <span th:text="${#temporals.format(dashboard.lastProcessEvent.at, 'yyyy-MM-dd HH:mm:ss')}">2026-10-13 10:00</span>
+                        <span class="small muted" th:if="${dashboard.lastProcessEvent.down()}">(내려감)</span>
+                        <span class="small muted" th:unless="${dashboard.lastProcessEvent.down()}"
+                              th:text="'(PID ' + ${dashboard.lastProcessEvent.previousPid ?: '-'} + ' → ' + ${dashboard.lastProcessEvent.currentPid} + ')'">(PID 1 → 2)</span>
+                    </dd>
+                </th:block>
                 <dt>관리도구</dt>
                 <dd th:text="${dashboard.appVersion}">0.1.0</dd>
                 <dt>마스터 PID</dt>

@@ -29,7 +29,7 @@
         <p th:if="${#lists.isEmpty(logs)}" class="muted">조건에 맞는 기록이 없습니다.</p>
         <table th:unless="${#lists.isEmpty(logs)}">
             <thead>
-            <tr><th>시각</th><th>사용자</th><th>동작</th><th>대상</th><th>결과</th></tr>
+            <tr><th>시각</th><th>사용자</th><th>동작</th><th>대상</th><th>결과</th><th>내용</th></tr>
             </thead>
             <tbody>
             <tr th:each="l : ${logs}">
@@ -41,6 +41,7 @@
                 <td th:text="${l.action}">APPLY</td>
                 <td><code th:text="${l.target}">version:3</code></td>
                 <td><span class="badge" th:classappend="${l.result.name() == 'SUCCESS' ? 'ok' : 'bad'}" th:text="${l.result}">SUCCESS</span></td>
+                <td class="small" th:text="${l.detail}"></td>
             </tr>
             </tbody>
         </table>

@@ -10,6 +10,11 @@ public interface NginxRuntime {
 
     RuntimeStatus status();
 
+    /** 살아 있는 마스터 PID. 내려가 있으면 null. 자주 불러도 되도록 명령을 실행하지 않는다. */
+    default Long masterPid() {
+        return status().masterPid();
+    }
+
     /** {@code nginx -t}. 실패해도 예외를 던지지 않고 결과로 돌려준다. */
     ValidationResult validate();
 

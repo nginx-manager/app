@@ -50,6 +50,11 @@ public class LocalNginxRuntime implements NginxRuntime {
     }
 
     @Override
+    public Long masterPid() {
+        return readLiveMasterPid();
+    }
+
+    @Override
     public ValidationResult validate() {
         CommandRunner.Result result = nginx("-t");
         return new ValidationResult(result.exitCode() == 0, result.output(),

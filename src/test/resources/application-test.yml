@@ -26,6 +26,8 @@ nginx-manager:
   cert:
     # 테스트에서는 예약 갱신을 돌리지 않는다. 필요한 테스트가 직접 부른다
     initial-delay: PT24H
+  process-watch:
+    interval: PT24H
 
 logging:
   level:
