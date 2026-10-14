@@ -10,19 +10,23 @@ ARG RUNTIME_BASE_IMAGE=eclipse-temurin:21-jre-noble
 ARG NGINXM_UID=10101
 
 FROM ${MAVEN_IMAGE} AS app-build
+# 관리도구 버전은 git 태그(vX.Y.Z)가 기준이다. 릴리스 워크플로가 태그에서 넘기고, 태그 없이 빌드하면 dev
+ARG APP_VERSION=dev
 WORKDIR /src
 COPY pom.xml .
 COPY .mvn ./.mvn
 RUN mvn -B -q dependency:go-offline
 COPY src ./src
-RUN mvn -B -q package -DskipTests \
+RUN mvn -B -q package -DskipTests -Drevision="${APP_VERSION}" \
     && cp target/nginx-manager-*.jar /src/app.jar
 
 FROM ${RUNTIME_BASE_IMAGE}
 ARG NGINXM_UID
+ARG APP_VERSION=dev
 
 LABEL org.opencontainers.image.title="nginx-manager" \
-      org.opencontainers.image.source="https://github.com/nginx-manager/app"
+      org.opencontainers.image.source="https://github.com/nginx-manager/app" \
+      org.opencontainers.image.version="${APP_VERSION}"
 
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/* \

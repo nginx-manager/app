@@ -67,6 +67,10 @@ nginx 컨테이너:
 
 Let's Encrypt는 HTTP-01 방식으로 인증하므로 도메인이 nginx 컨테이너의 80 포트로 들어와야 합니다. 처음에는 화면의 설정에서 스테이징으로 시험해 보는 것을 권합니다.
 
+## 버전과 릴리스 노트
+
+지금 쓰는 관리도구 버전은 관리 화면 아래(footer)에 보입니다. 버전은 git 태그(`vX.Y.Z`)가 기준이고, 태그 없이 빌드한 이미지는 `dev`로 보입니다. 버전별로 무엇이 바뀌었는지는 [릴리스 노트](docs/releases/README.md)에 화면과 함께 정리합니다. 버전 규칙과 릴리스 절차도 거기에 있습니다.
+
 ## 업그레이드와 되돌리기
 
 두 이미지는 **같은 버전**으로 맞춥니다. compose 파일은 `NGINX_MANAGER_VERSION` 하나로 두 이미지의 태그를 함께 정합니다(기본 `latest`).
@@ -118,4 +122,4 @@ cd frontend && npm ci && npm run build
 - 연관관계는 모두 `fetch = LAZY`, `open-in-view=false`입니다.
 - 목록 조회마다 `QueryCounter.assertConstantQueries`로 데이터 건수와 상관없이 쿼리 수가 같은지 확인합니다.
 
-릴리스: `v<버전>` 태그를 밀면 그 버전과 최신 nginx로 두 이미지를 게시합니다. 이후 nginx 릴리스는 매일 확인해 nginx 이미지만 자동으로 게시합니다. 에이전트 API를 바꾸면 `agent/server.go`의 `Protocol`과 `AgentNginxRuntime.PROTOCOL`을 함께 올립니다.
+릴리스: [릴리스 노트](docs/releases/README.md)를 쓰고 `v<버전>` 태그를 밀면 그 버전과 최신 nginx로 두 이미지를 게시합니다. 이후 nginx 릴리스는 매일 확인해 nginx 이미지만 자동으로 게시합니다. 에이전트 API를 바꾸면 `agent/server.go`의 `Protocol`과 `AgentNginxRuntime.PROTOCOL`을 함께 올립니다.
