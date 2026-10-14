@@ -206,6 +206,12 @@ td input[type=radio] { vertical-align: middle; margin-right: .35rem; }
 .badge.warn { background: var(--warn-soft); color: var(--warn); }
 .tags { display: flex; flex-wrap: wrap; gap: .4rem; list-style: none; padding: 0; margin: 0; }
 .tags li { margin: 0; padding: .15rem .55rem; border: 1px solid var(--line); border-radius: 6px; background: var(--subtle); font-size: .78rem; font-family: var(--mono); color: var(--fg-soft); }
+.modules { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: .6rem; }
+.modules li { margin: 0; padding: .65rem .8rem; border: 1px solid var(--line); border-radius: 8px; background: var(--subtle); }
+.modules .module-head { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; }
+.modules code { font-family: var(--mono); font-size: .8rem; font-weight: 600; color: var(--fg); background: none; padding: 0; }
+.modules .badge { font-size: .68rem; }
+.modules p { margin: .3rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--muted); }
 .facts { display: grid; grid-template-columns: max-content 1fr; gap: .65rem 2rem; margin: 0; font-size: .92rem; }
 .facts dt { color: var(--muted); }
 .facts dd { margin: 0; font-weight: 500; display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
