@@ -67,7 +67,7 @@ public class SiteController {
             Site site = siteService.create(form, authentication.getName());
             return "redirect:/sites/" + site.getId() + "?saved";
         } catch (DuplicateSiteException e) {
-            bindingResult.rejectValue("primaryDomain", "duplicate", duplicateMessage(e));
+            bindingResult.rejectValue("primaryDomain", "msg.site.domainTaken", new Object[] {e.getDomain()}, duplicateMessage(e));
             return "sites/form";
         }
     }
@@ -95,7 +95,7 @@ public class SiteController {
         try {
             siteService.update(id, form, authentication.getName());
         } catch (DuplicateSiteException e) {
-            bindingResult.rejectValue("extraDomains", "duplicate", duplicateMessage(e));
+            bindingResult.rejectValue("extraDomains", "msg.site.domainTaken", new Object[] {e.getDomain()}, duplicateMessage(e));
             Site site = siteQueryRepository.findWithFile(id).orElseThrow(() -> new NotFoundException("site " + id));
             model.addAttribute("site", site);
             model.addAttribute("content", currentContent(site));

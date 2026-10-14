@@ -1,53 +1,55 @@
 <!DOCTYPE html>
-<html lang="ko" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="~{fragments/layout :: head('감사 로그')}"></head>
+<html lang="ko" th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(#{audit.list.title})}"></head>
 <body>
 <nav th:replace="~{fragments/layout :: nav}"></nav>
 <main class="page">
-    <h1>감사 로그</h1>
+    <h1 th:text="#{audit.list.title}">감사 로그</h1>
+    <p class="muted" th:text="#{audit.list.intro}">누가 언제 무엇을 했는지 기록합니다. 로그인, 사용자 변경, 설정 적용·되돌리기, 인증서 작업이 남습니다.</p>
     <section class="card">
         <form th:action="@{/audit}" method="get" class="row-form">
-            <label>사용자 <input type="text" name="username" th:value="${filter.username}"></label>
-            <label>동작
+            <label><span th:text="#{audit.list.filter.username}">사용자</span> <input type="text" name="username" th:value="${filter.username}"></label>
+            <label><span th:text="#{audit.list.filter.action}">동작</span>
                 <select name="action">
-                    <option value="">전체</option>
-                    <option th:each="a : ${actions}" th:value="${a}" th:text="${a}" th:selected="${a == filter.action}">APPLY</option>
+                    <option value="" th:text="#{audit.list.filter.all}">전체</option>
+                    <option th:each="a : ${actions}" th:value="${a}" th:text="#{|enum.AuditAction.${a.name()}|}" th:selected="${a == filter.action}">APPLY</option>
                 </select>
             </label>
-            <label>결과
+            <label><span th:text="#{audit.list.filter.result}">결과</span>
                 <select name="result">
-                    <option value="">전체</option>
-                    <option th:each="r : ${results}" th:value="${r}" th:text="${r}" th:selected="${r == filter.result}">SUCCESS</option>
+                    <option value="" th:text="#{audit.list.filter.all}">전체</option>
+                    <option th:each="r : ${results}" th:value="${r}" th:text="#{|enum.AuditResult.${r.name()}|}" th:selected="${r == filter.result}">SUCCESS</option>
                 </select>
             </label>
-            <label>시작일 <input type="date" name="from" th:value="${filter.from}"></label>
-            <label>종료일 <input type="date" name="to" th:value="${filter.to}"></label>
-            <button type="submit">검색</button>
+            <label><span th:text="#{audit.list.filter.from}">시작일</span> <input type="date" name="from" th:value="${filter.from}"></label>
+            <label><span th:text="#{audit.list.filter.to}">종료일</span> <input type="date" name="to" th:value="${filter.to}"></label>
+            <button type="submit" th:text="#{audit.list.filter.search}">검색</button>
         </form>
+        <p class="hint" th:text="#{audit.list.filter.hint}">사용자는 아이디가 정확히 같아야 찾습니다. 비워 둔 조건은 적용하지 않으며, 날짜는 시작일과 종료일을 모두 포함합니다.</p>
     </section>
     <section class="card">
-        <p th:if="${#lists.isEmpty(logs)}" class="muted">조건에 맞는 기록이 없습니다.</p>
+        <p th:if="${#lists.isEmpty(logs)}" class="muted" th:text="#{audit.list.empty}">조건에 맞는 기록이 없습니다.</p>
         <table th:unless="${#lists.isEmpty(logs)}">
             <thead>
-            <tr><th>시각</th><th>사용자</th><th>동작</th><th>대상</th><th>결과</th><th>내용</th></tr>
+            <tr><th th:text="#{audit.list.col.time}">시각</th><th th:text="#{audit.list.col.user}">사용자</th><th th:text="#{audit.list.col.action}">동작</th><th th:text="#{audit.list.col.target}">대상</th><th th:text="#{audit.list.col.result}">결과</th><th th:text="#{audit.list.col.detail}">내용</th></tr>
             </thead>
             <tbody>
             <tr th:each="l : ${logs}">
                 <td class="nowrap" th:text="${#temporals.format(l.createdAt, 'yyyy-MM-dd HH:mm:ss')}">2026-10-13</td>
                 <td>
-                    <span th:text="${l.username ?: '시스템'}">admin</span>
+                    <span th:text="${l.username} ?: #{audit.list.system}">admin</span>
                     <span class="muted small" th:if="${l.userRole != null}" th:text="${l.userRole}">ADMIN</span>
                 </td>
-                <td th:text="${l.action}">APPLY</td>
+                <td th:text="#{|enum.AuditAction.${l.action.name()}|}" th:title="${l.action}">APPLY</td>
                 <td><code th:text="${l.target}">version:3</code></td>
-                <td><span class="badge" th:classappend="${l.result.name() == 'SUCCESS' ? 'ok' : 'bad'}" th:text="${l.result}">SUCCESS</span></td>
+                <td><span class="badge" th:classappend="${l.result.name() == 'SUCCESS' ? 'ok' : 'bad'}" th:text="#{|enum.AuditResult.${l.result.name()}|}">SUCCESS</span></td>
                 <td class="small" th:text="${l.detail}"></td>
             </tr>
             </tbody>
         </table>
         <p class="pager">
-            <a th:if="${page > 0}" th:href="@{/audit(username=${filter.username},action=${filter.action},result=${filter.result},from=${filter.from},to=${filter.to},page=${page - 1})}">← 최근</a>
-            <a th:if="${hasNext}" th:href="@{/audit(username=${filter.username},action=${filter.action},result=${filter.result},from=${filter.from},to=${filter.to},page=${page + 1})}">이전 →</a>
+            <a th:if="${page > 0}" th:href="@{/audit(username=${filter.username},action=${filter.action},result=${filter.result},from=${filter.from},to=${filter.to},page=${page - 1})}" th:text="#{audit.list.newer}">← 최근</a>
+            <a th:if="${hasNext}" th:href="@{/audit(username=${filter.username},action=${filter.action},result=${filter.result},from=${filter.from},to=${filter.to},page=${page + 1})}" th:text="#{audit.list.older}">이전 →</a>
         </p>
     </section>
 </main>

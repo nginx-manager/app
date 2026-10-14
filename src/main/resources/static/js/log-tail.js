@@ -6,13 +6,23 @@
     const state = document.getElementById('live-state');
     if (!toggle) return;
     const MAX_LINES = 2000;
+    // 화면 문구는 템플릿이 data-* 속성으로 넣는다(다국어). 없으면 한국어 기본값을 쓴다
+    const d = toggle.dataset;
+    const text = {
+        start: d.labelStart || '실시간 보기',
+        stop: d.labelStop || '실시간 멈추기',
+        stopped: d.stateStopped || '멈춤',
+        connecting: d.stateConnecting || '연결 중',
+        watching: d.stateWatching || '보는 중',
+        reconnecting: d.stateReconnecting || '다시 연결 중'
+    };
     let source = null;
 
     function stop() {
         if (source) source.close();
         source = null;
-        toggle.textContent = '실시간 보기';
-        state.textContent = '멈춤';
+        toggle.textContent = text.start;
+        state.textContent = text.stopped;
         state.className = 'badge';
     }
 
@@ -20,11 +30,11 @@
         if (source) { stop(); return; }
         panel.hidden = false;
         lines.textContent = '';
-        state.textContent = '연결 중';
+        state.textContent = text.connecting;
         source = new EventSource(toggle.dataset.stream);
-        toggle.textContent = '실시간 멈추기';
+        toggle.textContent = text.stop;
         source.addEventListener('open', function () {
-            state.textContent = '보는 중';
+            state.textContent = text.watching;
             state.className = 'badge ok';
         });
         source.addEventListener('line', function (e) {
@@ -38,7 +48,7 @@
             stop();
         });
         source.addEventListener('error', function () {
-            state.textContent = '다시 연결 중';
+            state.textContent = text.reconnecting;
             state.className = 'badge warn';
         });
     });

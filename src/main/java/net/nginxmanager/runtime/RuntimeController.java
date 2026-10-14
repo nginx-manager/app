@@ -1,5 +1,6 @@
 package net.nginxmanager.runtime;
 
+import net.nginxmanager.common.Messages;
 import net.nginxmanager.apply.ApplyService;
 import net.nginxmanager.audit.AuditAction;
 import net.nginxmanager.audit.AuditEvent;
@@ -17,9 +18,11 @@ public class RuntimeController {
     private final NginxRuntimeProperties properties;
     private final ApplyService applyService;
     private final ApplicationEventPublisher events;
+    private final Messages messages;
 
     public RuntimeController(NginxRuntime runtime, NginxRuntimeProperties properties, ApplyService applyService,
-                             ApplicationEventPublisher events) {
+                             ApplicationEventPublisher events, Messages messages) {
+        this.messages = messages;
         this.runtime = runtime;
         this.properties = properties;
         this.applyService = applyService;
@@ -35,7 +38,7 @@ public class RuntimeController {
             }
             ValidationResult validation = runtime.validate();
             if (!validation.ok()) {
-                return "설정 검증에 실패해 nginx를 띄우지 않았습니다. 설정을 고친 뒤 다시 시도하세요.\n" + validation.output();
+                return messages.get("msg.runtime.validationFailed") + "\n" + validation.output();
             }
             try {
                 runtime.start();
@@ -43,11 +46,11 @@ public class RuntimeController {
                 return e.getMessage();
             }
             HealthResult health = runtime.healthCheck(properties.healthTimeout());
-            return health.healthy() ? null : "nginx가 시작되지 않았습니다: " + health.detail();
+            return health.healthy() ? null : messages.get("msg.runtime.notStarted", health.detail());
         });
         if (error == null) {
             events.publishEvent(AuditEvent.success(actor, AuditAction.RUNTIME_START, "nginx"));
-            redirect.addFlashAttribute("notice", "nginx가 실행 중입니다.");
+            redirect.addFlashAttribute("notice", messages.get("msg.runtime.running"));
         } else {
             events.publishEvent(AuditEvent.failure(actor, AuditAction.RUNTIME_START, "nginx", error));
             redirect.addFlashAttribute("error", error);

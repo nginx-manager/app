@@ -1,34 +1,34 @@
 <!DOCTYPE html>
-<html lang="ko" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="~{fragments/layout :: head('알림 설정')}"></head>
+<html lang="ko" th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(#{settings.notifications.title})}"></head>
 <body>
 <nav th:replace="~{fragments/layout :: nav}"></nav>
 <main class="page">
-    <h1>알림 설정</h1>
-    <p class="muted">인증서 발급·갱신에 실패하거나 만료가 가까워지면 아래 채널로 알립니다.</p>
+    <h1 th:text="#{settings.notifications.title}">알림 설정</h1>
+    <p class="muted" th:text="#{settings.notifications.intro}">인증서 발급·갱신에 실패하거나 만료가 가까워지면 아래 채널로 알립니다.</p>
     <p class="notice" th:if="${notice}" th:text="${notice}">완료</p>
     <p class="error" th:if="${error}" th:text="${error}">오류</p>
     <section class="card">
-        <p class="muted" th:if="${#lists.isEmpty(channels)}">등록된 채널이 없습니다.</p>
+        <p class="muted" th:if="${#lists.isEmpty(channels)}" th:text="#{settings.notifications.empty}">등록된 채널이 없습니다.</p>
         <table th:unless="${#lists.isEmpty(channels)}">
-            <thead><tr><th>종류</th><th>대상</th><th>상태</th><th></th></tr></thead>
+            <thead><tr><th th:text="#{settings.notifications.col.type}">종류</th><th th:text="#{settings.notifications.col.target}">대상</th><th th:text="#{settings.notifications.col.status}">상태</th><th></th></tr></thead>
             <tbody>
             <tr th:each="ch : ${channels}">
-                <td th:text="${ch.type.name() == 'EMAIL'} ? '메일' : '웹훅'">메일</td>
+                <td th:text="${ch.type.name() == 'EMAIL'} ? #{settings.notifications.type.email} : #{settings.notifications.type.webhook}">메일</td>
                 <td class="small" th:text="${ch.target}">ops@example.com</td>
                 <td>
-                    <span class="badge" th:classappend="${ch.enabled ? 'ok' : ''}" th:text="${ch.enabled ? '사용' : '중지'}">사용</span>
+                    <span class="badge" th:classappend="${ch.enabled ? 'ok' : ''}" th:text="${ch.enabled} ? #{settings.notifications.enabled} : #{settings.notifications.disabled}">사용</span>
                     <form th:action="@{/settings/notifications/{id}/enabled(id=${ch.id})}" method="post" class="inline">
                         <input type="hidden" name="enabled" th:value="${!ch.enabled}">
-                        <button type="submit" class="link" th:text="${ch.enabled ? '중지' : '사용'}">중지</button>
+                        <button type="submit" class="link" th:text="${ch.enabled} ? #{settings.notifications.disable} : #{settings.notifications.enable}">중지</button>
                     </form>
                 </td>
                 <td class="nowrap">
                     <form th:action="@{/settings/notifications/{id}/test(id=${ch.id})}" method="post" class="inline">
-                        <button type="submit" class="link">테스트</button>
+                        <button type="submit" class="link" th:text="#{settings.notifications.test}" th:title="#{settings.notifications.testHint}">테스트</button>
                     </form>
                     <form th:action="@{/settings/notifications/{id}/delete(id=${ch.id})}" method="post" class="inline">
-                        <button type="submit" class="link">삭제</button>
+                        <button type="submit" class="link" th:text="#{settings.notifications.delete}">삭제</button>
                     </form>
                 </td>
             </tr>
@@ -36,18 +36,20 @@
         </table>
     </section>
     <section class="card">
-        <h2>채널 추가</h2>
+        <h2 th:text="#{settings.notifications.add.title}">채널 추가</h2>
         <form th:action="@{/settings/notifications}" method="post" class="row-form">
-            <label>종류
+            <label><span th:text="#{settings.notifications.add.type}">종류</span>
                 <select name="type">
-                    <option value="WEBHOOK">웹훅 (JSON POST, Slack 호환 text 필드 포함)</option>
-                    <option value="EMAIL">메일</option>
+                    <option value="WEBHOOK" th:text="#{settings.notifications.add.typeWebhook}">웹훅 (JSON POST, Slack 호환 text 필드 포함)</option>
+                    <option value="EMAIL" th:text="#{settings.notifications.type.email}">메일</option>
                 </select>
             </label>
-            <label>대상 <input type="text" name="target" required maxlength="500" placeholder="https://hooks.example.com/... 또는 ops@example.com"></label>
-            <button type="submit">추가</button>
+            <label><span th:text="#{settings.notifications.add.target}">대상</span> <input type="text" name="target" required maxlength="500" th:placeholder="#{settings.notifications.add.targetPlaceholder}" placeholder="https://hooks.example.com/... 또는 ops@example.com">
+                <span class="hint" th:text="#{settings.notifications.add.targetHint}">웹훅은 URL, 메일은 받는 주소를 적습니다.</span></label>
+            <button type="submit" th:text="#{settings.notifications.add.submit}">추가</button>
         </form>
-        <p class="muted small">메일은 서버에 spring.mail.* (SMTP) 설정이 있어야 보낼 수 있습니다.</p>
+        <p class="hint" th:text="#{settings.notifications.webhookHint}">웹훅은 알림마다 event, subject, message, text 필드를 담은 JSON을 POST로 보냅니다. text 필드가 있어 Slack 수신 웹훅 URL을 그대로 쓸 수 있습니다.</p>
+        <p class="muted small" th:text="#{settings.notifications.mailHint}">메일은 서버에 spring.mail.* (SMTP) 설정이 있어야 보낼 수 있습니다.</p>
     </section>
 </main>
 </body>

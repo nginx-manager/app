@@ -1,5 +1,6 @@
 package net.nginxmanager.cert;
 
+import net.nginxmanager.common.Messages;
 import net.nginxmanager.common.NotFoundException;
 import net.nginxmanager.site.Site;
 import net.nginxmanager.site.SiteRepository;
@@ -31,10 +32,12 @@ public class CertificateController {
     private final CertificateUploadService uploadService;
     private final SiteService siteService;
     private final Clock clock;
+    private final Messages messages;
 
     public CertificateController(TlsCertificateRepository certificateRepository, SiteRepository siteRepository,
                                  CertificateService certificateService, CertificateUploadService uploadService,
-                                 SiteService siteService, Clock clock) {
+                                 SiteService siteService, Clock clock, Messages messages) {
+        this.messages = messages;
         this.certificateRepository = certificateRepository;
         this.siteRepository = siteRepository;
         this.certificateService = certificateService;
@@ -63,7 +66,7 @@ public class CertificateController {
             throw new NotFoundException("certificate " + id);
         }
         certificateService.submit(id);
-        redirect.addFlashAttribute("notice", "발급·갱신을 시작했습니다. 끝나면 이 목록과 이력에 결과가 보입니다.");
+        redirect.addFlashAttribute("notice", messages.get("msg.cert.renewStarted"));
         return "redirect:/certs";
     }
 
@@ -72,7 +75,7 @@ public class CertificateController {
     public String letsEncrypt(@RequestParam long siteId, Authentication authentication, RedirectAttributes redirect) {
         long certificateId = siteService.enableLetsEncrypt(siteId, authentication.getName());
         certificateService.submit(certificateId);
-        redirect.addFlashAttribute("notice", "인증서 발급을 시작했습니다. 발급되면 HTTPS 설정이 자동으로 적용됩니다.");
+        redirect.addFlashAttribute("notice", messages.get("msg.cert.issueStarted"));
         return "redirect:/sites/" + siteId;
     }
 
@@ -88,10 +91,10 @@ public class CertificateController {
             if (failure.isPresent()) {
                 redirect.addFlashAttribute("error", failure.get());
             } else {
-                redirect.addFlashAttribute("notice", "인증서를 올렸습니다. 사이트 화면에서 HTTPS를 켜고 이 인증서를 고르세요.");
+                redirect.addFlashAttribute("notice", messages.get("msg.cert.uploaded"));
             }
         } catch (CertificateUploadService.InvalidCertificateException e) {
-            redirect.addFlashAttribute("error", e.getMessage());
+            redirect.addFlashAttribute("error", e.code() == null ? e.getMessage() : messages.get(e.code(), e.args()));
         }
         return "redirect:/certs";
     }

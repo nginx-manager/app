@@ -32,7 +32,7 @@ public class SetupController {
     public String create(@Valid @ModelAttribute("form") SetupForm form, BindingResult bindingResult) {
         requireSetupPending();
         if (!form.password().equals(form.passwordConfirm())) {
-            bindingResult.rejectValue("passwordConfirm", "mismatch", "비밀번호가 서로 다릅니다.");
+            bindingResult.rejectValue("passwordConfirm", "msg.setup.passwordMismatch", "비밀번호가 서로 다릅니다.");
         }
         if (bindingResult.hasErrors()) {
             return "setup";

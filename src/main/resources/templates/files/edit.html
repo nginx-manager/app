@@ -1,20 +1,22 @@
 <!DOCTYPE html>
-<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<html lang="ko" th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/layout :: head(${file.path})}"></head>
 <body>
 <nav th:replace="~{fragments/layout :: nav}"></nav>
 <main class="page">
     <h1 th:text="${file.path}">nginx.conf</h1>
-    <p class="notice" th:if="${param.saved}">초안을 저장했습니다. <a th:href="@{/apply}">적용 화면</a>에서 반영하세요.</p>
-    <p class="warning" th:if="${site != null and site.type.name() != 'RAW'}">
+    <p class="notice" th:if="${param.saved}"><span th:text="#{files.edit.saved.before}">초안을 저장했습니다.</span>
+        <a th:href="@{/apply}" th:text="#{files.edit.saved.link}">적용 화면</a><span th:text="#{files.edit.saved.after}">에서 반영하세요.</span></p>
+    <p class="warning" th:if="${site != null and site.type.name() != 'RAW'}" th:text="#{files.edit.formSiteWarning}">
         폼으로 만든 사이트의 파일입니다. 여기서 저장하면 이 사이트는 원문 편집 전용으로 바뀌고, 폼으로 다시 고칠 수 없습니다.
     </p>
     <section class="card">
+        <p class="hint" th:if="${currentUser.canEdit()}" th:text="#{files.edit.help}">저장하면 초안으로만 남고 서버의 파일은 그대로입니다. 적용 화면에서 검증 후 적용해야 반영되며, 그 전에는 초안을 버릴 수도 있습니다.</p>
         <form th:action="@{/files/{id}(id=${file.id})}" method="post">
             <input type="hidden" name="version" th:value="${file.version}">
             <textarea name="content" class="editor" spellcheck="false" th:text="${content}"
                       th:readonly="${!currentUser.canEdit()}"></textarea>
-            <button type="submit" th:if="${currentUser.canEdit()}">초안 저장</button>
+            <button type="submit" th:if="${currentUser.canEdit()}" th:text="#{files.edit.submit}">초안 저장</button>
         </form>
     </section>
 </main>

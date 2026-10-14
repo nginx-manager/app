@@ -1,20 +1,21 @@
 <!DOCTYPE html>
-<html lang="ko" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="~{fragments/layout :: head('내 계정')}"></head>
+<html lang="ko" th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(#{account.pageTitle})}"></head>
 <body>
 <nav th:replace="~{fragments/layout :: nav}"></nav>
 <main class="page">
-    <h1>비밀번호 변경</h1>
+    <h1 th:text="#{account.title}">비밀번호 변경</h1>
     <section class="card narrow">
-        <p class="notice" th:if="${param.saved}">비밀번호를 바꿨습니다.</p>
+        <p class="notice" th:if="${param.saved}" th:text="#{account.saved}">비밀번호를 바꿨습니다.</p>
         <form th:action="@{/account}" th:object="${form}" method="post">
-            <label>현재 비밀번호 <input type="password" th:field="*{currentPassword}" autocomplete="current-password" required></label>
+            <label><span th:text="#{account.currentPassword}">현재 비밀번호</span> <input type="password" th:field="*{currentPassword}" autocomplete="current-password" required></label>
             <p class="error" th:if="${#fields.hasErrors('currentPassword')}" th:errors="*{currentPassword}"></p>
-            <label>새 비밀번호 <input type="password" th:field="*{newPassword}" minlength="10" autocomplete="new-password" required></label>
+            <label><span th:text="#{account.newPassword}">새 비밀번호</span> <input type="password" th:field="*{newPassword}" minlength="10" autocomplete="new-password" required>
+                <span class="hint" th:text="#{account.newPasswordHint}">10자 이상. 여러 단어를 이은 긴 문장이 외우기 쉽고 안전합니다.</span></label>
             <p class="error" th:if="${#fields.hasErrors('newPassword')}" th:errors="*{newPassword}"></p>
-            <label>새 비밀번호 확인 <input type="password" th:field="*{newPasswordConfirm}" autocomplete="new-password" required></label>
+            <label><span th:text="#{account.newPasswordConfirm}">새 비밀번호 확인</span> <input type="password" th:field="*{newPasswordConfirm}" autocomplete="new-password" required></label>
             <p class="error" th:if="${#fields.hasErrors('confirmed')}" th:errors="*{confirmed}"></p>
-            <button type="submit">변경</button>
+            <button type="submit" th:text="#{account.submit}">변경</button>
         </form>
     </section>
 </main>

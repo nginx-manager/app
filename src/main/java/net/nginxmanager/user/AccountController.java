@@ -32,7 +32,7 @@ public class AccountController {
             return "account";
         }
         if (!userService.changeOwnPassword(authentication.getName(), form.currentPassword(), form.newPassword())) {
-            bindingResult.rejectValue("currentPassword", "mismatch", "현재 비밀번호가 맞지 않습니다.");
+            bindingResult.rejectValue("currentPassword", "msg.account.wrongPassword", "현재 비밀번호가 맞지 않습니다.");
             return "account";
         }
         return "redirect:/account?saved";

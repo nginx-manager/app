@@ -21,7 +21,7 @@ import java.util.Locale;
  * @param proxyReadTimeout 백엔드 응답(읽기·쓰기) 타임아웃(초). null이면 nginx 기본값(60초)
  */
 public record SiteForm(
-        @Pattern(regexp = SiteForm.DOMAIN, message = "도메인 형식이 아닙니다.")
+        @Pattern(regexp = SiteForm.DOMAIN, message = "{msg.validation.domain}")
         String primaryDomain,
         String extraDomains,
         @NotNull
@@ -36,9 +36,9 @@ public record SiteForm(
         /** 업로드한 인증서. null이면 Let's Encrypt로 자동 발급한다. */
         Long certificateId,
         Boolean proxyWebsocket,
-        @Min(value = 1, message = "타임아웃은 1~3600초입니다.") @Max(value = 3600, message = "타임아웃은 1~3600초입니다.")
+        @Min(value = 1, message = "{msg.validation.timeout}") @Max(value = 3600, message = "{msg.validation.timeout}")
         Integer proxyConnectTimeout,
-        @Min(value = 1, message = "타임아웃은 1~3600초입니다.") @Max(value = 3600, message = "타임아웃은 1~3600초입니다.")
+        @Min(value = 1, message = "{msg.validation.timeout}") @Max(value = 3600, message = "{msg.validation.timeout}")
         Integer proxyReadTimeout,
         LoadBalancing proxyLoadBalancing) {
 
@@ -90,13 +90,13 @@ public record SiteForm(
         return Arrays.stream(extraDomains.trim().split("[\\s,]+")).distinct().collect(Collectors.joining(" "));
     }
 
-    @AssertTrue(message = "추가 도메인 형식이 맞지 않습니다. 공백이나 쉼표로 구분해 주세요.")
+    @AssertTrue(message = "{msg.validation.extraDomains}")
     public boolean isExtraDomainsValid() {
         String normalized = extraDomainsNormalized();
         return normalized == null || Arrays.stream(normalized.split(" ")).allMatch(d -> d.matches(EXTRA_DOMAIN));
     }
 
-    @AssertTrue(message = "정적 사이트는 / 로 시작하는 문서 루트가 필요합니다(.. 불가).")
+    @AssertTrue(message = "{msg.validation.staticRoot}")
     public boolean isStaticRootValid() {
         return type != SiteType.STATIC
                 || (staticRoot != null && staticRoot.matches(STATIC_ROOT) && !staticRoot.contains(".."));
@@ -116,7 +116,7 @@ public record SiteForm(
         return targets.isEmpty() ? null : String.join("\n", targets);
     }
 
-    @AssertTrue(message = "프록시 대상은 http://호스트:포트 형식이어야 합니다. 여러 개면 줄마다 하나씩, 같은 http/https와 같은 경로로 적어 주세요(최대 32개).")
+    @AssertTrue(message = "{msg.validation.proxyTarget}")
     public boolean isProxyTargetValid() {
         if (type != SiteType.PROXY) {
             return true;
@@ -135,7 +135,7 @@ public record SiteForm(
     }
 
     /** 관리 화면과 상태 확인 포트로 프록시하면 관리 화면이 사이트 포트로 공개된다. */
-    @AssertTrue(message = "관리도구 자신(이 서버의 9000, 8081 포트)으로는 프록시할 수 없습니다.")
+    @AssertTrue(message = "{msg.validation.proxyNotManager}")
     public boolean isProxyTargetNotManager() {
         return type != SiteType.PROXY || !isProxyTargetValid()
                 || proxyTargets().stream().map(ProxyBackend::parse).noneMatch(ProxyBackend::isManager);
@@ -148,7 +148,7 @@ public record SiteForm(
     static final List<String> PROTECTED_DIRS = List.of("/data", "/etc/nginx/certs", "/app", "/proc", "/sys",
             "/run", "/root", "/var/lib/nginx-manager", "/command", "/package", "/etc/s6-overlay");
 
-    @AssertTrue(message = "이 디렉터리는 관리도구 데이터나 인증서 키가 있어 문서 루트로 쓸 수 없습니다.")
+    @AssertTrue(message = "{msg.validation.staticRootSafe}")
     public boolean isStaticRootSafe() {
         if (type != SiteType.STATIC || staticRoot == null || !isStaticRootValid()) {
             return true;
@@ -161,7 +161,7 @@ public record SiteForm(
                 || dir.startsWith(root + "/"));
     }
 
-    @AssertTrue(message = "와일드카드 도메인(*.)은 Let's Encrypt 자동 발급(HTTP 인증)으로 받을 수 없습니다. 인증서를 업로드해 주세요.")
+    @AssertTrue(message = "{msg.validation.wildcardLetsEncrypt}")
     public boolean isLetsEncryptDomainsValid() {
         String normalized = extraDomainsNormalized();
         return !httpsEnabled || certificateId != null || normalized == null || !normalized.contains("*");
@@ -182,12 +182,12 @@ public record SiteForm(
     /** HTTPS(443), 관리 화면(9000), nginx 상태 확인(127.0.0.1:8081)이 쓰는 포트. */
     static final List<Integer> RESERVED_PORTS = List.of(443, 8081, 9000);
 
-    @AssertTrue(message = "443번은 HTTPS용이고 8081, 9000번은 관리도구가 씁니다. HTTP 포트로는 다른 포트를 골라 주세요.")
+    @AssertTrue(message = "{msg.validation.listenPort}")
     public boolean isListenPortFree() {
         return !RESERVED_PORTS.contains(listenHttpPort);
     }
 
-    @AssertTrue(message = "원문 편집 사이트는 폼으로 만들 수 없습니다.")
+    @AssertTrue(message = "{msg.validation.rawType}")
     public boolean isFormType() {
         return type != SiteType.RAW;
     }

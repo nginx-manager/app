@@ -1,21 +1,19 @@
 <!DOCTYPE html>
-<html lang="ko" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="~{fragments/layout :: head('대시보드')}"></head>
+<html lang="ko" th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(#{dashboard.title})}"></head>
 <body>
 <nav th:replace="~{fragments/layout :: nav}"></nav>
 <main class="page">
-    <h1>대시보드</h1>
+    <h1 th:text="#{dashboard.title}">대시보드</h1>
     <p class="notice" th:if="${notice}" th:text="${notice}">완료</p>
     <pre class="error code" th:if="${error}" th:text="${error}">오류</pre>
 
     <section class="card bad-card" id="startup-check" th:if="${dashboard.failedStartupCheck}">
-        <h2>nginx를 띄우지 않았습니다: 시작 검사 실패</h2>
+        <h2 th:text="#{dashboard.startup.title}">nginx를 띄우지 않았습니다: 시작 검사 실패</h2>
         <p>
-            컨테이너가 시작될 때 지금 설정을 이 이미지의 nginx(<strong th:text="${status.version} ?: '알 수 없음'">1.31.6</strong>)로
-            검증했는데 통과하지 못했습니다<span th:if="${dashboard.versionChange != null and dashboard.versionChange.nginxChanged()}">.
-            이번 시작에서 nginx가 <strong th:text="${dashboard.versionChange.previousNginx}">1.29.0</strong>에서
-            <strong th:text="${dashboard.versionChange.currentNginx}">1.31.6</strong>(으)로 바뀌었습니다</span>.
-            사이트는 지금 응답하지 않습니다.
+            <th:block th:text="#{dashboard.startup.checkedBefore}">컨테이너가 시작될 때 지금 설정을 이 이미지의 nginx(</th:block><strong th:text="${status.version} ?: #{dashboard.unknown}">1.31.6</strong><th:block th:text="#{dashboard.startup.checkedAfter}">)로 검증했는데 통과하지 못했습니다</th:block><span th:if="${dashboard.versionChange != null and dashboard.versionChange.nginxChanged()}"><th:block th:text="#{dashboard.startup.changedBefore}">. 이번 시작에서 nginx가</th:block>
+            <strong th:text="${dashboard.versionChange.previousNginx}">1.29.0</strong><th:block th:text="#{dashboard.startup.changedFrom}">에서</th:block>
+            <strong th:text="${dashboard.versionChange.currentNginx}">1.31.6</strong><th:block th:text="#{dashboard.startup.changedTo}">(으)로 바뀌었습니다</th:block></span><th:block th:text="#{dashboard.startup.notResponding}">. 사이트는 지금 응답하지 않습니다.</th:block>
         </p>
         <ul th:unless="${#lists.isEmpty(dashboard.failedStartupCheck.messages)}">
             <li th:each="m : ${dashboard.failedStartupCheck.messages}">
@@ -24,88 +22,118 @@
             </li>
         </ul>
         <pre class="code" th:text="${dashboard.failedStartupCheck.output}">nginx -t 출력</pre>
-        <h3>복구 방법</h3>
+        <h3 th:text="#{dashboard.startup.recoveryTitle}">복구 방법</h3>
         <ol>
-            <li><a th:href="@{/files}">설정 파일</a>에서 문제가 된 줄을 고치고 적용한 뒤, 위의 "nginx 시작"을 누릅니다.</li>
-            <li>또는 컨테이너를 이전 이미지 태그(예: <code th:if="${dashboard.versionChange}" th:text="${dashboard.versionChange.previousApp} + '-nginx' + ${dashboard.versionChange.previousNginx}">0.1.0-nginx1.29.0</code><span th:unless="${dashboard.versionChange}">바로 전에 쓰던 태그</span>)로
-                다시 띄웁니다. 볼륨의 설정과 데이터는 그대로 씁니다.</li>
+            <li><th:block th:text="#{dashboard.startup.fixBefore}"></th:block><a th:href="@{/files}" th:text="#{dashboard.startup.fixLink}">설정 파일</a><th:block th:text="#{dashboard.startup.fixAfter}">에서 문제가 된 줄을 고치고 적용한 뒤, 위의 "nginx 시작"을 누릅니다.</th:block></li>
+            <li><th:block th:text="#{dashboard.startup.rollbackBefore}">또는 컨테이너를 이전 이미지 태그(예: </th:block><code th:if="${dashboard.versionChange}" th:text="${dashboard.versionChange.previousApp} + '-nginx' + ${dashboard.versionChange.previousNginx}">0.1.0-nginx1.29.0</code><span th:unless="${dashboard.versionChange}" th:text="#{dashboard.startup.rollbackPreviousTag}">바로 전에 쓰던 태그</span><th:block th:text="#{dashboard.startup.rollbackAfter}">)로 다시 띄웁니다. 볼륨의 설정과 데이터는 그대로 씁니다.</th:block></li>
         </ol>
     </section>
 
     <section class="card" id="version-change" th:if="${dashboard.versionChange != null and dashboard.failedStartupCheck == null}">
-        <p>이번 시작에서 버전이 바뀌었습니다: <strong th:text="${dashboard.versionChange.describe()}">nginx 1.29.0 → 1.31.6</strong></p>
+        <p><th:block th:text="#{dashboard.versionChanged}">이번 시작에서 버전이 바뀌었습니다:</th:block> <strong th:text="${dashboard.versionChange.describe()}">nginx 1.29.0 → 1.31.6</strong></p>
     </section>
 
     <section class="card warn-card" id="cert-warnings" th:unless="${#lists.isEmpty(dashboard.certificateWarnings)}">
-        <h2>인증서 확인 필요</h2>
+        <h2 th:text="#{dashboard.certWarnings.title}">인증서 확인 필요</h2>
         <ul>
             <li th:each="w : ${dashboard.certificateWarnings}">
                 <a th:href="@{/certs#cert-{id}(id=${w.id})}" th:text="${w.name}">app.local</a>
-                <span th:if="${w.failing}" class="badge bad">발급·갱신 실패</span>
-                <span th:if="${w.notAfter != null}" class="badge warn" th:text="${w.daysLeft} + '일 뒤 만료'">10일 뒤 만료</span>
+                <span th:if="${w.failing}" class="badge bad" th:text="#{dashboard.certWarnings.failing}">발급·갱신 실패</span>
+                <span th:if="${w.notAfter != null}" class="badge warn" th:text="#{dashboard.certWarnings.daysLeft(${'' + w.daysLeft})}">10일 뒤 만료</span>
                 <span class="small error" th:if="${w.failing}" th:text="${w.lastError}"></span>
             </li>
         </ul>
     </section>
 
+    <div class="stats" id="stats">
+        <a class="stat" th:href="@{/}" th:classappend="${status.state.name() == 'RUNNING'} ? 'ok' : 'bad'">
+            <span class="stat-label" th:text="#{dashboard.stats.nginx}">nginx</span>
+            <strong class="stat-value" th:text="${status.state.name() == 'RUNNING'} ? #{dashboard.facts.running} : #{dashboard.facts.stopped}">실행 중</strong>
+            <span class="stat-sub" th:text="${status.version} ?: #{dashboard.unknown}">1.31.6</span>
+        </a>
+        <a class="stat" th:href="@{/sites}">
+            <span class="stat-label" th:text="#{dashboard.stats.sites}">활성 사이트</span>
+            <strong class="stat-value" th:text="${dashboard.enabledSiteCount}">3</strong>
+            <span class="stat-sub" th:text="#{dashboard.stats.sitesSub(${'' + dashboard.siteCount})}">전체 4개</span>
+        </a>
+        <a class="stat" th:href="${currentUser.canEdit()} ? @{/apply} : @{/versions}" th:classappend="${pendingCount > 0} ? 'warn'">
+            <span class="stat-label" th:text="#{dashboard.stats.pending}">적용 대기</span>
+            <strong class="stat-value" th:text="${pendingCount}">0</strong>
+            <span class="stat-sub" th:text="${pendingCount > 0} ? #{dashboard.stats.pendingSub} : #{dashboard.stats.pendingNone}">적용 화면에서 반영하세요</span>
+        </a>
+        <a class="stat" th:href="@{/certs}" th:classappend="${!#lists.isEmpty(dashboard.certificateWarnings)} ? 'warn'">
+            <span class="stat-label" th:text="#{dashboard.stats.certs}">인증서 경고</span>
+            <strong class="stat-value" th:text="${#lists.size(dashboard.certificateWarnings)}">0</strong>
+            <span class="stat-sub" th:text="${#lists.isEmpty(dashboard.certificateWarnings)} ? #{dashboard.stats.certsNone} : #{dashboard.stats.certsSub}">모두 정상</span>
+        </a>
+    </div>
+
     <div class="columns">
         <section class="card">
             <h2>nginx</h2>
             <dl class="facts">
-                <dt>상태</dt>
+                <dt th:text="#{dashboard.facts.state}">상태</dt>
                 <dd>
-                    <span th:if="${status.state.name() == 'RUNNING'}" class="badge ok">실행 중</span>
-                    <span th:unless="${status.state.name() == 'RUNNING'}" class="badge bad">중지됨</span>
+                    <span th:if="${status.state.name() == 'RUNNING'}" class="badge ok" th:text="#{dashboard.facts.running}">실행 중</span>
+                    <span th:unless="${status.state.name() == 'RUNNING'}" class="badge bad" th:text="#{dashboard.facts.stopped}">중지됨</span>
                     <form th:if="${status.state.name() != 'RUNNING' and currentUser.isAdmin()}"
                           th:action="@{/runtime/start}" method="post" class="inline">
-                        <button type="submit">nginx 시작</button>
+                        <button type="submit" th:text="#{dashboard.facts.start}">nginx 시작</button>
                     </form>
                 </dd>
-                <dt>버전</dt>
-                <dd th:text="${status.version} ?: '알 수 없음'">1.31.6</dd>
+                <dt th:text="#{dashboard.facts.version}">버전</dt>
+                <dd th:text="${status.version} ?: #{dashboard.unknown}">1.31.6</dd>
                 <th:block th:if="${dashboard.lastProcessEvent}">
-                    <dt>마지막 재시작</dt>
+                    <dt th:text="#{dashboard.facts.lastRestart}">마지막 재시작</dt>
                     <dd id="last-restart">
                         <span th:text="${#temporals.format(dashboard.lastProcessEvent.at, 'yyyy-MM-dd HH:mm:ss')}">2026-10-13 10:00</span>
-                        <span class="small muted" th:if="${dashboard.lastProcessEvent.down()}">(내려감)</span>
+                        <span class="small muted" th:if="${dashboard.lastProcessEvent.down()}" th:text="#{dashboard.facts.wentDown}">(내려감)</span>
                         <span class="small muted" th:unless="${dashboard.lastProcessEvent.down()}"
                               th:text="'(PID ' + ${dashboard.lastProcessEvent.previousPid ?: '-'} + ' → ' + ${dashboard.lastProcessEvent.currentPid} + ')'">(PID 1 → 2)</span>
                     </dd>
                 </th:block>
-                <dt>관리도구</dt>
+                <dt th:text="#{dashboard.facts.appVersion}">관리도구</dt>
                 <dd th:text="${dashboard.appVersion}">0.1.0</dd>
-                <dt>마스터 PID</dt>
+                <dt th:text="#{dashboard.facts.masterPid}">마스터 PID</dt>
                 <dd th:text="${status.masterPid} ?: '-'">1</dd>
-                <dt>사이트</dt>
-                <dd><a th:href="@{/sites}" th:text="${dashboard.enabledSiteCount} + ' 활성 / ' + ${dashboard.siteCount} + ' 전체'">3 / 4</a></dd>
-                <dt>DB 크기</dt>
+                <dt th:text="#{dashboard.facts.sites}">사이트</dt>
+                <dd><a th:href="@{/sites}" th:text="#{dashboard.facts.siteCount(${'' + dashboard.enabledSiteCount}, ${'' + dashboard.siteCount})}">3 / 4</a></dd>
+                <dt th:text="#{dashboard.facts.dbSize}">DB 크기</dt>
                 <dd th:text="${#numbers.formatDecimal(dashboard.databaseBytes / 1048576.0, 1, 1)} + ' MB'">1.2 MB</dd>
             </dl>
         </section>
         <section class="card">
             <div class="title-row">
-                <h2>최근 적용</h2>
-                <a th:href="@{/versions}">전체 이력</a>
+                <h2 th:text="#{dashboard.recent.title}">최근 적용</h2>
+                <a th:href="@{/versions}" th:text="#{dashboard.recent.all}">전체 이력</a>
             </div>
-            <p class="muted" th:if="${#lists.isEmpty(dashboard.recentVersions)}">아직 기록이 없습니다.</p>
+            <p class="muted" th:if="${#lists.isEmpty(dashboard.recentVersions)}" th:text="#{dashboard.recent.empty}">아직 기록이 없습니다.</p>
             <table th:unless="${#lists.isEmpty(dashboard.recentVersions)}" id="recent-versions">
                 <tbody>
                 <tr th:each="v : ${dashboard.recentVersions}">
                     <td><a th:href="@{/versions/{id}(id=${v.id})}" th:text="'#' + ${v.id}">#3</a></td>
                     <td class="nowrap small" th:text="${#temporals.format(v.createdAt, 'MM-dd HH:mm')}">10-13 10:00</td>
-                    <td th:text="${v.source.label()}">적용</td>
+                    <td th:text="#{|enum.VersionSource.${v.source.name()}|}">적용</td>
                     <td><span class="badge" th:classappend="${v.result.name() == 'SUCCESS' ? 'ok' : 'bad'}"
-                              th:text="${v.result.label()}">적용됨</span></td>
-                    <td class="small" th:text="${v.authorName ?: '시스템'}">admin</td>
+                              th:text="#{|enum.VersionResult.${v.result.name()}|}">적용됨</span></td>
+                    <td class="small" th:text="${v.authorName} ?: #{dashboard.recent.system}">admin</td>
                 </tr>
                 </tbody>
             </table>
         </section>
     </div>
     <section class="card">
-        <h2>설치된 모듈 <small th:text="${#lists.size(status.modules)}">0</small></h2>
-        <ul class="tags">
-            <li th:each="m : ${status.modules}" th:text="${m.dynamic} ? ${m.name} + ' (동적)' : ${m.name}">http_ssl_module</li>
+        <h2><th:block th:text="#{dashboard.modules.title}">설치된 모듈</th:block> <small th:text="${#lists.size(status.modules)}">0</small></h2>
+        <p class="hint" th:text="#{dashboard.modules.hint}">이 이미지의 nginx에 들어 있는 모듈입니다.</p>
+        <ul class="modules">
+            <li th:each="m : ${status.modules}"
+                th:with="desc=${#messages.msgOrNull('module.desc.' + m.name)}">
+                <div class="module-head">
+                    <code th:text="${m.name}">http_ssl_module</code>
+                    <span class="badge" th:if="${m.dynamic}" th:text="#{dashboard.modules.dynamicBadge}">동적</span>
+                </div>
+                <p th:text="${desc} ?: #{dashboard.modules.unknown}">HTTPS를 제공합니다.</p>
+            </li>
         </ul>
     </section>
 </main>
