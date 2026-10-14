@@ -2,8 +2,21 @@
 # 컨테이너가 시작될 때 nginx를 띄우기 전에 볼륨의 설정을 이 이미지의 nginx로 검증한다(FR-024).
 # 결과는 관리도구가 읽어 대시보드에 보여 준다. 검증이 실패해도 관리도구는 떠야 하므로 이 스크립트는 늘 성공한다.
 dir=/run/nginx-manager/startup-check
-mkdir -p "$dir" /run/nginx /var/log/nginx/sites
-chown nginxm:nginxm /run/nginx-manager "$dir" /run/nginx /var/log/nginx/sites
+mkdir -p "$dir" /run/nginx
+
+# 빈 디렉터리를 바인드 마운트한 경우: 기본 nginx 설정을 채우고(있는 파일은 건드리지 않는다), 소유자를 맞춘다
+if [ ! -e /etc/nginx/nginx.conf ]; then
+    cp -an /usr/share/nginx-manager/defaults/. /etc/nginx/
+fi
+mkdir -p /etc/nginx/conf.d/sites /etc/nginx/sites-disabled /etc/nginx/stream.d /etc/nginx/certs \
+         /var/log/nginx/sites /var/lib/nginx-manager/acme-webroot
+for d in /etc/nginx /var/log/nginx /data /var/lib/nginx-manager; do
+    find "$d" ! -user nginxm -exec chown nginxm:nginxm {} + 2>/dev/null || true
+done
+chown nginxm:nginxm /run/nginx-manager "$dir" /run/nginx
+
+# /run은 컨테이너를 다시 시작해도 남는다. 예전 마스터의 pid 파일이 남아 있으면 다른 프로세스를 nginx로 오인한다
+rm -f /run/nginx/nginx.pid
 
 if s6-setuidgid nginxm /usr/sbin/nginx -t > "$dir/output" 2>&1; then
     echo ok > "$dir/result"

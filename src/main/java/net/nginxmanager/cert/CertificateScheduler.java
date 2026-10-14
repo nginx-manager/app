@@ -52,11 +52,7 @@ public class CertificateScheduler {
     public void renewDue() {
         Instant now = clock.instant();
         List<Long> due = tx.execute(status -> {
-            Set<Long> inUse = siteRepository.findByCertificateIdIsNotNull().stream()
-                    .filter(Site::isHttpsEnabled)
-                    .map(Site::getCertificateId)
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toSet());
+            Set<Long> inUse = inUse();
             return certificateRepository.findBySourceOrderByNameAsc(CertificateSource.LETS_ENCRYPT).stream()
                     .filter(c -> inUse.contains(c.getId()) && c.isDue(now))
                     .map(TlsCertificate::getId)
@@ -65,10 +61,21 @@ public class CertificateScheduler {
         due.forEach(certificateService::issueOrRenew);
     }
 
+    /** HTTPS를 켠 사이트가 쓰는 인증서. 쓰지 않는 인증서는 갱신하지도, 만료를 알리지도 않는다. */
+    private Set<Long> inUse() {
+        return siteRepository.findByCertificateIdIsNotNull().stream()
+                .filter(Site::isHttpsEnabled)
+                .map(Site::getCertificateId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+    }
+
     public void notifyExpiring() {
         Instant now = clock.instant();
         List<TlsCertificate> expiring = tx.execute(status -> {
+            Set<Long> inUse = inUse();
             List<TlsCertificate> list = certificateRepository.findAllByOrderByNameAsc().stream()
+                    .filter(c -> inUse.contains(c.getId()))
                     .filter(c -> c.getStatus() == CertificateStatus.ACTIVE && c.isExpiringSoon(now))
                     .filter(c -> c.getLastExpiryNoticeAt() == null
                             || c.getLastExpiryNoticeAt().plus(EXPIRY_NOTICE_INTERVAL).isBefore(now))

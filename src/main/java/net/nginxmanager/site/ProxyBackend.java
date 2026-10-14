@@ -23,6 +23,12 @@ record ProxyBackend(String scheme, String host, int port, String path) {
         return new ProxyBackend(scheme, host, port, path);
     }
 
+    /** 같은 컨테이너의 관리 화면(9000)이나 상태 확인(8081) 포트를 가리키는지. */
+    boolean isManager() {
+        boolean local = host.equals("localhost") || host.startsWith("127.") || host.equals("0.0.0.0");
+        return local && (port == 9000 || port == 8081);
+    }
+
     /** upstream의 server 항목. 포트는 늘 적는다(https의 기본 포트는 80이 아니라서). */
     String server() {
         return host + ":" + port;

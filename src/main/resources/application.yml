@@ -16,6 +16,10 @@ nginx-manager:
   cert:
     # 갱신이 필요한 인증서를 찾는 주기
     check-interval: PT6H
+  logs:
+    # 이 크기를 넘은 nginx 로그를 .1, .2 …로 밀어내고 keep 개만 남긴다
+    max-size-mb: 100
+    keep: 5
 
 spring:
   application:
@@ -38,6 +42,11 @@ spring:
     enabled: true
   thymeleaf:
     cache: true
+  task:
+    scheduling:
+      pool:
+        # 로그 실시간 보기가 느린 접속에 막혀도 인증서 갱신·감시 작업은 돌도록 스레드를 나눈다
+        size: 4
 
 nginx:
   runtime:

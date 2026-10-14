@@ -5,7 +5,6 @@ import org.shredzone.acme4j.AccountBuilder;
 import org.shredzone.acme4j.Authorization;
 import org.shredzone.acme4j.Certificate;
 import org.shredzone.acme4j.Order;
-import org.shredzone.acme4j.OrderBuilder;
 import org.shredzone.acme4j.Session;
 import org.shredzone.acme4j.Status;
 import org.shredzone.acme4j.challenge.Http01Challenge;
@@ -62,11 +61,20 @@ public class Acme4jClient implements AcmeClient {
             }
             Account account = builder.create(session);
 
-            OrderBuilder orderBuilder = account.newOrder().domains(domains);
+            Order order;
             if (replaces != null) {
-                orderBuilder.replaces(replaces);
+                try {
+                    order = account.newOrder().domains(domains).replaces(replaces).create();
+                } catch (AcmeRateLimitedException e) {
+                    throw e;
+                } catch (AcmeException e) {
+                    // 지금 인증서가 다른 CA(스테이징↔운영)나 다른 계정에서 받은 것이면 replaces를 거절한다. 그냥 새로 받는다
+                    log.info("order with replaces rejected ({}), ordering without it", e.getMessage());
+                    order = account.newOrder().domains(domains).create();
+                }
+            } else {
+                order = account.newOrder().domains(domains).create();
             }
-            Order order = orderBuilder.create();
             for (Authorization authorization : order.getAuthorizations()) {
                 if (authorization.getStatus() == Status.VALID) {
                     continue;
@@ -142,10 +150,10 @@ public class Acme4jClient implements AcmeClient {
             }
         }
         KeyPair keyPair = KeyPairUtils.createKeyPair(2048);
+        createPrivate(file);
         try (Writer writer = Files.newBufferedWriter(file)) {
             KeyPairUtils.writeKeyPair(keyPair, writer);
         }
-        restrict(file);
         return keyPair;
     }
 
@@ -155,6 +163,17 @@ public class Acme4jClient implements AcmeClient {
                     .digest(value.getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
+        }
+    }
+
+    /** 내용을 쓰기 전에 소유자만 읽을 수 있는 빈 파일을 만든다(쓰는 동안에도 다른 사용자가 읽지 못하게). */
+    static void createPrivate(Path file) throws IOException {
+        Files.deleteIfExists(file);
+        try {
+            Files.createFile(file, PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")));
+        } catch (UnsupportedOperationException e) {
+            // POSIX 권한이 없는 파일 시스템
+            Files.createFile(file);
         }
     }
 

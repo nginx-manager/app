@@ -7,6 +7,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.NoSuchFileException;
 import java.time.Duration;
 import java.io.RandomAccessFile;
@@ -65,6 +66,14 @@ public class LocalNginxRuntime implements NginxRuntime {
         CommandRunner.Result result = nginx("-t");
         return new ValidationResult(result.exitCode() == 0, result.output(),
                 NginxOutputParser.parseTestOutput(result.output()));
+    }
+
+    @Override
+    public void reopenLogs() {
+        CommandRunner.Result result = nginx("-s", "reopen");
+        if (result.exitCode() != 0) {
+            throw new NginxCommandException("nginx reopen failed: " + result.output().strip());
+        }
     }
 
     /**
@@ -170,11 +179,24 @@ public class LocalNginxRuntime implements NginxRuntime {
     private Long readLiveMasterPid() {
         try {
             long pid = Long.parseLong(Files.readString(properties.pidFile()).strip());
-            return ProcessHandle.of(pid).filter(ProcessHandle::isAlive).isPresent() ? pid : null;
+            // 컨테이너를 다시 띄우면 남은 pid 파일의 번호를 다른 프로세스가 쓰고 있을 수 있다
+            return ProcessHandle.of(pid).filter(ProcessHandle::isAlive).isPresent() && isNginxMaster(pid) ? pid : null;
         } catch (NoSuchFileException | NumberFormatException e) {
             return null;
         } catch (IOException e) {
             throw new NginxCommandException("cannot read pid file " + properties.pidFile(), e);
+        }
+    }
+
+    /** /proc가 없는 환경(개발용 macOS 등)에서는 확인하지 않는다. */
+    private static boolean isNginxMaster(long pid) {
+        Path cmdline = Path.of("/proc", Long.toString(pid), "cmdline");
+        try {
+            return new String(Files.readAllBytes(cmdline), StandardCharsets.UTF_8).startsWith("nginx: master");
+        } catch (NoSuchFileException e) {
+            return !Files.isDirectory(Path.of("/proc/self"));
+        } catch (IOException e) {
+            return false;
         }
     }
 

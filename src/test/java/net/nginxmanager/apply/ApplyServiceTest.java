@@ -89,6 +89,21 @@ class ApplyServiceTest extends ConfigRootTest {
     }
 
     @Test
+    void unexpectedErrorDuringValidationRestoresFiles() {
+        stageChangeToExistingFile("server { listen 80; server_name app.local; return 204; }\n");
+        nginx.validation = () -> {
+            throw new IllegalStateException("nginx binary vanished");
+        };
+
+        assertThatThrownBy(() -> applyService.applyPending("editor", null))
+                .isInstanceOf(IllegalStateException.class);
+
+        assertThat(readFile(SITE_PATH)).isEqualTo(ORIGINAL);
+        assertThat(nginx.reloadCalls).isZero();
+        assertThat(configFileRepository.findByPath(SITE_PATH).orElseThrow().hasPendingChange()).isTrue();
+    }
+
+    @Test
     void unhealthyReloadIsRolledBackAutomatically() {
         stageChangeToExistingFile("server { listen 80; server_name app.local; return 500; }\n");
         nginx.health = () -> HealthResult.failed("stub_status unreachable");

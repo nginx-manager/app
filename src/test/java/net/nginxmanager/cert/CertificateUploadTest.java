@@ -131,6 +131,13 @@ class CertificateUploadTest extends ConfigRootTest {
             TestCertificates.Issued soon = TestCertificates.selfSigned(List.of("soon.example.com"),
                     now.minusSeconds(80L * 24 * 3600), now.plusSeconds(10L * 24 * 3600));
             uploadService.upload("soon", soon.certPem(), soon.keyPem(), "editor");
+            // 어느 사이트도 쓰지 않는 인증서는 만료돼도 알리지 않는다
+            TestCertificates.Issued unused = TestCertificates.selfSigned(List.of("unused.example.com"),
+                    now.minusSeconds(80L * 24 * 3600), now.plusSeconds(10L * 24 * 3600));
+            uploadService.upload("unused", unused.certPem(), unused.keyPem(), "editor");
+            Long soonId = certificateRepository.findByName("soon").orElseThrow().getId();
+            siteService.create(new SiteForm("soon.example.com", "", SiteType.PROXY, 80, null,
+                    "http://10.0.0.5:8080", null, true, false, soonId), "editor");
 
             scheduler.notifyExpiring();
             scheduler.notifyExpiring();
@@ -138,6 +145,7 @@ class CertificateUploadTest extends ConfigRootTest {
             assertThat(received).singleElement().satisfies(body -> assertThat(body)
                     .contains("\"event\":\"CERT_EXPIRING\"")
                     .contains("soon")
+                    .doesNotContain("unused")
                     .contains("직접 교체"));
         } finally {
             webhook.stop(0);

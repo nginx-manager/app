@@ -49,7 +49,9 @@ jobs:
           set -euo pipefail
           nginx="${INPUT_NGINX:-}"
           if [ -z "$nginx" ]; then
-            nginx="$(gh api repos/nginx/nginx/releases/latest --jq .tag_name | sed 's/^release-//')"
+            # latest는 stable 패치가 나중에 나오면 stable을 가리킨다. 가장 높은 정식 버전(mainline)을 고른다
+            nginx="$(gh api 'repos/nginx/nginx/releases?per_page=30' --jq '.[] | select(.prerelease | not) | .tag_name' \
+              | sed 's/^release-//' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n1)"
           fi
           if ! echo "$nginx" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
             echo "unexpected nginx version: $nginx" >&2
@@ -58,7 +60,8 @@ jobs:
           if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
             ref="${GITHUB_REF_NAME}"
           else
-            ref="$(git tag --list 'v*' --sort=-v:refname | head -n1)"
+            # v1.2.0-rc1 같은 시험 태그는 건너뛴다
+            ref="$(git tag --list 'v*' | grep -Ev -- '-' | sort -V | tail -n1 || true)"
           fi
           if [ -z "$ref" ]; then
             echo "no app release tag (v*) yet; nothing to publish" >&2

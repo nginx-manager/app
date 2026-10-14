@@ -17,6 +17,9 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
+import java.util.function.Predicate;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import java.util.Locale;
 
@@ -48,8 +51,8 @@ public class CertificateFiles {
             Path cert = dir.resolve(FULLCHAIN);
             Path key = dir.resolve(PRIVKEY);
             Files.writeString(cert, fullchainPem, StandardCharsets.US_ASCII);
+            Acme4jClient.createPrivate(key);
             Files.writeString(key, privateKeyPem, StandardCharsets.US_ASCII);
-            Acme4jClient.restrict(key);
             return new CertificatePaths(cert.toString(), key.toString());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -61,8 +64,13 @@ public class CertificateFiles {
         deleteTree(Path.of(paths.certPath()).getParent());
     }
 
-    /** 지금 쓰는 디렉터리와 바로 이전 몇 개만 남긴다. */
-    public void prune(String name, CertificatePaths current) {
+    /**
+     * 지금 쓰는 디렉터리와 바로 이전 몇 개만 남긴다. 설정 파일·초안·되돌릴 수 있는 버전이 아직 가리키는 디렉터리는
+     * 오래되었어도 남긴다(지우면 nginx가 시작하지 못하거나 되돌리기가 검증에서 실패한다).
+     *
+     * @param referenced 디렉터리 경로를 받아 어딘가에서 아직 쓰는지 알려 준다
+     */
+    public void prune(String name, CertificatePaths current, Predicate<String> referenced) {
         Path base = root.resolve(safeName(name));
         Path keep = Path.of(current.certPath()).getParent();
         if (!Files.isDirectory(base)) {
@@ -71,10 +79,29 @@ public class CertificateFiles {
         try (Stream<Path> dirs = Files.list(base)) {
             List<Path> old = dirs.filter(Files::isDirectory).filter(d -> !d.equals(keep))
                     .sorted(Comparator.reverseOrder()).toList();
-            old.stream().skip(KEEP_PREVIOUS).forEach(CertificateFiles::deleteTree);
+            old.stream().skip(KEEP_PREVIOUS)
+                    .filter(dir -> !referenced.test(dir.toString() + "/"))
+                    .forEach(CertificateFiles::deleteTree);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    /**
+     * 이 인증서의 어느 디렉터리(이전 발급분 포함)를 가리키는 경로든 새 경로로 바꾼다. 되돌리기로 더 오래된 인증서를
+     * 가리키게 된 설정도 갱신 때 함께 새 인증서로 옮겨 간다.
+     */
+    public String repoint(String content, String name, CertificatePaths fresh) {
+        String base = Pattern.quote(root.resolve(safeName(name)).toString() + "/") + "[^/\\s;\"']+/";
+        return content
+                .replaceAll(base + Pattern.quote(FULLCHAIN), Matcher.quoteReplacement(fresh.certPath()))
+                .replaceAll(base + Pattern.quote(PRIVKEY), Matcher.quoteReplacement(fresh.keyPath()));
+    }
+
+    /** 인증서 파일 경로를 이름·시각과 상관없는 같은 글자로 바꾼다. 경로만 다른 두 설정을 같다고 볼 때 쓴다. */
+    public String maskPaths(String content) {
+        return content.replaceAll(Pattern.quote(root.toString() + "/") + "[^\\s;\"']+/(" + Pattern.quote(FULLCHAIN)
+                + "|" + Pattern.quote(PRIVKEY) + ")", "<certificate>/$1");
     }
 
     public X509Certificate readLeaf(CertificatePaths paths) {

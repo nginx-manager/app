@@ -13,6 +13,8 @@ public interface ConfigFileRepository extends JpaRepository<ConfigFile, Long> {
 
     long countByDraftContentIsNotNullOrDraftDeleteTrue();
 
+    boolean existsByDraftContentContaining(String text);
+
     default long countPending() {
         return countByDraftContentIsNotNullOrDraftDeleteTrue();
     }

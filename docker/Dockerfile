@@ -125,17 +125,21 @@ RUN groupadd --system nginxm \
     && chown -R nginxm:nginxm /etc/nginx /var/log/nginx /var/cache/nginx /var/lib/nginx-manager /data
 
 COPY --chown=nginxm:nginxm docker/nginx/nginx.conf /etc/nginx/nginx.conf
+# 빈 디렉터리를 /etc/nginx에 바인드 마운트해도 시작할 때 기본 설정을 채울 수 있도록 사본을 둔다
+RUN mkdir -p /usr/share/nginx-manager && cp -a /etc/nginx /usr/share/nginx-manager/defaults
 COPY docker/s6-overlay/ /etc/s6-overlay/
 COPY --from=app-build /src/app.jar /app/app.jar
 
+# 멈출 때 진행 중인 적용(검증·reload·상태 확인·복구)이 끝날 시간을 준다. docker stop -t 40 과 함께 쓴다
 ENV S6_KEEP_ENV=1 \
     S6_BEHAVIOUR_IF_STAGE2_FAILS=2 \
+    S6_SERVICES_GRACETIME=35000 \
     JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=50"
 
 VOLUME ["/etc/nginx", "/var/log/nginx", "/data"]
 EXPOSE 80 443 9000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s \
-    CMD curl -fsS http://127.0.0.1:9000/actuator/health || exit 1
+    CMD curl --noproxy '*' -fsS http://127.0.0.1:9000/actuator/health || exit 1
 
 ENTRYPOINT ["/init"]

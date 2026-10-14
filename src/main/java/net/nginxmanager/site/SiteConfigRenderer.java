@@ -121,6 +121,14 @@ public class SiteConfigRenderer {
                 .append("        proxy_set_header X-Real-IP $remote_addr;\n")
                 .append("        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n")
                 .append("        proxy_set_header X-Forwarded-Proto $scheme;\n");
+        if (pass.startsWith("https://")) {
+            // https 백엔드에 SNI를 보낸다(가상 호스트·CDN 백엔드는 SNI가 없으면 핸드셰이크를 거절한다).
+            // upstream으로 묶으면 보낼 이름이 upstream 이름이 되므로 첫 백엔드의 호스트 이름을 쓴다
+            out.append("        proxy_ssl_server_name on;\n");
+            if (targets.size() > 1) {
+                out.append("        proxy_ssl_name ").append(ProxyBackend.parse(targets.getFirst()).host()).append(";\n");
+            }
+        }
         if (form.proxyWebsocket()) {
             out.append("        proxy_set_header Upgrade $http_upgrade;\n")
                     .append("        proxy_set_header Connection ").append(connectionVariable(primaryDomain)).append(";\n");

@@ -1,6 +1,7 @@
 #!/command/with-contenv sh
 # nginx는 포그라운드로 실행하고, 죽으면 s6가 다시 띄운다.
 # 볼륨을 빈 디렉터리로 바인드 마운트해도 사이트 로그 경로가 있도록 만든다.
+umask 027
 mkdir -p /run/nginx /var/log/nginx/sites
 chown nginxm:nginxm /run/nginx /var/log/nginx/sites
 # 마스터가 갑자기 죽으면 워커가 남아 80/443을 계속 잡고 있어 새 nginx가 뜨지 못한다. 남은 nginx 프로세스를 정리한다.
@@ -11,6 +12,7 @@ s6-svperms -G nginxm . 2>/dev/null || true
 # 관리 화면에서 설정을 고친 뒤 "nginx 시작"으로 다시 띄운다.
 if ! s6-setuidgid nginxm /usr/sbin/nginx -t -q > /dev/null 2>&1; then
     echo "nginx: configuration test failed, staying down (see the manager dashboard)" >&2
+    rm -f /run/nginx/nginx.pid
     s6-svc -d .
     exit 1
 fi
