@@ -1,0 +1,3 @@
+#!/command/with-contenv sh
+# 관리도구가 죽어도 nginx는 계속 서비스한다.
+exec s6-setuidgid nginxm java -jar /app/app.jar

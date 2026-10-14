@@ -1,0 +1,21 @@
+spring:
+  datasource:
+    # 테스트는 컨텍스트마다 메모리 DB를 쓴다. 커넥션이 하나라도 열려 있는 동안 유지된다
+    url: jdbc:sqlite:file:nm-test-${random.uuid}?mode=memory&cache=shared&foreign_keys=on
+    hikari:
+      minimum-idle: 1
+  jpa:
+    properties:
+      hibernate:
+        generate_statistics: true
+
+nginx:
+  runtime:
+    binary: /nonexistent/nginx
+    pid-file: ${java.io.tmpdir}/nginx-manager-test-missing.pid
+    status-url: http://127.0.0.1:1/nginx_status
+    command-timeout: 2s
+
+logging:
+  level:
+    org.hibernate.engine.internal.StatisticalLoggingSessionEventListener: warn
