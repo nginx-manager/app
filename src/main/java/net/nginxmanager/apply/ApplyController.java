@@ -24,6 +24,16 @@ import java.util.List;
 public class ApplyController {
 
     public record PendingFile(Long id, String path, boolean delete, String diff) {
+
+        /** 더한 줄 수. 파일 머리(+++)는 세지 않는다 */
+        public long added() {
+            return diff.lines().filter(line -> line.startsWith("+") && !line.startsWith("+++")).count();
+        }
+
+        /** 뺀 줄 수. 파일 머리(---)는 세지 않는다 */
+        public long removed() {
+            return diff.lines().filter(line -> line.startsWith("-") && !line.startsWith("---")).count();
+        }
     }
 
     private final ApplyService applyService;

@@ -3,6 +3,7 @@
 <body>
 <!-- 사이트 추가·수정 폼이 함께 쓰는 리버스 프록시 항목. th:object 안에서 넣는다 -->
 <th:block th:fragment="fields(editable)">
+<div class="type-fields type-proxy">
     <label><th:block th:text="#{sites.proxy.target}">프록시 대상 (리버스 프록시, 여러 개면 줄마다 하나)</th:block>
         <span class="hint" th:text="#{sites.proxy.target.hint}">요청을 넘길 백엔드 주소입니다.</span>
         <textarea th:field="*{proxyTarget}" rows="3" placeholder="http://127.0.0.1:8080" th:disabled="${!editable}"></textarea>
@@ -30,6 +31,7 @@
             </select>
         </label>
     </details>
+</div>
 </th:block>
 </body>
 </html>

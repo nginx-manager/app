@@ -45,16 +45,17 @@
     <section class="card">
         <h2 th:text="#{apply.pending.title}">적용 대기 중인 변경</h2>
         <p th:if="${#lists.isEmpty(pending)}" class="muted" th:text="#{apply.empty}">적용할 변경이 없습니다.</p>
-        <div th:each="p : ${pending}" class="pending">
-            <div class="title-row">
+        <details th:each="p : ${pending}" class="pending" open>
+            <summary class="title-row">
                 <code th:text="${p.path}">conf.d/sites/app.local.conf</code>
                 <span th:if="${p.delete}" class="badge warn" th:text="#{apply.pending.delete}">삭제</span>
+                <span class="diff-stat"><span class="add" th:text="'+' + ${p.added()}">+12</span> <span class="del" th:text="'−' + ${p.removed()}">−3</span></span>
                 <form th:if="${currentUser.canEdit()}" th:action="@{/apply/discard/{id}(id=${p.id})}" method="post" class="inline">
                     <button type="submit" class="link" th:text="#{apply.pending.discard}">초안 버리기</button>
                 </form>
-            </div>
+            </summary>
             <pre class="code diff" th:text="${p.diff}"></pre>
-        </div>
+        </details>
         <p th:if="${currentUser.canEdit() and !#lists.isEmpty(pending) and applyBlocked}" class="hint warn" th:text="#{apply.form.blocked}">nginx에 연결할 수 없어 지금은 적용할 수 없습니다. 연결되면 다시 적용하세요.</p>
         <form th:if="${currentUser.canEdit() and !#lists.isEmpty(pending) and !applyBlocked}" th:action="@{/apply}" method="post"
               hx-post="/apply" hx-target="#result" hx-swap="outerHTML" hx-disabled-elt="find button">

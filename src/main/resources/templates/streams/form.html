@@ -25,11 +25,12 @@
                 <p class="muted small" th:text="#{streams.form.portNote}">nginx 컨테이너에서 이 포트를 열어야 합니다.</p>
             </form>
         </section>
-        <section class="card">
+        <!-- 미리보기만 바꿔 끼운다. 요청을 거는 요소(section)는 그대로 남아야 바꿔 끼우는 사이에 생긴 입력도 놓치지 않는다 -->
+        <section class="card sticky"
+                 hx-post="/streams/preview" hx-include="#stream-form" hx-target="#preview" hx-swap="outerHTML" hx-sync="this:replace"
+                 hx-trigger="input changed delay:400ms from:#stream-form, change from:#stream-form">
             <h2 th:text="#{sites.form.preview}">설정 미리보기</h2>
             <pre class="code" id="preview" th:fragment="preview"
-                 hx-post="/streams/preview" hx-include="#stream-form" hx-swap="outerHTML"
-                 hx-trigger="input changed delay:400ms from:#stream-form, change from:#stream-form"
                  th:text="${preview} ?: #{sites.form.preview.empty}"></pre>
         </section>
     </div>
