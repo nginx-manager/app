@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ko" th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(#{import.preview.title})}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<main class="page">
+    <div class="title-row">
+        <h1 th:text="#{import.preview.title}">가져오기 미리 보기</h1>
+        <a class="button secondary" th:href="@{/sites/import}" th:text="#{import.title}">설정 파일 가져오기</a>
+    </div>
+    <p><code th:text="${sourcePath}">/home/a/nginx/app.conf</code></p>
+    <p class="error" th:if="${errorKey}" th:text="#{${errorKey}(${errorArg})}">오류</p>
+    <p class="error" th:unless="${analysis.importable()}" th:text="#{${analysis.errorKey}(${analysis.errorArg})}">등록할 수 없습니다.</p>
+    <p class="notice" th:if="${existing}">
+        <th:block th:text="#{import.preview.existing}">이 파일에서 가져온 사이트가 있습니다:</th:block>
+        <a th:href="@{/sites/{id}(id=${existing.id})}" th:text="${existing.primaryDomain}">app</a>
+    </p>
+
+    <div class="columns" th:if="${analysis.importable()}">
+        <section class="card">
+            <h2 th:text="#{import.preview.result}">해석 결과</h2>
+            <p th:text="#{import.preview.servers(${analysis.serverCount})}">server 블록 1개</p>
+            <p th:unless="${#lists.isEmpty(analysis.domains)}">
+                <th:block th:text="#{import.col.domain}">도메인</th:block>:
+                <code th:text="${#strings.listJoin(analysis.domains, ' ')}">app.example.com</code>
+            </p>
+            <th:block th:if="${analysis.formPossible()}">
+                <p><span class="badge ok" th:text="#{import.mode.form}">폼 사이트</span>
+                    <th:block th:text="#{|sites.list.type.${analysis.form.type.name()}|}">프록시</th:block></p>
+                <th:block th:unless="${#lists.isEmpty(analysis.changes)}">
+                    <h3 th:text="#{import.preview.changes}">폼으로 옮기면 바뀌는 점</h3>
+                    <ul><li th:each="n : ${analysis.changes}" th:text="#{${n.key}(${n.arg})}">로그 경로</li></ul>
+                </th:block>
+            </th:block>
+            <th:block th:unless="${analysis.formPossible()}">
+                <p><span class="badge" th:text="#{import.mode.raw}">원문 사이트</span></p>
+                <h3 th:text="#{import.preview.unsupported}">폼으로 옮길 수 없는 설정</h3>
+                <ul>
+                    <li th:if="${analysis.primaryDomain == null}" th:text="#{import.error.domainRequired}">도메인</li>
+                    <li th:each="n : ${analysis.unsupported}" th:text="#{${n.key}(${n.arg})}">location /api</li>
+                </ul>
+            </th:block>
+
+            <form th:action="@{/sites/import}" method="post">
+                <input type="hidden" name="path" th:value="${sourcePath}" th:unless="${uploaded}">
+                <input type="hidden" name="uploadName" th:value="${sourcePath}" th:if="${uploaded}">
+                <textarea name="upload" hidden th:if="${uploaded}" th:text="${content}"></textarea>
+                <input type="hidden" name="contentHash" th:value="${contentHash}">
+                <label><th:block th:text="#{import.preview.primaryDomain}">대표 도메인</th:block>
+                    <span class="hint" th:text="#{import.preview.primaryDomain.hint}">사이트 파일 이름이 됩니다.</span>
+                    <input type="text" name="primaryDomain" th:value="${primaryDomain}" required>
+                </label>
+                <fieldset>
+                    <legend th:text="#{import.preview.mode}">등록 방식</legend>
+                    <label class="inline"><input type="radio" name="mode" value="FORM" th:checked="${analysis.formPossible()}"
+                                                 th:disabled="${!analysis.formPossible()}">
+                        <th:block th:text="#{import.mode.form}">폼 사이트</th:block></label>
+                    <label class="inline"><input type="radio" name="mode" value="RAW" th:checked="${!analysis.formPossible()}">
+                        <th:block th:text="#{import.mode.raw}">원문 사이트</th:block></label>
+                    <p class="hint" th:text="#{import.preview.mode.hint}">폼 사이트는 폼으로 고치고, 원문 사이트는 원문 편집기로 고칩니다.</p>
+                </fieldset>
+                <label class="inline" th:if="${rootRelative != null}">
+                    <input type="checkbox" name="removeSource" value="true" checked>
+                    <th:block th:text="#{import.removeSource(${rootRelative})}">원본 지우기</th:block>
+                </label>
+                <p class="hint" th:if="${rootRelative != null}" th:text="#{import.removeSource.hint}">원본을 남기면 같은 server가 두 번 읽힐 수 있습니다.</p>
+                <p class="hint" th:if="${rootRelative == null and !uploaded}" th:text="#{import.keepSource.hint}">설정 루트 밖의 원본은 그대로 둡니다.</p>
+                <p class="error" th:if="${sourcePending}" th:text="#{import.error.sourcePending(${rootRelative})}">원본에 적용 대기 초안이 있습니다.</p>
+                <button type="submit" th:text="#{import.preview.submit}">사이트로 등록(초안)</button>
+            </form>
+        </section>
+        <section class="card">
+            <h2 th:text="#{import.preview.original}">원본</h2>
+            <pre class="code" th:text="${content}"></pre>
+            <th:block th:if="${rendered}">
+                <h2 th:text="#{import.preview.rendered}">폼 사이트로 만들 설정</h2>
+                <pre class="code diff" th:text="${renderedDiff}"></pre>
+            </th:block>
+        </section>
+    </div>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

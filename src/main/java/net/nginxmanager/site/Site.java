@@ -95,6 +95,14 @@ public class Site extends BaseEntity {
     @Column(name = "applied_settings", columnDefinition = "TEXT")
     private String appliedSettings;
 
+    /** 가져온 원본 파일(절대 경로). 가져오기로 만든 사이트가 아니면 null. */
+    @Column(name = "import_path", length = 1024)
+    private String importPath;
+
+    /** 가져올 때 원본 내용의 해시. 다시 검사할 때 원본이 바뀌었는지 본다. */
+    @Column(name = "import_hash", length = 64)
+    private String importHash;
+
     @OneToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "config_file_id")
     private ConfigFile configFile;
@@ -308,6 +316,23 @@ public class Site extends BaseEntity {
 
     public void markImportedDisabled() {
         this.enabled = false;
+    }
+
+    /** 가져온 원본을 기록한다. 원문 사이트면 server_name의 나머지 이름을 추가 도메인으로 둔다(다른 사이트와 겹치는지 보려고). */
+    void markImportedFrom(String path, String hash, String rawExtraDomains) {
+        this.importPath = path;
+        this.importHash = hash;
+        if (type == SiteType.RAW) {
+            this.extraDomains = rawExtraDomains == null || rawExtraDomains.isBlank() ? null : rawExtraDomains;
+        }
+    }
+
+    public String getImportPath() {
+        return importPath;
+    }
+
+    public String getImportHash() {
+        return importHash;
     }
 
     void switchToRaw() {
