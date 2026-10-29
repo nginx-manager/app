@@ -7,7 +7,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** 가져올 설정 파일을 폼으로 옮길 수 있는지 판단(spec 004 FR-404). */
+/** 가져올 설정 파일을 폼으로 옮길 수 있는지 판단(spec 005 FR-504). */
 class SiteImporterTest {
 
     private final SiteImporter importer = new SiteImporter(Validation.buildDefaultValidatorFactory().getValidator());

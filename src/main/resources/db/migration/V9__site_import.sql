@@ -1,4 +1,4 @@
--- 설정 파일 가져오기(spec 004).
+-- 설정 파일 가져오기(spec 005).
 -- 등록해 둔 가져오기 위치(경로 패턴). 다시 검사하면 새로 생기거나 바뀐 파일을 보여 준다
 CREATE TABLE import_source (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,

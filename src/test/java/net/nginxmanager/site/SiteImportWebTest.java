@@ -34,7 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrlPattern;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** 설정 파일을 지정해 사이트로 가져오기(spec 004). */
+/** 설정 파일을 지정해 사이트로 가져오기(spec 005). */
 class SiteImportWebTest extends ConfigRootTest {
 
     /** 호스트에서 마운트한 디렉터리(예: /home) 역할. */
