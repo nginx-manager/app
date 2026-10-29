@@ -3,8 +3,7 @@
 <body>
 <!-- 사이트 추가·수정 폼이 함께 쓰는 리디렉션 항목. th:object 안에서 넣는다 -->
 <th:block th:fragment="redirect(editable)">
-    <details class="redirect-options" th:open="${form?.type?.name() == 'REDIRECT'}">
-        <summary th:text="#{sites.redirect.title}">리디렉션 (유형이 리디렉션일 때)</summary>
+    <div class="type-fields type-redirect">
         <label><th:block th:text="#{sites.redirect.target}">보낼 주소</th:block>
             <span class="hint" th:text="#{sites.redirect.target.hint}">요청을 넘길 주소입니다.</span>
             <input type="text" th:field="*{redirectTarget}" placeholder="https://new.example.com" th:disabled="${!editable}">
@@ -19,7 +18,7 @@
         </label>
         <label class="inline"><input type="checkbox" th:field="*{redirectKeepPath}" th:disabled="${!editable}"> <th:block th:text="#{sites.redirect.keepPath}">요청 경로와 쿼리를 그대로 붙이기</th:block></label>
         <p class="hint" th:text="#{sites.redirect.keepPath.hint}">켜면 /a?b=1 요청을 새 주소/a?b=1로 넘깁니다.</p>
-    </details>
+    </div>
 </th:block>
 
 <!-- 유형과 관계없이 켜는 모듈 설정(접근 제한, 속도 제한, 성능·보안) -->

@@ -12,7 +12,7 @@
         <p th:if="${#lists.isEmpty(sites)}" class="muted" th:text="#{sites.list.empty}">등록된 사이트가 없습니다.</p>
         <table th:unless="${#lists.isEmpty(sites)}">
             <thead>
-            <tr><th th:text="#{sites.list.col.domain}">도메인</th><th th:text="#{sites.list.col.type}">유형</th><th th:text="#{sites.list.col.port}">포트</th><th th:text="#{sites.list.col.status}">상태</th><th></th></tr>
+            <tr><th th:text="#{sites.list.col.domain}">도메인</th><th th:text="#{sites.list.col.type}">유형</th><th th:text="#{sites.list.col.target}">대상</th><th th:text="#{sites.list.col.port}">포트</th><th th:text="#{sites.list.col.status}">상태</th></tr>
             </thead>
             <tbody>
             <tr th:each="s : ${sites}">
@@ -26,12 +26,18 @@
                     <span th:case="'REDIRECT'" th:text="#{sites.list.type.REDIRECT}">리디렉션</span>
                     <span th:case="*" th:text="#{sites.list.type.RAW}">원문 편집</span>
                 </td>
-                <td th:text="${s.listenHttpPort}">80</td>
+                <td class="targets">
+                    <code th:each="t : ${s.targets()}" th:text="${t}">http://127.0.0.1:8080</code>
+                </td>
                 <td>
+                    <span th:text="${s.listenHttpPort}">80</span>
+                    <span th:if="${s.httpsEnabled}" class="badge">HTTPS</span>
+                </td>
+                <td class="badges">
                     <span th:if="${s.enabled}" class="badge ok" th:text="#{sites.status.enabled}">활성</span>
                     <span th:unless="${s.enabled}" class="badge" th:text="#{sites.status.disabled}">비활성</span>
+                    <span th:if="${s.pending}" class="badge warn" th:text="#{sites.status.pending}">적용 대기</span>
                 </td>
-                <td><span th:if="${s.pending}" class="badge warn" th:text="#{sites.status.pending}">적용 대기</span></td>
             </tr>
             </tbody>
         </table>

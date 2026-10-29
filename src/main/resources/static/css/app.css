@@ -122,11 +122,14 @@ body.centered > .card.narrow h1::before {
 body.centered button[type=submit] { width: 100%; margin-top: .5rem; padding: .65rem 1rem; }
 .columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 1.25rem; align-items: start; }
 .columns > .card { margin-bottom: 0; }
+/* 긴 설정 줄(pre)이 칸을 넓히지 않고 칸 안에서 가로로 스크롤되게 한다. 좁은 화면에서 페이지가 옆으로 밀리지 않는다 */
+.columns > * { min-width: 0; }
 .columns + .card, .columns + section { margin-top: 1.25rem; }
 .title-row { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin-bottom: 1.25rem; }
 .card .title-row, .pending .title-row { margin-bottom: .75rem; }
 .title-row h1, .title-row h2 { margin: 0; }
 .title-row .button, .title-row form { margin-left: auto; }
+.title-row .button + form { margin-left: 0; }
 .title-row h2 + a { margin-left: auto; font-size: .88rem; }
 
 /* 폼 */
@@ -159,6 +162,13 @@ form.inline { display: inline; }
 .https-choice .https-uploaded, .https-choice .https-on { margin-top: .6rem; }
 .https-choice:has(input[value="NONE"]:checked) .https-on { display: none; }
 .https-choice:not(:has(input[value="UPLOADED"]:checked)) .https-uploaded { display: none; }
+/* 사이트 폼의 유형 선택: 고른 유형(프록시·정적·리디렉션)에 쓰는 항목만 보인다 */
+form:has(input[name=type]:checked):not(:has(input[name=type][value=PROXY]:checked)) .type-proxy,
+form:has(input[name=type]:checked):not(:has(input[name=type][value=STATIC]:checked)) .type-static,
+form:has(input[name=type]:checked):not(:has(input[name=type][value=REDIRECT]:checked)) .type-redirect { display: none; }
+/* 폼과 나란히 두는 미리보기는 긴 폼을 내려도 화면에 남는다 */
+.columns > .card.sticky { position: sticky; top: 1rem; }
+.columns > .card.sticky pre.code { max-height: calc(100vh - 8rem); overflow: auto; }
 .row-form { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .75rem 1rem; }
 .row-form label { margin: 0; flex: 1 1 180px; }
 .row-form > button, .row-form > button[type=submit] { flex: none; margin-top: calc(.85rem * 1.5 + .35rem); }
@@ -262,6 +272,16 @@ textarea.editor { min-height: 60vh; margin: 0 0 1rem; padding: .9rem; font-famil
 .pending { margin-bottom: 1.25rem; padding-bottom: .25rem; }
 .pending code, .card > .title-row > code { background: none; padding: 0; font-size: .9rem; font-weight: 600; color: var(--fg); }
 pre.code:empty, code:empty { display: none; }
+/* 적용 화면: 파일마다 diff를 접고 펼친다. 머리에 더한·뺀 줄 수를 보인다 */
+details.pending { margin: 0 0 1.25rem; padding: 0; border: 0; background: none; }
+details.pending > summary { list-style: none; }
+details.pending > summary::-webkit-details-marker { display: none; }
+details.pending > summary::before { content: ""; width: .45rem; height: .45rem; border: solid var(--muted); border-width: 0 2px 2px 0; transform: rotate(-45deg); transition: transform .15s; }
+details.pending[open] > summary::before { transform: rotate(45deg); }
+details.pending:not([open]) > summary { margin-bottom: 0; }
+.diff-stat { font-family: var(--mono); font-size: .8rem; font-weight: 600; }
+.diff-stat .add { color: var(--ok); }
+.diff-stat .del { color: var(--bad); }
 summary code { background: none; padding: 0; }
 .log-lines { max-height: 60vh; overflow: auto; white-space: pre; font-size: .8rem; }
 .log-lines mark { background: #fde68a; color: #111827; border-radius: 2px; }
@@ -407,6 +427,7 @@ body > footer, .footer { padding: 1.25rem 2rem 2rem; text-align: center; color: 
     .nav .langs { display: flex; padding: 0; }
     .page { padding: 1.25rem 1rem 2rem; }
     .columns { grid-template-columns: 1fr; }
+    .columns > .card.sticky { position: static; }
     .card { padding: 1rem; }
     .card > table, .card > form > table { display: block; overflow-x: auto; }
     th, td { white-space: nowrap; }

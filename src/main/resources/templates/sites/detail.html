@@ -10,6 +10,11 @@
         <span th:unless="${site.enabled}" class="badge" th:text="#{sites.status.disabled}">비활성</span>
         <span th:if="${site.configFile.hasPendingChange()}" class="badge warn" th:text="#{sites.status.pending}">적용 대기</span>
         <a class="button secondary" th:href="@{/logs/{id}(id=${site.id})}" th:text="#{sites.detail.viewLogs}">로그 보기</a>
+        <form th:if="${currentUser.canEdit()}" th:action="@{/sites/{id}/enabled(id=${site.id})}" method="post">
+            <input type="hidden" name="version" th:value="${site.version}">
+            <input type="hidden" name="enabled" th:value="${!site.enabled}">
+            <button type="submit" class="secondary" th:text="${site.enabled} ? #{sites.detail.disable} : #{sites.detail.enable}">비활성화</button>
+        </form>
     </div>
     <p class="notice" th:if="${notice}" th:text="${notice}">완료</p>
     <p class="error" th:if="${error}" th:text="${error}">오류</p>
@@ -36,7 +41,7 @@
                 </fieldset>
                 <th:block th:replace="~{sites/proxy-fields :: fields(${currentUser.canEdit()})}"></th:block>
                 <th:block th:replace="~{sites/options-fields :: redirect(${currentUser.canEdit()})}"></th:block>
-                <label><th:block th:text="#{sites.detail.staticRoot}">문서 루트</th:block>
+                <label class="type-fields type-static"><th:block th:text="#{sites.detail.staticRoot}">문서 루트</th:block>
                     <span class="hint" th:text="#{sites.field.staticRoot.hint}">내보낼 폴더의 절대 경로입니다.</span>
                     <input type="text" th:field="*{staticRoot}" th:disabled="${!currentUser.canEdit()}">
                     <span class="error" th:errors="*{staticRootValid}"></span>
@@ -99,11 +104,6 @@
                 <a th:if="${currentUser.canEdit()}" th:href="@{/files/{id}(id=${site.configFile.id})}" th:text="#{sites.detail.editRaw}">원문 편집</a>
             </div>
             <pre class="code" th:text="${content}"></pre>
-            <form th:if="${currentUser.canEdit()}" th:action="@{/sites/{id}/enabled(id=${site.id})}" method="post">
-                <input type="hidden" name="version" th:value="${site.version}">
-                <input type="hidden" name="enabled" th:value="${!site.enabled}">
-                <button type="submit" class="secondary" th:text="${site.enabled} ? #{sites.detail.disable} : #{sites.detail.enable}">비활성화</button>
-            </form>
         </section>
     </div>
 </main>
