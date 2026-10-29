@@ -132,7 +132,7 @@ body.centered button[type=submit] { width: 100%; margin-top: .5rem; padding: .65
 .card .title-row, .pending .title-row { margin-bottom: .75rem; }
 .title-row h1, .title-row h2 { margin: 0; }
 .title-row .button, .title-row form { margin-left: auto; }
-.title-row .button + form { margin-left: 0; }
+.title-row .button + form, .title-row .button + .button { margin-left: 0; }
 .title-row h2 + a { margin-left: auto; font-size: .88rem; }
 
 /* 폼 */
@@ -446,11 +446,11 @@ body > footer, .footer { padding: 1.25rem 2rem 2rem; text-align: center; color: 
     /* 스크립트가 있으면 가로 메뉴 대신 메뉴 버튼으로 연다 */
     .js .nav { flex-wrap: wrap; overflow: visible; row-gap: .15rem; }
     .js .nav .brand span:last-child { display: inline; }
-    .js .nav-toggle {
+    .js .nav .nav-toggle {
         display: inline-flex; align-items: center; gap: .4rem; margin-left: auto; padding: .45rem .55rem;
         background: none; border: 1px solid rgba(148, 163, 184, .25); color: var(--side-fg);
     }
-    .js .nav-toggle:hover { background: var(--side-hover); }
+    .js .nav .nav-toggle:hover { background: var(--side-hover); color: #fff; }
     .js .nav-toggle .count { margin-left: 0; }
     .js .nav:not(.open) > :not(.brand):not(.nav-toggle) { display: none; }
     .js .nav.open { max-height: 100vh; overflow-y: auto; padding-bottom: .75rem; }
@@ -458,7 +458,7 @@ body > footer, .footer { padding: 1.25rem 2rem 2rem; text-align: center; color: 
     .js .nav.open .nav-label { display: block; }
     .js .nav.open .nav-user { border-top: 1px solid rgba(148, 163, 184, .15); padding-top: .5rem; }
     .js .nav.open .nav-user span { display: inline; }
-    .js .nav.open a, .js .nav.open button.link { width: 100%; padding: .6rem .7rem; }
+    .js .nav.open .nav-links a, .js .nav.open .nav-user a, .js .nav.open button.link { width: 100%; padding: .6rem .7rem; }
     .js .nav.open .langs { width: 100%; padding: .5rem 0 0; flex-wrap: wrap; }
     .js .nav.open .langs a { width: auto; }
 }
