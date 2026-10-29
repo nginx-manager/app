@@ -6,6 +6,7 @@
 <main class="page">
     <div class="title-row">
         <h1 th:text="#{sites.list.title}">사이트</h1>
+        <a class="button secondary" th:if="${currentUser.canEdit()}" th:href="@{/sites/import}" th:text="#{import.title}">설정 파일 가져오기</a>
         <a class="button" th:if="${currentUser.canEdit()}" th:href="@{/sites/new}" th:text="#{sites.list.add}">사이트 추가</a>
     </div>
     <section class="card">

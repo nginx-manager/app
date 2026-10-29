@@ -32,6 +32,8 @@ public class SecurityConfig {
                         .requestMatchers("/account").authenticated()
                         // 적용 화면은 diff 미리보기도 편집자부터 본다
                         .requestMatchers("/apply/**").hasRole("EDITOR")
+                        // 가져오기는 허용한 디렉터리의 파일 내용을 보여 주므로 편집자부터 쓴다
+                        .requestMatchers("/sites/import", "/sites/import/**").hasRole("EDITOR")
                         // 조회는 VIEWER부터, 변경 요청은 EDITOR부터 허용한다
                         .requestMatchers(HttpMethod.GET, "/**").hasRole("VIEWER")
                         .anyRequest().hasRole("EDITOR"))
