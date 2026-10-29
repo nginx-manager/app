@@ -9,6 +9,8 @@ public interface ConfigFileRepository extends JpaRepository<ConfigFile, Long> {
 
     Optional<ConfigFile> findByPath(String path);
 
+    Optional<ConfigFile> findByImportedFrom(String importedFrom);
+
     List<ConfigFile> findAllByOrderByPathAsc();
 
     List<ConfigFile> findByPathStartingWith(String prefix);

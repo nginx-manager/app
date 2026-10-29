@@ -14,6 +14,17 @@
     <p class="notice" th:if="${notice}" th:text="${notice}">완료</p>
     <p class="error" th:if="${error}" th:text="${error}">오류</p>
     <p class="error" th:if="${param.rawOnly}" th:text="#{sites.detail.rawOnly}">원문 편집기로 고친 사이트라 폼으로 저장하지 않았습니다.</p>
+    <p class="notice" th:if="${param.imported}"><th:block th:text="#{import.detail.imported}">설정 파일을 가져와 사이트 초안을 만들었습니다.</th:block> <a th:href="@{/apply}" th:text="#{sites.detail.saved.link}">적용 화면</a><th:block th:text="#{sites.detail.saved.after}">에서 반영하세요.</th:block></p>
+    <p class="error" th:if="${errorKey}" th:text="#{${errorKey}(${errorArg})}">오류</p>
+    <p class="hint" th:if="${site.importPath}">
+        <th:block th:text="#{import.detail.source}">가져온 원본</th:block>: <code th:text="${site.importPath}">/home/a/nginx/app.conf</code>
+        <span th:if="${importChanged}" class="badge warn" th:text="#{import.status.changed}">원본 바뀜</span>
+    </p>
+    <form th:if="${importChanged and currentUser.canEdit()}" th:action="@{/sites/{id}/reimport(id=${site.id})}" method="post">
+        <input type="hidden" name="version" th:value="${site.version}">
+        <p class="hint" th:text="#{import.detail.reimport.hint}">원본이 가져온 뒤 바뀌었습니다. 다시 가져오면 바뀐 내용으로 초안을 만듭니다.</p>
+        <button type="submit" class="secondary" th:text="#{import.detail.reimport}">원본에서 다시 가져오기</button>
+    </form>
     <p class="notice" th:if="${param.saved}"><th:block th:text="#{sites.detail.saved.before}">초안을 저장했습니다.</th:block> <a th:href="@{/apply}" th:text="#{sites.detail.saved.link}">적용 화면</a><th:block th:text="#{sites.detail.saved.after}">에서 반영하세요.</th:block></p>
 
     <div class="columns">

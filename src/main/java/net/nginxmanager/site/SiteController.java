@@ -30,10 +30,13 @@ public class SiteController {
     private final ConfigFileStore store;
     private final TlsCertificateRepository certificateRepository;
     private final CertificateService certificateService;
+    private final ImportFiles importFiles;
 
     public SiteController(SiteService siteService, SiteQueryRepository siteQueryRepository,
                           SiteRendering rendering, ConfigFileStore store,
-                          TlsCertificateRepository certificateRepository, CertificateService certificateService) {
+                          TlsCertificateRepository certificateRepository, CertificateService certificateService,
+                          ImportFiles importFiles) {
+        this.importFiles = importFiles;
         this.certificateService = certificateService;
         this.siteService = siteService;
         this.siteQueryRepository = siteQueryRepository;
@@ -176,6 +179,22 @@ public class SiteController {
         model.addAttribute("certificate", certificate);
         model.addAttribute("certificateRunning", certificate != null && certificateService.isRunning(certificate.getId()));
         model.addAttribute("siteLive", site.isEnabled() && store.read(site.getConfigFile().getPath()) != null);
+        model.addAttribute("importChanged", importChanged(site));
+    }
+
+    /** 가져온 원본이 가져온 뒤 바뀌었는지. 원본을 볼 수 없으면(지웠거나 마운트가 빠짐) false. */
+    private boolean importChanged(Site site) {
+        if (site.getImportPath() == null || site.getImportHash() == null) {
+            return false;
+        }
+        try {
+            return importFiles.resolve(site.getImportPath())
+                    .map(importFiles::read)
+                    .map(content -> !ConfigFileStore.hash(content).equals(site.getImportHash()))
+                    .orElse(false);
+        } catch (RuntimeException e) {
+            return false;
+        }
     }
 
     private TlsCertificate certificateOf(Site site) {

@@ -13,6 +13,8 @@ public interface SiteRepository extends JpaRepository<Site, Long> {
 
     Optional<Site> findByPrimaryDomain(String primaryDomain);
 
+    List<Site> findByImportPath(String importPath);
+
     List<Site> findByCertificateId(Long certificateId);
 
     List<Site> findByCertificateIdIsNotNull();

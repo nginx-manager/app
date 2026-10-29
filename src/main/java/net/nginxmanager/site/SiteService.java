@@ -37,11 +37,12 @@ public class SiteService {
     private final TransactionTemplate tx;
     private final List<OtherTcpPorts> otherTcpPorts;
     private final SiteReconciler reconciler;
+    private final SiteImporter importer;
 
     public SiteService(SiteRepository siteRepository, ConfigFileRepository configFileRepository,
                        ConfigFileStore store, SiteRendering rendering, CertificateRegistry certificateRegistry,
                        ApplicationEventPublisher events, ApplyLock applyLock, TransactionTemplate tx,
-                       List<OtherTcpPorts> otherTcpPorts, SiteReconciler reconciler) {
+                       List<OtherTcpPorts> otherTcpPorts, SiteReconciler reconciler, SiteImporter importer) {
         this.siteRepository = siteRepository;
         this.configFileRepository = configFileRepository;
         this.store = store;
@@ -52,6 +53,7 @@ public class SiteService {
         this.tx = tx;
         this.otherTcpPorts = otherTcpPorts;
         this.reconciler = reconciler;
+        this.importer = importer;
     }
 
     private <T> T locked(Supplier<T> work) {
@@ -68,7 +70,7 @@ public class SiteService {
         if (siteRepository.existsByPrimaryDomain(domain) || configFileRepository.findByPath(path).isPresent()) {
             throw new DuplicateSiteException(domain);
         }
-        requireUnusedDomains(null, domain, form);
+        requireUnusedDomains(null, form.certificateDomains(domain));
         requireFreePort(form.listenHttpPort());
         ConfigFile file = configFileRepository.save(new ConfigFile(path, true));
         Site site = new Site(domain, form.type(), file);
@@ -91,7 +93,7 @@ public class SiteService {
         if (site.getType() == SiteType.RAW) {
             throw new RawSiteFormException();
         }
-        requireUnusedDomains(site.getId(), site.getPrimaryDomain(), form);
+        requireUnusedDomains(site.getId(), form.certificateDomains(site.getPrimaryDomain().toLowerCase(Locale.ROOT)));
         if (form.listenHttpPort() != site.getListenHttpPort()) {
             requireFreePort(form.listenHttpPort());
         }
@@ -125,6 +127,117 @@ public class SiteService {
         events.publishEvent(AuditEvent.success(actor, AuditAction.SITE_SAVE,
                 "site:" + site.getPrimaryDomain() + (enabled ? " enable" : " disable")));
         return site;
+    }
+
+    /**
+     * 가져올 파일.
+     *
+     * @param sourcePath   화면에 보일 원본 위치(절대 경로, 올린 파일이면 파일 이름)
+     * @param rootRelative 원본이 설정 루트 안이면 루트 기준 경로, 아니면 null
+     * @param content      원본 내용
+     * @param primaryDomain 운영자가 고른 대표 도메인. 비우면 server_name의 첫 도메인
+     * @param asForm       폼 사이트로 등록한다(폼으로 옮길 수 있을 때만)
+     * @param removeSource 설정 루트 안의 원본을 지우는 초안을 함께 만든다
+     */
+    public record ImportCommand(String sourcePath, String rootRelative, String content, String primaryDomain,
+                                boolean asForm, boolean removeSource) {
+    }
+
+    /**
+     * 설정 파일을 사이트로 가져온다(초안). 폼으로 옮길 수 있고 asForm이면 폼 사이트로, 아니면 원문 그대로 원문 사이트로
+     * {@code conf.d/sites/<대표 도메인>.conf}에 만든다. 원본을 지우면 그 삭제 초안이 사이트 초안과 짝이 된다.
+     *
+     * @throws SiteImportException 사이트로 등록할 수 없으면
+     * @throws DuplicateSiteException 도메인이 다른 사이트와 겹치면
+     * @throws PortInUseException HTTP 포트를 스트림이 쓰면
+     */
+    public Site importSite(ImportCommand command, String actor) {
+        return locked(() -> doImport(command, actor));
+    }
+
+    private Site doImport(ImportCommand command, String actor) {
+        SiteImportAnalysis analysis = importer.analyze(command.content(), command.primaryDomain());
+        if (!analysis.importable()) {
+            throw new SiteImportException(analysis.errorKey(), analysis.errorArg());
+        }
+        String domain = analysis.primaryDomain();
+        if (domain == null) {
+            throw new SiteImportException("import.error.domainRequired", null);
+        }
+        if (!domain.matches(SiteForm.DOMAIN)) {
+            throw new SiteImportException("import.error.domainInvalid", domain);
+        }
+        ConfigFile source = null;
+        if (command.removeSource() && command.rootRelative() != null) {
+            source = configFileRepository.findByPath(command.rootRelative()).orElse(null);
+            if (source != null && source.hasPendingChange()) {
+                throw new SiteImportException("import.error.sourcePending", command.rootRelative());
+            }
+        }
+        Site site;
+        if (command.asForm()) {
+            if (!analysis.formPossible()) {
+                throw new SiteImportException("import.error.formNotPossible", null);
+            }
+            site = doCreate(analysis.form(), actor);
+        } else {
+            String path = SitePaths.of(domain, true);
+            if (siteRepository.existsByPrimaryDomain(domain) || configFileRepository.findByPath(path).isPresent()
+                    || store.read(path) != null) {
+                throw new DuplicateSiteException(domain);
+            }
+            requireUnusedDomains(null, analysis.domains());
+            requireFreePort(analysis.listenPort());
+            ConfigFile file = configFileRepository.save(new ConfigFile(path, false));
+            site = new Site(domain, SiteType.RAW, file);
+            site.readRawListenPort(command.content());
+            siteRepository.save(site);
+            file.stageContent(normalizeNewlines(command.content()));
+        }
+        site.markImportedFrom(command.sourcePath(), ConfigFileStore.hash(command.content()),
+                String.join(" ", analysis.extraDomains(domain)));
+        if (command.removeSource() && command.rootRelative() != null) {
+            if (source == null) {
+                source = configFileRepository.save(new ConfigFile(command.rootRelative(), false));
+                source.markImported(ConfigFileStore.hash(store.read(command.rootRelative())));
+            }
+            source.stageDelete();
+            site.getConfigFile().markImportedFrom(command.rootRelative());
+        }
+        events.publishEvent(AuditEvent.success(actor, AuditAction.SITE_IMPORT,
+                "site:" + domain + " from " + command.sourcePath() + (command.asForm() ? " (form)" : " (raw)")));
+        return site;
+    }
+
+    /**
+     * 원본이 바뀐 가져온 사이트를 다시 가져온다(초안). 폼 사이트이고 새 내용도 폼으로 옮길 수 있으면 폼 값을 바꾸고
+     * (HTTPS와 폼에만 있는 옵션은 그대로 둔다), 아니면 원문 그대로 바꿔 원문 사이트가 된다.
+     */
+    public Site reimport(long siteId, String content, long expectedVersion, String actor) {
+        return locked(() -> {
+            Site site = load(siteId);
+            requireVersion(site.getVersion(), expectedVersion, "site " + site.getPrimaryDomain());
+            SiteImportAnalysis analysis = importer.analyze(content, site.getPrimaryDomain());
+            if (!analysis.importable()) {
+                throw new SiteImportException(analysis.errorKey(), analysis.errorArg());
+            }
+            if (site.getType() != SiteType.RAW && analysis.formPossible()) {
+                SiteForm merged = SiteImporter.merge(rendering.formOf(site), analysis.form());
+                doUpdate(siteId, merged, actor);
+            } else {
+                requireUnusedDomains(site.getId(), analysis.domains());
+                site.getConfigFile().stageContent(normalizeNewlines(content));
+                if (site.getType() != SiteType.RAW) {
+                    site.switchToRaw();
+                }
+                site.readRawListenPort(content);
+            }
+            site.markImportedFrom(site.getImportPath(), ConfigFileStore.hash(content),
+                    String.join(" ", analysis.extraDomains(site.getPrimaryDomain())));
+            events.publishEvent(AuditEvent.success(actor, AuditAction.SITE_IMPORT,
+                    "site:" + site.getPrimaryDomain() + " from " + site.getImportPath() + " (again)"));
+            return site;
+        });
     }
 
     /** 원문 편집. 폼 사이트의 파일이면 그 사이트는 원문 전용(RAW)으로 바뀐다. */
@@ -214,6 +327,16 @@ public class SiteService {
     }
 
     private ConfigFile pairedFile(ConfigFile file) {
+        // 가져오기로 만든 사이트 파일과 원본 삭제는 함께 버린다(원본만 지워지거나 같은 server가 두 번 남지 않게)
+        if (file.getImportedFrom() != null) {
+            return configFileRepository.findByPath(file.getImportedFrom()).orElse(null);
+        }
+        if (file.isDraftDelete()) {
+            ConfigFile importing = configFileRepository.findByImportedFrom(file.getPath()).orElse(null);
+            if (importing != null) {
+                return importing;
+            }
+        }
         if (file.getPath().startsWith(Htpasswd.DIR)) {
             String domain = file.getPath().substring(Htpasswd.DIR.length());
             return siteRepository.findByPrimaryDomain(domain).map(Site::getConfigFile).orElse(null);
@@ -394,7 +517,7 @@ public class SiteService {
      * 다른 사이트가 이미 대표·추가 도메인으로 쓰는 이름은 받지 않는다. nginx는 겹치는 server_name을 경고만 하고
      * 한쪽을 무시하므로, 검증을 통과해도 한 사이트가 조용히 그 도메인에 응답하지 않게 된다.
      */
-    private void requireUnusedDomains(Long siteId, String primary, SiteForm form) {
+    private void requireUnusedDomains(Long siteId, List<String> domains) {
         java.util.Set<String> taken = new java.util.HashSet<>();
         for (Site other : siteRepository.findAll()) {
             if (other.getId().equals(siteId)) {
@@ -407,8 +530,8 @@ public class SiteService {
                 }
             }
         }
-        for (String domain : form.certificateDomains(primary.toLowerCase(Locale.ROOT))) {
-            if (taken.contains(domain)) {
+        for (String domain : domains) {
+            if (taken.contains(domain.toLowerCase(Locale.ROOT))) {
                 throw new DuplicateSiteException(domain);
             }
         }

@@ -31,6 +31,13 @@ public class ConfigFile extends BaseEntity {
     @Column(nullable = false)
     private boolean managed;
 
+    /**
+     * 가져오기로 만든 사이트 파일 초안이 대신하는 설정 루트 안의 원본 경로(그 원본은 삭제 초안이다).
+     * 두 초안은 함께 적용되고 함께 버려진다. 적용되면 비운다.
+     */
+    @Column(name = "imported_from", length = 1024)
+    private String importedFrom;
+
     protected ConfigFile() {
     }
 
@@ -56,6 +63,15 @@ public class ConfigFile extends BaseEntity {
     public void discardDraft() {
         this.draftContent = null;
         this.draftDelete = false;
+        this.importedFrom = null;
+    }
+
+    public void markImportedFrom(String sourcePath) {
+        this.importedFrom = sourcePath;
+    }
+
+    public String getImportedFrom() {
+        return importedFrom;
     }
 
     /** 적용이 끝난 뒤 디스크 상태를 기준으로 삼는다. */
