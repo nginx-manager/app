@@ -4,8 +4,8 @@ nginx manager의 버전별 변경 내용입니다. 최신 버전이 위에 있�
 
 | 버전 | 날짜 | 주요 내용 | 릴리스 노트 |
 | --- | --- | --- | --- |
-| v1.1.0 | 출시 예정 | 쓰던 nginx 설정 파일을 사이트로 가져오기: 경로 패턴(`/home/*/nginx/*.conf`)으로 찾아 한꺼번에 등록, 폼/원문 자동 판단, 원본 바뀜 알림과 다시 가져오기. 화면 다듬기: 고른 유형만 보이는 사이트 폼, 놓치지 않는 미리보기, 대상이 보이는 사이트 목록, 접히는 적용 diff, 휴대폰 메뉴 버튼 | [초안 보기](v1.1.0.md) |
-| v1.0.0 | 출시 예정 | 첫 정식 릴리스: 폼으로 사이트·TCP/UDP 스트림 만들기, 검증 후 적용과 자동 복구, 이력·비교·되돌리기, Let's Encrypt 자동 발급·갱신, 대시보드와 로그, 4개 언어·다크 모드, 사용자·감사 로그, 컨테이너 두 개와 업그레이드 안전장치 | [초안 보기](v1.0.0.md) |
+| v1.1.0 | 2026-10-29 | 쓰던 nginx 설정 파일을 사이트로 가져오기: 경로 패턴(`/home/*/nginx/*.conf`)으로 찾아 한꺼번에 등록, 폼/원문 자동 판단, 원본 바뀜 알림과 다시 가져오기. 화면 다듬기: 고른 유형만 보이는 사이트 폼, 놓치지 않는 미리보기, 대상이 보이는 사이트 목록, 접히는 적용 diff, 휴대폰 메뉴 버튼 | [v1.1.0](v1.1.0.md) |
+| v1.0.0 | 2026-10-29 | 첫 정식 릴리스: 폼으로 사이트·TCP/UDP 스트림 만들기, 검증 후 적용과 자동 복구, 이력·비교·되돌리기, Let's Encrypt 자동 발급·갱신, 대시보드와 로그, 4개 언어·다크 모드, 사용자·감사 로그, 컨테이너 두 개와 업그레이드 안전장치 | [v1.0.0](v1.0.0.md) |
 
 ## 버전 규칙
 
@@ -28,7 +28,7 @@ nginx manager의 버전별 변경 내용입니다. 최신 버전이 위에 있�
    TRAFFIC_URL=http://localhost node scripts/release-screenshots.mjs http://localhost:9000 docs/releases/images/vX.Y.Z
    docker compose -f docker/docker-compose.yml -p nm-shots down -v
    ```
-   스크립트에는 [playwright](https://playwright.dev) 패키지가 필요합니다(`npm i -g playwright`, 전역 설치면 `NODE_PATH`를 지정). `APP_VERSION`을 주고 빌드해야 화면에 `vX.Y.Z`가 보입니다.
+   스크립트에는 [playwright](https://playwright.dev) 패키지가 필요합니다(`npm i -g playwright`, 전역 설치면 `NODE_PATH`를 지정). `APP_VERSION`을 주고 빌드해야 화면에 `vX.Y.Z`가 보입니다. 설정 파일 가져오기 화면도 찍으려면 예시 설정 파일을 둔 호스트 디렉터리를 compose의 `manager`에 `/home`으로 읽기 전용 마운트하고 `NGINX_MANAGER_IMPORT_ROOTS: /home`을 준 뒤, 스크립트에 `IMPORT_PATTERN='/home/*/nginx/*.conf'`를 줍니다. 마지막에 휴대폰 폭(390px) 화면도 찍습니다.
 3. **태그 달기**: 노트를 main에 합친 뒤 그 커밋에 `vX.Y.Z` 태그를 밀면 [이미지 릴리스 워크플로](../../.github/workflows/nginx-release.yml)가 버전을 `X.Y.Z`로 정해 빌드·테스트·게시합니다.
    ```bash
    git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z

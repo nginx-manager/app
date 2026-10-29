@@ -6,6 +6,7 @@
 // 자세한 절차는 docs/releases/README.md. 빈 볼륨으로 띄운 컨테이너에 관리자 계정을 만들고, 예시 사이트를 만들어 적용한 뒤 화면마다 찍는다.
 // 그림은 레티나 2배(deviceScaleFactor 2)로 찍는다. 노트에서는 width로 실제 화면 크기(1배)에 맞춰 보여 준다.
 // playwright 패키지가 필요하다(npm i -g playwright 또는 NODE_PATH로 지정).
+// IMPORT_PATTERN(예: /home/*/nginx/*.conf)을 주면 그 위치를 등록해 설정 파일 가져오기 화면도 찍는다. 파일 준비는 README의 릴리스 절차.
 import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync } from 'node:fs';
@@ -183,5 +184,38 @@ await page.waitForTimeout(1500);
 await shot('logs');
 await go('/audit');
 await shot('audit');
+
+// 6. 설정 파일 가져오기: 위치 등록 → 검사 → 미리 보기(폼/원문) → 한꺼번에 등록 → 적용 화면
+const importPattern = process.env.IMPORT_PATTERN;
+if (importPattern) {
+    await go('/sites/import');
+    await page.fill('form[action$="/sites/import/sources"] input[name=pattern]', importPattern);
+    await Promise.all([page.waitForNavigation(), page.click('button:has-text("위치 등록")')]);
+    await Promise.all([page.waitForNavigation(), page.click('button:has-text("등록한 위치 모두 검사")')]);
+    await page.waitForLoadState('networkidle');
+    await shot('import-scan', { fullPage: true });
+    const previews = page.locator('a:has-text("미리 보기")');
+    const formRow = page.locator('tr', { has: page.locator('.badge:has-text("폼 사이트")') }).first();
+    const rawRow = page.locator('tr', { has: page.locator('.badge:has-text("원문 사이트")') }).first();
+    if (await previews.count()) {
+        await go(await formRow.locator('a:has-text("미리 보기")').getAttribute('href'));
+        await shot('import-preview-form', { fullPage: true });
+        await go('/sites/import?scan=');
+        await go(await rawRow.locator('a:has-text("미리 보기")').getAttribute('href'));
+        await shot('import-preview-raw', { fullPage: true });
+    }
+    await go('/sites/import?scan=');
+    await Promise.all([page.waitForNavigation(), page.click('button:has-text("고른 파일 등록")')]);
+    await go('/apply');
+    await shot('import-apply');
+}
+
+// 7. 휴대폰 폭(390px): 메뉴 버튼으로 연 메뉴
+await page.setViewportSize({ width: 390, height: 844 });
+await go('/sites');
+await shot('mobile-sites');
+await page.click('.nav-toggle');
+await page.waitForTimeout(300);
+await shot('mobile-menu');
 
 await browser.close();
