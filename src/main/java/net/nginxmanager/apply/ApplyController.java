@@ -6,6 +6,7 @@ import net.nginxmanager.config.ConfigFileStore;
 import net.nginxmanager.config.UnifiedDiff;
 import net.nginxmanager.runtime.NginxCommandException;
 import net.nginxmanager.runtime.RuntimeCompatibility;
+import net.nginxmanager.common.Messages;
 import net.nginxmanager.common.NotFoundException;
 import net.nginxmanager.site.SiteAccess;
 import net.nginxmanager.site.SiteService;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import java.nio.file.AccessDeniedException;
 import java.util.List;
 import java.util.function.Predicate;
 
@@ -49,11 +51,13 @@ public class ApplyController {
     private final SiteService siteService;
     private final RuntimeCompatibility compatibility;
     private final SiteAccess access;
+    private final Messages messages;
 
     public ApplyController(ApplyService applyService, ConfigFileRepository configFileRepository,
                            ConfigFileStore store, SiteService siteService, RuntimeCompatibility compatibility,
-                           SiteAccess access) {
+                           SiteAccess access, Messages messages) {
         this.access = access;
+        this.messages = messages;
         this.applyService = applyService;
         this.configFileRepository = configFileRepository;
         this.store = store;
@@ -83,11 +87,21 @@ public class ApplyController {
         } catch (RuntimeException e) {
             // 예상하지 못한 오류도 화면에 이유를 보인다(아무 반응 없이 500으로 끝나지 않게)
             log.error("apply failed", e);
-            model.addAttribute("failure", e.getClass().getSimpleName() + ": " + e.getMessage());
+            model.addAttribute("failure", failureText(e));
         }
         model.addAttribute("pending", pendingFiles(authentication));
         model.addAttribute("applyBlocked", applyBlocked());
         return htmx != null ? "apply/pending :: result" : "apply/pending";
+    }
+
+    /** 설정 디렉터리에 쓰지 못한 경우(서버에서 sudo로 만든 root 소유 디렉터리 등)는 고치는 방법을 함께 보인다. */
+    private String failureText(RuntimeException e) {
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t instanceof AccessDeniedException denied) {
+                return messages.get("apply.failure.denied", denied.getFile());
+            }
+        }
+        return e.getClass().getSimpleName() + ": " + e.getMessage();
     }
 
     @PostMapping("/discard/{fileId}")

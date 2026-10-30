@@ -86,4 +86,26 @@ class ApplyRecoveryTest extends ConfigRootTest {
         assertThat(journal.pending()).isEmpty();
         assertThat(applyService.recoverInterruptedApply()).isFalse();
     }
+
+    @Test
+    void aRestoreThatFailsDoesNotStopStartupAndIsRetriedLater() throws Exception {
+        interruptedAfterWriting();
+        // 되돌릴 수 없는 상태(쓰기 권한이 없는 디렉터리 대신, 루트로 돌려도 실패하는 비어 있지 않은 디렉터리)
+        java.nio.file.Files.delete(CONFIG_ROOT.resolve(ADDED));
+        java.nio.file.Files.createDirectories(CONFIG_ROOT.resolve(ADDED).resolve("child"));
+
+        assertThat(applyService.recoverInterruptedApply()).isTrue();
+
+        assertThat(journal.pending()).isPresent();
+        assertThat(nginx.reloadCalls).isZero();
+        await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> assertThat(auditLogRepository.findAll())
+                .anySatisfy(log -> assertThat(log.getDetail()).startsWith("INTERRUPTED; restore failed")));
+
+        // 고친 뒤 다음 시작 때 되돌린다
+        java.nio.file.Files.delete(CONFIG_ROOT.resolve(ADDED).resolve("child"));
+        java.nio.file.Files.delete(CONFIG_ROOT.resolve(ADDED));
+        assertThat(applyService.recoverInterruptedApply()).isTrue();
+        assertThat(readFile(CHANGED)).doesNotContain("unvalidated");
+        assertThat(journal.pending()).isEmpty();
+    }
 }
