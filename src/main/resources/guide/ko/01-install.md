@@ -34,6 +34,7 @@ curl -fsSL https://github.com/nginx-manager/app/releases/latest/download/install
 | `--version X.Y.Z` | 설치할 버전(기본 최신) |
 | `--admin-domain`, `--email` | 관리 도메인과 Let's Encrypt 연락 이메일 |
 | `--http-port`, `--https-port`, `--manager-port` | 서버에 여는 포트(기본 80, 443, 9000) |
+| `--import-root DIR` | [설정 파일 가져오기](05-import.md#호스트의-다른-디렉터리-붙이기)에서 찾을 호스트 디렉터리(예: `/home`). 여럿이면 여러 번 |
 | `--bundle FILE` | 인터넷이 막힌 서버에서 미리 받은 묶음(`nginx-manager.tar.gz`)으로 설치 |
 
 설치가 끝나면 접속 주소가 나옵니다. 처음 접속하면 관리자 계정을 만드는 화면이 나옵니다([2장](02-getting-started.md)). 관리 도메인이 없을 때 다른 컴퓨터에서 들어가려면 SSH 터널을 씁니다.
@@ -61,7 +62,7 @@ ssh -L 9000:127.0.0.1:9000 <서버>
 | `NGINX_BIND_ADDRESS` | `0.0.0.0` | nginx를 특정 IP에만 열 때 |
 | `NGINX_MANAGER_BACKUP_KEEP` | `14` | `nm backup`이 남길 백업 수 |
 | `TZ` | `Asia/Seoul` | 서버 시간대가 다를 때 |
-| `NGINX_MANAGER_IMPORT_ROOTS` | (비움) | `/etc/nginx` 밖의 설정 파일을 가져올 때 |
+| `NGINX_MANAGER_IMPORT_ROOTS` | (비움) | `/etc/nginx` 밖의 설정 파일을 가져올 때. 직접 고치지 말고 `nm import-root add /home` |
 | `SPRING_MAIL_*` | (비움) | 메일 알림을 보낼 때 SMTP 서버 |
 
 자세한 내용은 [관리 도메인](#관리-도메인으로-https-열기), [포트](#포트), [환경 변수](#환경-변수)에 있습니다.
@@ -133,7 +134,7 @@ services:
 | --- | --- |
 | `MANAGER_VERSION`, `NGINX_IMAGE` | 두 이미지의 버전. `nm upgrade`가 바꿉니다 |
 | `NGINX_MANAGER_ADMIN_DOMAIN`, `NGINX_MANAGER_ADMIN_EMAIL`, `NGINX_MANAGER_ADMIN_ALLOW` | [관리 도메인](#관리-도메인으로-https-열기) |
-| `NGINX_MANAGER_IMPORT_ROOTS` | 호스트의 다른 디렉터리(예: `/home`)에서 [설정 파일을 가져올](05-import.md) 때. 그 디렉터리를 `compose.override.yml`로 manager에 같은 경로로 읽기 전용 마운트(`- /home:/home:ro`)하고 여기에 적습니다. 여럿이면 쉼표로 구분합니다. |
+| `NGINX_MANAGER_IMPORT_ROOTS` | 호스트의 다른 디렉터리(예: `/home`)에서 [설정 파일을 가져올](05-import.md#호스트의-다른-디렉터리-붙이기) 때. `nm import-root add`가 적고 두 컨테이너에 같은 경로로 붙입니다 |
 | `SPRING_MAIL_HOST`, `SPRING_MAIL_PORT`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD` | [메일 알림](12-admin.md#알림-설정)을 보낼 SMTP 서버 |
 | `NGINX_MANAGER_BACKUP_KEEP` | `nm backup`이 남길 백업 수(기본 14) |
 | `TZ` | 시간대(기본 `Asia/Seoul`) |
@@ -153,6 +154,7 @@ services:
 | `nm upgrade [버전] [--nginx]` | [업그레이드](#업그레이드) |
 | `nm backup`, `nm restore <파일>` | [백업과 복원](#백업과-복원) |
 | `nm migrate` | [v1.1 이전 설치 옮기기](#v11-이전-설치-옮기기) |
+| `nm import-root add\|remove\|check\|grant` | [가져올 호스트 디렉터리](05-import.md#호스트의-다른-디렉터리-붙이기) 붙이기·떼기, UID 10101 읽기 권한 확인·부여 |
 
 ## 업그레이드
 

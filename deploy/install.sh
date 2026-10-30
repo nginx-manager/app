@@ -13,6 +13,7 @@
 #   --http-port N          nginx HTTP 포트(기본 80)
 #   --https-port N         nginx HTTPS 포트(기본 443)
 #   --manager-port N       관리 화면 포트(기본 9000, 이 서버에서만 열림)
+#   --import-root DIR      설정 파일 가져오기에서 찾을 호스트 디렉터리(예: /home). 여럿이면 여러 번
 #   --bundle FILE          미리 받은 묶음(nginx-manager.tar.gz)으로 설치(인터넷이 막힌 서버)
 #   --no-start             파일만 깔고 띄우지 않는다
 set -eu
@@ -26,6 +27,7 @@ HTTP_PORT=80
 HTTPS_PORT=443
 MANAGER_PORT=9000
 BUNDLE=""
+IMPORT_ROOTS=""
 START=1
 
 say() { printf '%s\n' "$*"; }
@@ -41,8 +43,9 @@ while [ $# -gt 0 ]; do
         --https-port) shift; HTTPS_PORT="$1" ;;
         --manager-port) shift; MANAGER_PORT="$1" ;;
         --bundle) shift; BUNDLE="$1" ;;
+        --import-root) shift; [ -d "$1" ] || die "디렉터리가 없습니다: $1"; IMPORT_ROOTS="${IMPORT_ROOTS:+$IMPORT_ROOTS,}${1%/}" ;;
         --no-start) START=0 ;;
-        -h|--help) say "옵션: --dir --version --admin-domain --email --http-port --https-port --manager-port --bundle --no-start"; exit 0 ;;
+        -h|--help) say "옵션: --dir --version --admin-domain --email --http-port --https-port --manager-port --import-root --bundle --no-start"; exit 0 ;;
         *) die "알 수 없는 옵션: $1" ;;
     esac
     shift
@@ -133,8 +136,10 @@ set_env NGINX_MANAGER_ADMIN_EMAIL "$EMAIL"
 set_env NGINX_HTTP_PORT "$HTTP_PORT"
 set_env NGINX_HTTPS_PORT "$HTTPS_PORT"
 set_env NGINX_MANAGER_PORT "$MANAGER_PORT"
+set_env NGINX_MANAGER_IMPORT_ROOTS "$IMPORT_ROOTS"
 umask 022
 mkdir -p data/conf data/logs data/shared data/manager backups
+[ -z "$IMPORT_ROOTS" ] || ./nm import-root sync
 
 say "nginx manager v$BUNDLE_VERSION (nginx 이미지 $BUNDLE_NGINX_IMAGE) 를 $DIR 에 깔았습니다"
 if [ "$HTTP_PORT" != 80 ]; then
@@ -154,6 +159,9 @@ if [ -n "$ADMIN_DOMAIN" ]; then
     say "  관리 도메인:           https://$ADMIN_DOMAIN (인증서를 받으면 1~2분 안에 열립니다)"
 else
     say "  인터넷에서 HTTPS로 열려면 $DIR/.env 에 NGINX_MANAGER_ADMIN_DOMAIN과 NGINX_MANAGER_ADMIN_EMAIL을 적고 $DIR/nm restart"
+fi
+if [ -n "$IMPORT_ROOTS" ]; then
+    say "  가져오기 디렉터리: $IMPORT_ROOTS (읽기 권한 확인: $DIR/nm import-root check)"
 fi
 say "  처음 접속하면 관리자 계정을 만드는 화면이 나옵니다."
 say "  운영 명령: $DIR/nm help"

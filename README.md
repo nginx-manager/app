@@ -31,7 +31,7 @@ curl -fsSL https://github.com/nginx-manager/app/releases/latest/download/install
 - 관리 화면은 기본으로 서버 안(`http://127.0.0.1:9000`)에서만 열립니다. `--admin-domain`(또는 `.env`의 `NGINX_MANAGER_ADMIN_DOMAIN`)을 주면 함께 든 nginx가 그 도메인으로 Let's Encrypt 인증서를 받아 HTTPS로만 관리 화면을 엽니다(80은 443으로 넘김).
 - 포트·도메인·버전은 설치 디렉터리의 `.env`에서 바꿉니다. 데이터는 `data/` 아래에 있습니다.
 - 이미 깐 서버에서 설치 명령을 다시 실행하면 `.env`와 `data/`를 건드리지 않고 끝납니다. 새 버전은 `nm upgrade`로 올리며, `.env`는 그대로 두고 새로 생긴 키만 기본값으로 더합니다.
-- 운영은 `nm` 명령으로 합니다: `nm status`, `nm upgrade`(manager만 올려 nginx는 끊기지 않음), `nm upgrade --nginx`, `nm backup`, `nm restore`, `nm migrate`(v1.1 이전 설치 옮기기).
+- 운영은 `nm` 명령으로 합니다: `nm status`, `nm upgrade`(manager만 올려 nginx는 끊기지 않음), `nm upgrade --nginx`, `nm backup`, `nm restore`, `nm migrate`(v1.1 이전 설치 옮기기), `nm import-root`(가져올 호스트 디렉터리를 같은 경로로 붙이고 읽기 권한 확인).
 - 자세한 내용은 사용 설명서 [1. 설치와 실행](src/main/resources/guide/ko/01-install.md)에 있습니다. 묶음의 원본은 [deploy/](deploy/)입니다.
 
 설치 디렉터리의 `.env`(설치 옵션으로 준 값이 들어갑니다). 바꾼 뒤에는 `nm restart`, nginx 포트를 바꿨으면 `nm restart nginx`.
@@ -48,7 +48,7 @@ curl -fsSL https://github.com/nginx-manager/app/releases/latest/download/install
 | `NGINX_BIND_ADDRESS` | `0.0.0.0` | nginx를 특정 IP에만 열 때 |
 | `NGINX_MANAGER_BACKUP_KEEP` | `14` | `nm backup`이 남길 백업 수 |
 | `TZ` | `Asia/Seoul` | 서버 시간대가 다를 때 |
-| `NGINX_MANAGER_IMPORT_ROOTS` | (비움) | `/etc/nginx` 밖의 설정 파일을 가져올 때 |
+| `NGINX_MANAGER_IMPORT_ROOTS` | (비움) | `/etc/nginx` 밖의 설정 파일을 가져올 때. 직접 고치지 말고 `nm import-root add /home` |
 | `SPRING_MAIL_*` | (비움) | 메일 알림을 보낼 때 SMTP 서버 |
 
 개발·시험에는 저장소의 [docker/docker-compose.yml](docker/docker-compose.yml)을 씁니다(이름 붙은 볼륨, 관리 화면을 모든 주소에 엶).

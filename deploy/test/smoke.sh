@@ -88,6 +88,33 @@ docker run --rm -v "$dir/data/conf:/c" alpine:3.20 rm -f /c/BAD /c/conf.d/sites/
 check "nginx 이미지가 $NEW_NGINX" [ "$(env_of NGINX_IMAGE)" = "$NEW_NGINX" ]
 check "nginx가 healthy" sh -c "cd '$dir' && docker compose ps nginx --format '{{.Health}}' | grep -q healthy"
 
+step "가져오기 디렉터리: 두 컨테이너에 같은 경로로 붙이고 읽기 권한을 확인한다"
+home="$work/home"
+mkdir -p "$home/alice/nginx" "$home/bob/nginx" "$home/alice/www"
+printf 'server { listen 80; server_name a.example.com; root %s; }\n' "$home/alice/www" > "$home/alice/nginx/a.conf"
+printf 'server { listen 80; server_name b.example.com; }\n' > "$home/bob/nginx/b.conf"
+chmod 700 "$home/bob" "$home/alice"
+chmod 755 "$work"
+"$dir/nm" import-root add "$home" || true
+check "compose.import.yml이 생김" [ -f "$dir/compose.import.yml" ]
+check ".env에 가져오기 디렉터리" grep -q "^NGINX_MANAGER_IMPORT_ROOTS=$home\$" "$dir/.env"
+for svc in manager nginx; do
+    check "$svc 에 같은 경로로 붙음" sh -c "docker inspect -f '{{range .Mounts}}{{.Destination}} {{end}}' \"\$(cd '$dir' && docker compose ps -q $svc)\" | grep -q '$home'"
+done
+if "$dir/nm" import-root check "$home/*/nginx/*.conf" > "$work/check.out" 2>&1; then
+    fail "UID 10101이 못 읽는 홈 디렉터리를 알리지 않음"
+fi
+check "못 읽는 파일을 알림" grep -q "$home/bob/nginx/b.conf" "$work/check.out"
+check "가리키는 root 경로도 확인" grep -q "$home/alice/www" "$work/check.out"
+if command -v setfacl >/dev/null 2>&1 && { [ "$(id -u)" = 0 ] || sudo -n true 2>/dev/null; }; then
+    sudo_="$( [ "$(id -u)" = 0 ] || echo sudo -n )"
+    $sudo_ "$dir/nm" import-root grant "$home/alice/nginx" "$home/alice/www" "$home/bob/nginx"
+    check "권한을 준 뒤에는 모두 읽힘" "$dir/nm" import-root check "$home/*/nginx/*.conf"
+    check "다른 사용자에게는 열지 않음" sh -c "stat -c %A '$home/bob' | grep -q -- '---\$'"
+else
+    printf 'skip: setfacl이나 sudo가 없어 grant는 건너뜀\n'
+fi
+
 step "백업과 복원"
 docker run --rm -v "$dir/data/conf:/c" alpine:3.20 sh -c 'mkdir -p /c/conf.d/sites && echo "# marker" > /c/conf.d/sites/zz-marker.conf'
 "$dir/nm" backup --keep 3
@@ -97,6 +124,7 @@ check "보관 수 3" [ "$(ls -1 "$dir"/backups/nginx-manager-*.tar.gz | wc -l)" 
 docker run --rm -v "$dir/data/conf:/c" alpine:3.20 rm -f /c/conf.d/sites/zz-marker.conf
 "$dir/nm" restore "$backup" -y
 check "복원한 파일이 돌아옴" [ -f "$dir/data/conf/conf.d/sites/zz-marker.conf" ]
+check "백업에 compose.import.yml" sh -c "tar -tzf '$backup' | grep -qx compose.import.yml"
 check "복원 전 데이터도 남김" sh -c "ls '$dir'/backups/*before-restore* >/dev/null"
 check "두 컨테이너가 healthy" sh -c "cd '$dir' && [ \"\$(docker compose ps --format '{{.Health}}' | grep -c healthy)\" = 2 ]"
 
