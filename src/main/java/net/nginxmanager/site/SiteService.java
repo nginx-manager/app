@@ -595,6 +595,31 @@ public class SiteService {
         }));
     }
 
+    /**
+     * 원문 사이트의 server 블록에 사이트별 access_log/error_log를 더한 초안을 만든다(011). 더할 것이 없으면 false.
+     */
+    public boolean addRawSiteLogs(long siteId, String actor) {
+        return Boolean.TRUE.equals(locked(() -> {
+            Site site = load(siteId);
+            if (site.getType() != SiteType.RAW) {
+                throw new NotFoundException("raw site " + siteId);
+            }
+            ConfigFile file = site.getConfigFile();
+            String current = file.getDraftContent() != null ? file.getDraftContent() : store.read(file.getPath());
+            if (current == null) {
+                return false;
+            }
+            String updated = RawLogs.withSiteLogs(current, site.getPrimaryDomain());
+            if (updated.equals(current)) {
+                return false;
+            }
+            file.stageContent(updated);
+            events.publishEvent(new RawEditedEvent(file.getPath()));
+            events.publishEvent(AuditEvent.success(actor, AuditAction.SITE_SAVE, "site:" + site.getPrimaryDomain() + " logs"));
+            return true;
+        }));
+    }
+
     private Long certificateFor(String domain, SiteForm form) {
         if (!form.httpsEnabled()) {
             return null;

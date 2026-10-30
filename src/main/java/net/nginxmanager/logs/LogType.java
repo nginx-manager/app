@@ -13,4 +13,9 @@ public enum LogType {
     public String suffix() {
         return suffix;
     }
+
+    /** nginx 지시어 이름(access_log, error_log). */
+    public String directive() {
+        return suffix + "_log";
+    }
 }
