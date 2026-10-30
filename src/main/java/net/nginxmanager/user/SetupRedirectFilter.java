@@ -32,6 +32,8 @@ public class SetupRedirectFilter extends OncePerRequestFilter {
                 || uri.startsWith("/css/")
                 || uri.startsWith("/js/")
                 || uri.startsWith("/webjars/")
+                || uri.equals("/favicon.ico") || uri.equals("/favicon.svg")
+                || uri.equals("/favicon-32.png") || uri.equals("/apple-touch-icon.png")
                 || uri.startsWith("/actuator/health")
                 || uri.equals("/error");
     }

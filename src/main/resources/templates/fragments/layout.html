@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title th:text="${title} + ' · nginx manager'">nginx manager</title>
     <script>document.documentElement.classList.add('js'); try { var t = localStorage.getItem('nm-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+    <link rel="icon" th:href="@{/favicon.ico}" sizes="48x48">
+    <link rel="icon" th:href="@{/favicon-32.png}" type="image/png" sizes="32x32">
+    <link rel="icon" th:href="@{/favicon.svg}" type="image/svg+xml">
+    <link rel="apple-touch-icon" th:href="@{/apple-touch-icon.png}">
     <link rel="stylesheet" th:href="@{/css/app.css}">
     <script th:src="@{/webjars/htmx.org/2.0.5/dist/htmx.min.js}" defer></script>
     <script th:src="@{/js/ui.js}" defer></script>
