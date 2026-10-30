@@ -120,7 +120,7 @@ func (s *Server) noteManagerVersion(v string) {
 		return
 	}
 	if _, seen := s.warned.LoadOrStore(v, true); !seen {
-		log.Printf("warning: nginx-manager %s talks to agent %s; run both images at the same version", v, s.Version)
+		log.Printf("nginx-manager %s talks to agent %s (same API version %d)", v, s.Version, Protocol)
 	}
 }
 

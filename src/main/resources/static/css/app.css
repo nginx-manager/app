@@ -342,7 +342,9 @@ body.auth {
 .auth-snippet .n { color: #fbbf24; }
 .auth-snippet .s { color: #c4b5fd; }
 .auth-snippet .ok { color: #4ade80; }
-.auth-version { align-self: flex-start; color: #64748b; font-size: .75rem; }
+.brand-version { margin-left: .1rem; padding: .05rem .4rem; border-radius: 999px; background: rgba(148, 163, 184, .16); color: #94a3b8; font-size: .7rem; font-weight: 500; letter-spacing: 0; align-self: center; }
+.auth-version { align-self: flex-start; display: inline-flex; align-items: center; gap: .35rem; color: #64748b; font-size: .75rem; text-decoration: none; }
+.auth-version .icon { width: 14px; height: 14px; fill: currentColor; stroke: none; }
 .auth-version:hover { color: #cbd5e1; }
 .auth-form { display: flex; flex-direction: column; justify-content: center; padding: 2.75rem 2.5rem; }
 .auth-form h1 { margin: 0 0 .35rem; font-size: 1.6rem; }

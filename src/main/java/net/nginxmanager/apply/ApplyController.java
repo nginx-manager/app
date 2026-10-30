@@ -95,7 +95,7 @@ public class ApplyController {
 
     /** 에이전트에 연결할 수 없거나 API 판이 다르면 적용 버튼을 감춘다. 릴리스 판만 다르면 적용은 된다. */
     private boolean applyBlocked() {
-        return compatibility.current().map(w -> w.kind() != RuntimeCompatibility.Kind.VERSION).orElse(false);
+        return compatibility.current().isPresent();
     }
 
     private List<PendingFile> pendingFiles(Authentication authentication) {

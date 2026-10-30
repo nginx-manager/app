@@ -8,6 +8,7 @@ import net.nginxmanager.user.Role;
 import net.nginxmanager.user.SetupState;
 import net.nginxmanager.user.User;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mock.web.MockMultipartFile;
@@ -19,6 +20,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Comparator;
 import java.util.stream.Stream;
 
@@ -246,6 +248,29 @@ class SiteImportWebTest extends ConfigRootTest {
         // 조회자는 가져오기 화면을 쓸 수 없다(파일 내용을 보여 주므로)
         mvc.perform(get("/sites/import").with(user("viewer").roles("MEMBER")))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void aDirectoryWithoutPermissionDoesNotStopTheScanAndIsListed() throws Exception {
+        // 루트는 권한과 상관없이 읽으므로 일반 사용자로 돌 때(CI)만 확인한다
+        Assumptions.assumeFalse("root".equals(System.getProperty("user.name")));
+        writeHome("alice/nginx/app.conf", PROXY);
+        writeHome("bob/nginx/shop.conf", RAW);
+        writeHome("carol/nginx/secret.conf", RAW);
+        Path bob = HOME.resolve("bob");
+        Path secret = HOME.resolve("carol/nginx/secret.conf");
+        Files.setPosixFilePermissions(bob, PosixFilePermissions.fromString("---------"));
+        Files.setPosixFilePermissions(secret, PosixFilePermissions.fromString("---------"));
+        try {
+            mvc.perform(get("/sites/import").param("pattern", HOME + "/*/nginx/*.conf").with(user("ed").roles("ADMIN")))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(containsString(HOME + "/alice/nginx/app.conf")))
+                    .andExpect(content().string(containsString("권한이 없어 열지 못한 곳이 있습니다")))
+                    .andExpect(content().string(containsString("sudo nm import-root grant " + bob + " " + secret)));
+        } finally {
+            Files.setPosixFilePermissions(bob, PosixFilePermissions.fromString("rwx------"));
+            Files.setPosixFilePermissions(secret, PosixFilePermissions.fromString("rw-------"));
+        }
     }
 
     private static void writeHome(String relative, String content) {

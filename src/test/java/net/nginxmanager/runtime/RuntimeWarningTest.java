@@ -71,7 +71,7 @@ class RuntimeWarningTest extends ConfigRootTest {
         nginx.agent = new AgentInfo(true, "2.0.0", AgentNginxRuntime.PROTOCOL + 1, "not supported");
 
         mvc.perform(get("/").with(user("admin").roles("ADMIN")))
-                .andExpect(content().string(containsString("서로 맞지 않아")));
+                .andExpect(content().string(containsString("API 판이 맞지 않아")));
     }
 
     @Test
@@ -83,24 +83,22 @@ class RuntimeWarningTest extends ConfigRootTest {
     }
 
     @Test
-    void releaseVersionsAreCompared() {
+    void onlyTheAgentProtocolDecidesCompatibility() {
         AppVersion app = mock(AppVersion.class);
-        when(app.current()).thenReturn("1.0.0");
+        when(app.current()).thenReturn("1.2.0");
         FakeNginxRuntime runtime = new FakeNginxRuntime();
         RuntimeCompatibility compatibility = new RuntimeCompatibility(runtime, app);
 
-        runtime.agent = FakeNginxRuntime.connectedAgent("1.0.0");
+        runtime.agent = FakeNginxRuntime.connectedAgent("1.2.0");
         assertThat(compatibility.current()).isEmpty();
-        runtime.agent = FakeNginxRuntime.connectedAgent("v1.0.0");
-        assertThat(compatibility.current()).isEmpty();
-        runtime.agent = FakeNginxRuntime.connectedAgent("dev");
-        assertThat(compatibility.current()).as("development builds are not compared").isEmpty();
+        runtime.agent = FakeNginxRuntime.connectedAgent("1.1.0");
+        assertThat(compatibility.current()).as("manager만 올린 상태는 정상이다").isEmpty();
 
-        runtime.agent = FakeNginxRuntime.connectedAgent("0.9.0");
+        runtime.agent = new AgentInfo(true, "0.9.0", AgentNginxRuntime.MIN_AGENT_PROTOCOL - 1, null);
         assertThat(compatibility.current()).hasValueSatisfying(w -> {
-            assertThat(w.kind()).isEqualTo(RuntimeCompatibility.Kind.VERSION);
+            assertThat(w.kind()).isEqualTo(RuntimeCompatibility.Kind.PROTOCOL);
             assertThat(w.agentVersion()).isEqualTo("0.9.0");
-            assertThat(w.appVersion()).isEqualTo("1.0.0");
+            assertThat(w.appVersion()).isEqualTo("1.2.0");
         });
     }
 

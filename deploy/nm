@@ -1,0 +1,583 @@
+#!/bin/sh
+# nginx manager 운영 명령. 설치 디렉터리(이 파일이 있는 곳)에서 docker compose를 부른다.
+# 사용법은 `nm help`.
+set -eu
+
+REPO="${NGINX_MANAGER_REPO:-nginx-manager/app}"
+DIR="$(cd "$(dirname "$0")" && pwd)"
+WAIT_TIMEOUT="${NM_WAIT_TIMEOUT:-180}"
+
+say() { printf '%s\n' "$*"; }
+warn() { printf '%s\n' "$*" >&2; }
+die() { warn "오류: $*"; exit 1; }
+
+cd "$DIR"
+[ -f compose.yml ] || die "$DIR 에 compose.yml이 없습니다. 설치 디렉터리의 nm을 실행하세요"
+
+dc() { docker compose "$@"; }
+
+# 이미지 받기. 인터넷이 막힌 서버(이미지를 docker load로 넣어 둔 경우)와 시험에서는 NM_SKIP_PULL=1
+pull() { [ "${NM_SKIP_PULL:-0}" = 1 ] || dc pull -q "$@"; }
+
+# .env에서 값 하나를 읽는다(없으면 빈 값)
+env_get() {
+    [ -f .env ] || return 0
+    sed -n "s/^$1=//p" .env | tail -n1
+}
+
+# .env의 값 하나를 바꾸거나 더한다
+env_set() {
+    if grep -q "^$1=" .env 2>/dev/null; then
+        tmp=".env.tmp.$$"
+        awk -v k="$1" -v v="$2" 'BEGIN { FS = OFS = "=" } $1 == k { print k "=" v; next } { print }' .env > "$tmp"
+        cat "$tmp" > .env
+        rm -f "$tmp"
+    else
+        printf '%s=%s\n' "$1" "$2" >> .env
+    fi
+}
+
+fetch() { # url dest
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL "$1" -o "$2"
+    else
+        wget -qO "$2" "$1"
+    fi
+}
+
+latest_version() {
+    url="https://api.github.com/repos/$REPO/releases/latest"
+    if command -v curl >/dev/null 2>&1; then body="$(curl -fsSL "$url")"; else body="$(wget -qO- "$url")"; fi
+    printf '%s' "$body" | sed -n 's/.*"tag_name": *"v\{0,1\}\([^"]*\)".*/\1/p' | head -n1
+}
+
+# 동작 중인 nginx 컨테이너의 에이전트 API 판. 모르면 빈 값
+agent_protocol() {
+    dc exec -T nginx curl --noproxy '*' -fsS http://127.0.0.1:7070/healthz 2>/dev/null \
+        | sed -n 's/.*"protocol": *\([0-9][0-9]*\).*/\1/p'
+}
+
+# data/ 아래 파일은 컨테이너 사용자(UID 10101)의 것이고 개인 키는 600이다. 루트가 아니면 관리도구 이미지 안에서
+# 루트로 다룬다(Docker를 쓸 수 있으면 충분하다). 명령은 설치 디렉터리(/w)에서 실행한다
+as_root() {
+    if [ "$(id -u)" = 0 ]; then
+        sh -c "$1"
+    else
+        docker run --rm --user 0 --entrypoint sh -v "$DIR:/w" -w /w \
+            "ghcr.io/nginx-manager/app:$(env_get MANAGER_VERSION)" -c "$1"
+    fi
+}
+
+# 받은 묶음을 풀 임시 디렉터리에 준비한다. $1 = 버전(비우면 최신) 또는 --bundle 파일
+prepare_bundle() { # version bundle-file
+    work="$(mktemp -d)"
+    trap 'rm -rf "$work"' EXIT
+    if [ -n "$2" ]; then
+        [ -f "$2" ] || die "묶음 파일이 없습니다: $2"
+        cp "$2" "$work/bundle.tar.gz"
+    else
+        v="$1"
+        [ -n "$v" ] || v="$(latest_version)"
+        [ -n "$v" ] || die "최신 릴리스를 알아내지 못했습니다. 버전을 직접 주세요(nm upgrade 1.2.0)"
+        fetch "https://github.com/$REPO/releases/download/v${v#v}/nginx-manager.tar.gz" "$work/bundle.tar.gz" \
+            || die "v${v#v} 묶음을 받지 못했습니다"
+    fi
+    mkdir "$work/b"
+    tar -xzf "$work/bundle.tar.gz" -C "$work/b" --strip-components=1
+    [ -f "$work/b/bundle.env" ] || die "묶음에 bundle.env가 없습니다"
+    BUNDLE_DIR="$work/b"
+    # shellcheck disable=SC1091
+    . "$BUNDLE_DIR/bundle.env"
+}
+
+wait_healthy() { # service...
+    dc up -d --no-deps --wait --wait-timeout "$WAIT_TIMEOUT" "$@"
+}
+
+# ---------------------------------------------------------------- backup / restore
+
+cmd_backup() {
+    with_logs=0
+    keep="$(env_get NGINX_MANAGER_BACKUP_KEEP)"
+    label=""
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --with-logs) with_logs=1 ;;
+            --keep) shift; keep="$1" ;;
+            --label) shift; label="-$1" ;;
+            *) die "알 수 없는 옵션: $1" ;;
+        esac
+        shift
+    done
+    keep="${keep:-14}"
+    mkdir -p backups
+    need_kb="$(du -sk data/conf data/shared data/manager 2>/dev/null | awk '{ s += $1 } END { print s + 0 }')"
+    free_kb="$(df -Pk backups | awk 'NR == 2 { print $4 }')"
+    [ "$free_kb" -gt "$need_kb" ] || die "백업할 공간이 모자랍니다(필요 ${need_kb}KB, 남음 ${free_kb}KB)"
+
+    version="$(env_get MANAGER_VERSION)"
+    stamp="$(date +%Y%m%d-%H%M%S)"
+    bfile="backups/nginx-manager-${stamp}-v${version}${label}.tar.gz"
+    printf 'MANAGER_VERSION=%s\nNGINX_IMAGE=%s\nCREATED=%s\n' "$version" "$(env_get NGINX_IMAGE)" "$stamp" > manifest.env
+    set -- manifest.env .env data/conf data/shared data/manager
+    for f in compose.override.yml "$IMPORT_FILE"; do [ -f "$f" ] && set -- "$@" "$f"; done
+    [ "$with_logs" = 1 ] && set -- "$@" data/logs
+
+    # DB를 일관되게 복사하려고 manager만 잠깐 멈춘다. nginx는 계속 돈다
+    running="$(dc ps -q manager 2>/dev/null || true)"
+    [ -n "$running" ] && dc stop manager >/dev/null
+    rc=0
+    as_root "umask 077 && tar -czf '$bfile' $* && chown $(id -u):$(id -g) '$bfile'" || rc=$?
+    rm -f manifest.env
+    [ -n "$running" ] && dc start manager >/dev/null
+    [ "$rc" = 0 ] || { rm -f "$bfile"; die "백업을 만들지 못했습니다"; }
+    chmod 600 "$bfile"
+    say "백업: $DIR/$bfile"
+
+    # 오래된 백업 정리(업그레이드 전 백업도 같이 센다)
+    ls -1t backups/nginx-manager-*.tar.gz 2>/dev/null | tail -n +"$((keep + 1))" | while read -r old; do
+        rm -f "$old"
+    done
+    LAST_BACKUP="$bfile"
+}
+
+version_ge() { # a b: a >= b (x.y.z)
+    [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -n1)" = "$1" ]
+}
+
+cmd_restore() {
+    yes=0
+    file=""
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -y|--yes) yes=1 ;;
+            *) file="$1" ;;
+        esac
+        shift
+    done
+    [ -n "$file" ] && [ -f "$file" ] || die "복원할 백업 파일을 주세요: nm restore backups/<파일>"
+    # 컨테이너 안에서 풀 수 있게 설치 디렉터리 안의 상대 경로로 바꾼다
+    case "$file" in
+        "$DIR"/*) file="${file#"$DIR"/}" ;;
+        /*) mkdir -p backups && cp "$file" backups/ && file="backups/$(basename "$file")" ;;
+    esac
+    manifest="$(tar -xzOf "$file" manifest.env 2>/dev/null)" || die "nginx manager 백업 파일이 아닙니다"
+    from="$(printf '%s\n' "$manifest" | sed -n 's/^MANAGER_VERSION=//p')"
+    now="$(env_get MANAGER_VERSION)"
+    if ! version_ge "$now" "$from"; then
+        die "백업은 manager v$from 것이고 지금은 v$now 입니다. 먼저 nm upgrade $from 하세요(DB는 낮은 버전으로 되돌릴 수 없습니다)"
+    fi
+    if [ "$yes" != 1 ]; then
+        printf '지금 데이터를 %s 의 내용으로 바꿉니다. nginx가 잠깐 다시 시작합니다. 계속할까요? [y/N] ' "$file"
+        read -r answer
+        case "$answer" in y|Y|yes) ;; *) say "그만둡니다"; exit 1 ;; esac
+    fi
+    cmd_backup --label before-restore
+    dc stop manager nginx >/dev/null
+    as_root "rm -rf .restore && mkdir .restore && tar -xzf '$file' -C .restore \
+        && rm -rf data/conf data/shared data/manager && mv .restore/data/conf .restore/data/shared .restore/data/manager data/ \
+        && rm -rf .restore"
+    (umask 077 && tar -xzf "$file" -O .env > .env.restored 2>/dev/null) || true
+    wait_healthy nginx manager
+    say "복원했습니다($file, 백업 당시 manager v$from). 백업 당시의 .env는 .env.restored에 두었습니다"
+}
+
+# ---------------------------------------------------------------- upgrade
+
+cmd_upgrade() {
+    want=""
+    bundle=""
+    with_nginx=0
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --nginx) with_nginx=1 ;;
+            --bundle) shift; bundle="$1" ;;
+            -*) die "알 수 없는 옵션: $1" ;;
+            *) want="$1" ;;
+        esac
+        shift
+    done
+    prepare_bundle "$want" "$bundle"
+    old_manager="$(env_get MANAGER_VERSION)"
+    old_nginx="$(env_get NGINX_IMAGE)"
+
+    current_protocol="$(agent_protocol || true)"
+    need_nginx=0
+    if [ -n "$current_protocol" ] && { [ "$current_protocol" -lt "$BUNDLE_MIN_AGENT_PROTOCOL" ] || [ "$current_protocol" -gt "$BUNDLE_PROTOCOL" ]; }; then
+        need_nginx=1
+    fi
+    if [ "$need_nginx" = 1 ] && [ "$with_nginx" = 0 ]; then
+        die "manager v$BUNDLE_VERSION 은 지금 nginx 이미지($old_nginx, API $current_protocol)와 맞지 않습니다. nginx도 함께 올리세요: nm upgrade $BUNDLE_VERSION --nginx (nginx가 몇 초 다시 시작합니다)"
+    fi
+
+    cmd_backup --label "before-v$BUNDLE_VERSION"
+    rollback_backup="$LAST_BACKUP"
+
+    # 묶음 파일 바꾸기. .env와 compose.override.yml은 그대로 둔다
+    mkdir -p .previous
+    cp compose.yml nm bundle.env .previous/ 2>/dev/null || true
+    cp "$BUNDLE_DIR/compose.yml" compose.yml
+    cp "$BUNDLE_DIR/env.example" .env.example
+    cp "$BUNDLE_DIR/bundle.env" bundle.env
+    cp "$BUNDLE_DIR/README.md" README.md 2>/dev/null || true
+    add_missing_env "$BUNDLE_VERSION"
+
+    if [ "$old_manager" != "$BUNDLE_VERSION" ]; then
+        say "manager v$old_manager → v$BUNDLE_VERSION (nginx는 그대로 트래픽을 받습니다)"
+        env_set MANAGER_VERSION "$BUNDLE_VERSION"
+        pull manager
+        if ! wait_healthy manager; then
+            warn "새 manager가 healthy가 되지 않아 v$old_manager 로 되돌립니다. 마지막 로그:"
+            dc logs --tail 40 manager >&2 || true
+            env_set MANAGER_VERSION "$old_manager"
+            cp .previous/compose.yml compose.yml
+            dc stop manager >/dev/null || true
+            as_root "rm -rf .restore && mkdir .restore && tar -xzf '$rollback_backup' -C .restore \
+                && rm -rf data/manager && mv .restore/data/manager data/ && rm -rf .restore"
+            wait_healthy manager || true
+            die "업그레이드하지 못했습니다. v$old_manager 와 업그레이드 전 DB로 되돌렸습니다"
+        fi
+    else
+        say "manager는 이미 v$BUNDLE_VERSION 입니다"
+    fi
+    # 새 nm으로 바꾸는 것은 마지막에(지금 실행 중인 파일이다)
+    cp "$BUNDLE_DIR/nm" nm.new && chmod 755 nm.new && mv nm.new nm
+
+    if [ "$with_nginx" = 1 ] || [ "$need_nginx" = 1 ]; then
+        upgrade_nginx "$BUNDLE_NGINX_IMAGE"
+    elif [ "$old_nginx" != "$BUNDLE_NGINX_IMAGE" ]; then
+        say ""
+        say "nginx 이미지 업데이트가 있습니다: $old_nginx → $BUNDLE_NGINX_IMAGE"
+        say "nginx가 몇 초 다시 시작하므로 한가한 시간에: nm upgrade --nginx"
+    fi
+}
+
+# 새 묶음의 env.example에만 있는 키를 기본값으로 .env 끝에 더한다. 이미 있는 값은 건드리지 않는다
+add_missing_env() { # version
+    added="$(awk -F= 'NR == FNR { if ($0 ~ /^[A-Z_]+=/) have[$1] = 1; next }
+        /^[A-Z_]+=/ && !($1 in have) { print }' .env .env.example)"
+    [ -n "$added" ] || return 0
+    (umask 077 && printf '\n# v%s에서 더한 설정(기본값)\n%s\n' "$1" "$added" >> .env)
+    say ".env에 새 설정을 기본값으로 더했습니다:"
+    printf '%s\n' "$added" | sed 's/^/  /'
+}
+
+upgrade_nginx() { # image tag
+    tag="$1"
+    old="$(env_get NGINX_IMAGE)"
+    if [ "$old" = "$tag" ]; then
+        say "nginx 이미지는 이미 $tag 입니다"
+        return 0
+    fi
+    image="ghcr.io/nginx-manager/nginx:$tag"
+    say "nginx 이미지 $old → $tag: 먼저 받아 두고 지금 설정을 새 nginx로 검사합니다"
+    [ "${NM_SKIP_PULL:-0}" = 1 ] || docker pull -q "$image" >/dev/null
+    # nginx와 같은 사용자(UID 10101)로 검사해 로그 파일이 루트 것으로 생기지 않게 한다
+    if ! docker run --rm --user 10101:10101 --entrypoint nginx \
+            -v "$DIR/data/conf:/etc/nginx:ro" -v "$DIR/data/shared:/var/lib/nginx-manager:ro" \
+            -v "$DIR/data/logs:/var/log/nginx" --tmpfs /run/nginx:uid=10101 "$image" -t; then
+        die "새 nginx($tag)가 지금 설정을 받아들이지 않아 바꾸지 않았습니다. 위 오류의 파일을 고친 뒤 다시 하세요"
+    fi
+    env_set NGINX_IMAGE "$tag"
+    if ! wait_healthy nginx; then
+        warn "새 nginx가 healthy가 되지 않아 $old 로 되돌립니다"
+        env_set NGINX_IMAGE "$old"
+        wait_healthy nginx || true
+        die "nginx 이미지를 바꾸지 못했습니다"
+    fi
+    say "nginx 이미지를 $tag 로 바꿨습니다"
+}
+
+# ---------------------------------------------------------------- migrate
+
+cmd_migrate() {
+    project=""
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --from) shift; project="$1" ;;
+            *) die "알 수 없는 옵션: $1" ;;
+        esac
+        shift
+    done
+    if [ -z "$project" ]; then
+        found="$(docker volume ls -q --filter name=nm-conf | sed -n 's/_nm-conf$//p')"
+        count="$(printf '%s\n' "$found" | grep -c . || true)"
+        if [ "$count" != 1 ]; then
+            warn "옮길 v1.0·v1.1 볼륨을 하나로 정하지 못했습니다. 찾은 프로젝트:"
+            printf '  %s\n' $found >&2
+            die "nm migrate --from <프로젝트 이름> 으로 정하세요"
+        fi
+        project="$found"
+    fi
+    for v in nm-conf nm-logs nm-shared nm-data; do
+        docker volume inspect "${project}_$v" >/dev/null 2>&1 || die "볼륨 ${project}_$v 이 없습니다"
+    done
+    if [ -n "$(ls -A data/manager 2>/dev/null)" ]; then
+        die "data/manager가 비어 있지 않습니다. 새 설치 디렉터리에서만 옮길 수 있습니다"
+    fi
+    say "옛 컨테이너를 멈추고 ${project}_nm-* 볼륨을 data/로 복사합니다(옛 볼륨은 지우지 않습니다)"
+    dc down >/dev/null 2>&1 || true
+    old_containers="$(docker ps -q --filter "volume=${project}_nm-conf")"
+    [ -n "$old_containers" ] && docker stop $old_containers >/dev/null
+    image="ghcr.io/nginx-manager/app:$(env_get MANAGER_VERSION)"
+    pull
+    for pair in nm-conf:conf nm-logs:logs nm-shared:shared nm-data:manager; do
+        vol="${pair%%:*}"
+        dst="${pair#*:}"
+        mkdir -p "data/$dst"
+        docker run --rm --user 0 --entrypoint sh -v "${project}_$vol:/from:ro" -v "$DIR/data/$dst:/to" "$image" \
+            -c 'cp -a /from/. /to/'
+    done
+    wait_healthy nginx manager
+    say "옮겼습니다. 확인한 뒤 옛 볼륨을 지우려면:"
+    say "  docker volume rm ${project}_nm-conf ${project}_nm-logs ${project}_nm-shared ${project}_nm-data"
+}
+
+# ---------------------------------------------------------------- import-root
+
+# 설정 파일 가져오기에서 찾을 호스트 디렉터리. 두 컨테이너에 같은 경로로 읽기 전용으로 붙인다:
+# manager는 파일을 찾아 읽고, nginx는 가져온 설정이 가리키는 root·ssl_certificate·include를 읽는다
+IMPORT_FILE=compose.import.yml
+APP_UID=10101
+
+import_roots() { env_get NGINX_MANAGER_IMPORT_ROOTS | tr ',' '\n' | sed '/^$/d'; }
+
+# compose.import.yml을 다시 쓰고, docker compose가 그 파일과 compose.override.yml을 함께 읽게 한다
+write_import_compose() {
+    roots="$(import_roots)"
+    if [ -z "$roots" ]; then
+        rm -f "$IMPORT_FILE"
+    else
+        {
+            echo "# nm import-root가 만든다. 고치지 말고 nm import-root add/remove를 쓴다"
+            echo "services:"
+            for svc in manager nginx; do
+                echo "  $svc:"
+                echo "    volumes:"
+                printf '%s\n' "$roots" | while read -r r; do echo "      - \"$r:$r:ro\""; done
+            done
+        } > "$IMPORT_FILE"
+    fi
+    sync_compose_files
+}
+
+# .env의 COMPOSE_FILE을 있는 파일에 맞춘다(compose.import.yml이 없으면 지운다)
+sync_compose_files() {
+    if [ -f "$IMPORT_FILE" ]; then
+        files="compose.yml:$IMPORT_FILE"
+        [ -f compose.override.yml ] && files="$files:compose.override.yml"
+        [ "$(env_get COMPOSE_FILE)" = "$files" ] || env_set COMPOSE_FILE "$files"
+    elif grep -q '^COMPOSE_FILE=' .env 2>/dev/null; then
+        tmp=".env.tmp.$$"
+        grep -v '^COMPOSE_FILE=' .env > "$tmp" || true
+        cat "$tmp" > .env
+        rm -f "$tmp"
+    fi
+}
+
+cmd_import_root() {
+    sub="${1:-list}"
+    [ $# -gt 0 ] && shift
+    case "$sub" in
+        list)
+            roots="$(import_roots)"
+            if [ -z "$roots" ]; then
+                say "붙인 디렉터리가 없습니다(/etc/nginx 안만 찾습니다). 붙이려면: nm import-root add /home"
+            else
+                say "설정 파일 가져오기에서 찾는 호스트 디렉터리(두 컨테이너에 같은 경로, 읽기 전용):"
+                printf '%s\n' "$roots" | sed 's/^/  /'
+            fi
+            ;;
+        add|remove)
+            [ $# -gt 0 ] || die "디렉터리를 주세요: nm import-root $sub /home"
+            roots="$(import_roots)"
+            for d in "$@"; do
+                d="${d%/}"
+                case "$d" in /*) ;; *) die "절대 경로를 주세요: $d" ;; esac
+                case "$d" in
+                    /|/etc|/etc/*|/proc*|/sys*|/dev*|/var/lib/docker*|"$DIR"|"$DIR"/*) die "$d 는 붙일 수 없습니다" ;;
+                esac
+                if [ "$sub" = add ]; then
+                    [ -d "$d" ] || die "디렉터리가 없습니다: $d"
+                    printf '%s\n' "$roots" | grep -qxF "$d" || roots="$(printf '%s\n%s\n' "$roots" "$d" | sed '/^$/d')"
+                else
+                    roots="$(printf '%s\n' "$roots" | grep -vxF "$d" || true)"
+                fi
+            done
+            env_set NGINX_MANAGER_IMPORT_ROOTS "$(printf '%s\n' "$roots" | sed '/^$/d' | paste -sd, -)"
+            write_import_compose
+            say "nginx와 manager를 다시 띄웁니다(nginx는 몇 초 끊깁니다)"
+            wait_healthy nginx manager
+            action="$sub"
+            cmd_import_root list
+            if [ "$action" = add ]; then
+                say ""
+                import_check || true
+            fi
+            ;;
+        check) import_check "$@" ;;
+        sync) write_import_compose ;;
+        grant) import_grant "$@" ;;
+        *) die "nm import-root [list|add 디렉터리...|remove 디렉터리...|check [패턴]|grant 경로...]" ;;
+    esac
+}
+
+# 컨테이너 사용자(UID 10101)가 패턴에 맞는 파일과, 그 파일이 가리키는 경로를 읽을 수 있는지 본다
+import_check() {
+    roots="$(import_roots)"
+    [ -n "$roots" ] || die "붙인 디렉터리가 없습니다. 먼저 nm import-root add /home"
+    pattern="${1:-}"
+    image="ghcr.io/nginx-manager/app:$(env_get MANAGER_VERSION)"
+    mounts=""
+    for r in $roots; do mounts="$mounts -v $r:$r:ro"; done
+    if [ -z "$pattern" ]; then
+        list_cmd='for r in '"$(printf '%s ' $roots)"'; do find "$r" -maxdepth 4 -name "*.conf" -type f 2>/dev/null; done'
+    else
+        list_cmd='for f in '"$pattern"'; do [ -f "$f" ] && echo "$f"; done'
+    fi
+    # 루트로 파일과 그 안의 경로(root, alias, ssl_certificate(_key), include)를 모은다
+    # shellcheck disable=SC2086
+    targets="$(docker run --rm --user 0 --entrypoint sh $mounts "$image" -c "
+        $list_cmd | head -n 200 | while read -r f; do
+            echo \"\$f\"
+            grep -oE '(^|[^[:alnum:]_])(root|alias|ssl_certificate|ssl_certificate_key|ssl_trusted_certificate|include)[[:space:]]+/[^;[:space:]]*' \"\$f\" | awk '{ print \$NF }'
+        done | sort -u")"
+    if [ -z "$targets" ]; then
+        say "맞는 파일이 없습니다${pattern:+: $pattern}"
+        return 0
+    fi
+    # 그중 붙인 디렉터리 안의 것을 UID 10101로 읽어 본다
+    inside="$(printf '%s\n' "$targets" | while read -r t; do
+        for r in $roots; do case "$t" in "$r"/*) echo "$t"; break ;; esac; done
+    done)"
+    outside="$(printf '%s\n' "$targets" | while read -r t; do
+        hit=0
+        for r in $roots /etc/nginx /var/lib/nginx-manager /var/log/nginx; do case "$t" in "$r"|"$r"/*) hit=1 ;; esac; done
+        case "$t" in *'*'*|*'$'*) hit=1 ;; esac
+        [ "$hit" = 1 ] || echo "$t"
+    done)"
+    # shellcheck disable=SC2086
+    denied="$(printf '%s\n' "$inside" | docker run --rm -i --user "$APP_UID:$APP_UID" --entrypoint sh $mounts "$image" -c '
+        while read -r t; do
+            if [ -d "$t" ]; then [ -r "$t" ] && [ -x "$t" ] || echo "$t"
+            elif [ -e "$t" ]; then [ -r "$t" ] || echo "$t"
+            else d="$(dirname "$t")"; [ -x "$d" ] 2>/dev/null || echo "$t"
+            fi
+        done')"
+    count="$(printf '%s\n' "$targets" | grep -c . || true)"
+    say "파일과 그 안의 경로 ${count}개를 UID $APP_UID 로 확인했습니다"
+    if [ -n "$outside" ]; then
+        warn ""
+        warn "붙인 디렉터리 밖이라 컨테이너에서 보이지 않는 경로(가져온 뒤 적용할 때 nginx -t가 실패합니다):"
+        printf '%s\n' "$outside" | sed 's/^/  /' >&2
+        warn "그 디렉터리도 붙이세요: nm import-root add <디렉터리>"
+    fi
+    if [ -n "$denied" ]; then
+        warn ""
+        warn "UID $APP_UID 가 읽지 못하는 경로:"
+        printf '%s\n' "$denied" | sed 's/^/  /' >&2
+        warn "읽기 권한을 주려면(홈 디렉터리의 다른 권한은 그대로 둡니다):"
+        warn "  sudo $DIR/nm import-root grant $(printf '%s\n' "$denied" | paste -sd' ' -)"
+        return 1
+    fi
+    [ -n "$outside" ] && return 1
+    say "모두 읽을 수 있습니다"
+}
+
+# ACL로 UID 10101에게 읽기만 준다. 디렉터리는 안의 것과 나중에 생길 것까지, 위쪽 디렉터리는 지나가기(x)만
+import_grant() {
+    [ $# -gt 0 ] || die "경로를 주세요: nm import-root grant /home/alice/nginx"
+    [ "$(id -u)" = 0 ] || die "권한을 바꾸려면 sudo로 실행하세요"
+    command -v setfacl >/dev/null 2>&1 || die "setfacl이 없습니다. acl 패키지를 설치하세요(apt install acl / dnf install acl). 또는 chmod로 다른 사용자에게 읽기를 열어 줍니다(chmod o+rX)"
+    for p in "$@"; do
+        [ -e "$p" ] || die "없는 경로입니다: $p"
+        case "$p" in /*) ;; *) die "절대 경로를 주세요: $p" ;; esac
+        if [ -d "$p" ]; then
+            setfacl -R -m "u:$APP_UID:rX" "$p" && find "$p" -type d -exec setfacl -d -m "u:$APP_UID:rX" {} + \
+                || die "$p 에 ACL을 줄 수 없습니다(ACL을 지원하지 않는 파일시스템일 수 있습니다). chmod -R o+rX $p 로 대신할 수 있습니다"
+        else
+            setfacl -m "u:$APP_UID:r" "$p" || die "$p 에 ACL을 줄 수 없습니다. chmod o+r $p 로 대신할 수 있습니다"
+        fi
+        d="$(dirname "$p")"
+        while [ "$d" != / ]; do
+            setfacl -m "u:$APP_UID:x" "$d" 2>/dev/null || true
+            d="$(dirname "$d")"
+        done
+        say "읽기 권한을 줬습니다: $p"
+    done
+    say "관리 화면에서 다시 검사하세요"
+}
+
+# ---------------------------------------------------------------- 그 밖
+
+cmd_status() {
+    dc ps
+    say ""
+    cmd_version_local
+    domain="$(env_get NGINX_MANAGER_ADMIN_DOMAIN)"
+    if [ -n "$domain" ]; then
+        say "관리 화면: https://$domain (그리고 $(local_url))"
+    else
+        say "관리 화면: $(local_url) (관리 도메인 없음)"
+    fi
+}
+
+local_url() {
+    addr="$(env_get NGINX_MANAGER_BIND_ADDRESS)"
+    printf 'http://%s:%s' "${addr:-127.0.0.1}" "$(env_get NGINX_MANAGER_PORT | sed 's/^$/9000/')"
+}
+
+cmd_version_local() {
+    say "manager: v$(env_get MANAGER_VERSION)"
+    say "nginx 이미지: $(env_get NGINX_IMAGE)"
+}
+
+cmd_version() {
+    cmd_version_local
+    latest="$(latest_version 2>/dev/null || true)"
+    [ -n "$latest" ] && say "최신 릴리스: v$latest"
+    return 0
+}
+
+usage() {
+    cat <<'EOF'
+nginx manager 운영 명령
+
+  nm status                       컨테이너 상태와 버전, 관리 화면 주소
+  nm version                      설치된 버전과 최신 릴리스
+  nm logs [manager|nginx]         로그 보기(따라가기)
+  nm restart [manager|nginx]      다시 띄우기(기본 manager. .env를 바꾼 뒤)
+  nm upgrade [버전] [--nginx]      manager를 올린다(nginx는 끊기지 않음). --nginx면 nginx 이미지도
+             [--bundle 파일]       인터넷이 막힌 서버에서 미리 받은 묶음으로
+  nm backup [--with-logs] [--keep N]   설정·인증서·DB를 backups/에 묶는다(nginx는 계속 돈다)
+  nm restore <파일> [-y]          백업으로 되돌린다
+  nm migrate [--from 프로젝트]     v1.0·v1.1(이름 붙은 볼륨)에서 옮겨 온다
+  nm import-root add 디렉터리      설정 파일 가져오기에서 찾을 호스트 디렉터리(/home 등)를 두 컨테이너에 같은 경로로 붙인다
+  nm import-root check [패턴]      컨테이너 사용자(UID 10101)가 그 파일들을 읽을 수 있는지 본다
+  nm import-root grant 경로...     ACL로 읽기 권한만 준다(sudo)
+  nm import-root remove 디렉터리   붙인 디렉터리를 뗀다
+EOF
+}
+
+# compose.override.yml을 나중에 만들었어도 docker compose가 읽게 한다
+[ -f "$IMPORT_FILE" ] && sync_compose_files
+
+cmd="${1:-help}"
+[ $# -gt 0 ] && shift
+case "$cmd" in
+    status) cmd_status ;;
+    version) cmd_version ;;
+    logs) dc logs -f --tail 200 "$@" ;;
+    restart)
+        svc="${1:-manager}"
+        wait_healthy "$svc"
+        ;;
+    up) dc up -d --wait --wait-timeout "$WAIT_TIMEOUT" ;;
+    upgrade) cmd_upgrade "$@" ;;
+    backup) cmd_backup "$@" ;;
+    restore) cmd_restore "$@" ;;
+    migrate) cmd_migrate "$@" ;;
+    import-root) cmd_import_root "$@" ;;
+    help|-h|--help) usage ;;
+    *) usage; exit 1 ;;
+esac

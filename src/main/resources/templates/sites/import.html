@@ -82,6 +82,10 @@
         <p class="error" th:if="${v.scan.errorKey}" th:text="#{${v.scan.errorKey}(${v.scan.errorArg})}">오류</p>
         <p class="muted" th:if="${v.scan.errorKey == null and #lists.isEmpty(v.rows)}" th:text="#{import.scan.none}">맞는 파일이 없습니다.</p>
         <p class="hint" th:if="${v.scan.truncated}" th:text="#{import.scan.truncated}">너무 많아 일부만 보입니다.</p>
+        <div class="warning" th:unless="${#lists.isEmpty(v.scan.denied)}">
+            <p th:text="#{import.scan.denied}">권한이 없어 열지 못한 곳이 있습니다.</p>
+            <pre><code th:text="${'sudo nm import-root grant ' + #strings.listJoin(v.scan.denied, ' ')}">sudo nm import-root grant /home/alice</code></pre>
+        </div>
         <form th:unless="${#lists.isEmpty(v.rows)}" th:action="@{/sites/import/bulk}" method="post">
             <table>
                 <thead>

@@ -1,5 +1,6 @@
 package net.nginxmanager.site;
 
+import net.nginxmanager.admin.AdminDomainProperties;
 import net.nginxmanager.apply.ApplyLock;
 import net.nginxmanager.audit.AuditAction;
 import net.nginxmanager.audit.AuditEvent;
@@ -46,8 +47,9 @@ public class SiteService {
                        ConfigFileStore store, SiteRendering rendering, CertificateRegistry certificateRegistry,
                        ApplicationEventPublisher events, ApplyLock applyLock, TransactionTemplate tx,
                        List<OtherTcpPorts> otherTcpPorts, SiteReconciler reconciler, SiteImporter importer,
-                       UserRepository userRepository) {
+                       UserRepository userRepository, AdminDomainProperties adminDomain) {
         this.userRepository = userRepository;
+        this.adminDomain = adminDomain;
         this.siteRepository = siteRepository;
         this.configFileRepository = configFileRepository;
         this.store = store;
@@ -60,6 +62,8 @@ public class SiteService {
         this.reconciler = reconciler;
         this.importer = importer;
     }
+
+    private final AdminDomainProperties adminDomain;
 
     private <T> T locked(Supplier<T> work) {
         return applyLock.withLock(() -> tx.execute(status -> work.get()));
@@ -567,6 +571,10 @@ public class SiteService {
                     taken.add(extra.toLowerCase(Locale.ROOT));
                 }
             }
+        }
+        if (adminDomain.enabled()) {
+            // 관리 화면이 쓰는 도메인(.env의 NGINX_MANAGER_ADMIN_DOMAIN)
+            taken.add(adminDomain.domain());
         }
         for (String domain : domains) {
             if (taken.contains(domain.toLowerCase(Locale.ROOT))) {

@@ -22,7 +22,8 @@ on:
         default: false
 
 permissions:
-  contents: read
+  # 설치 묶음을 GitHub Release에 첨부한다
+  contents: write
   packages: write
   issues: write
 
@@ -138,6 +139,22 @@ jobs:
             docker push "$APP_IMAGE:$app"
             docker push "$APP_IMAGE:latest"
           fi
+
+      # 설치 묶음(compose.yml, .env.example, nm)과 install.sh를 그 릴리스에 첨부한다(008).
+      # nginx만 다시 빌드한 날에도 묶음의 권장 nginx 이미지를 새 태그로 바꿔 올린다(`nm upgrade`가 알린다)
+      - name: Attach install bundle
+        if: steps.versions.outputs.skip != 'true' && steps.existing.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          app="${{ steps.versions.outputs.app }}"
+          deploy/build-bundle.sh "$app" "${{ steps.versions.outputs.tag }}" bundle-out
+          if ! gh release view "v$app" > /dev/null 2>&1; then
+            notes="docs/releases/v$app.md"
+            [ -f "$notes" ] || notes=/dev/null
+            gh release create "v$app" --verify-tag --title "v$app" --notes-file "$notes"
+          fi
+          gh release upload "v$app" bundle-out/nginx-manager.tar.gz bundle-out/install.sh --clobber
 
       - name: Open an issue when the build fails
         if: failure()
