@@ -35,12 +35,25 @@ public final class RawHttps {
             }
             return false;
         }
+
+        /** 80 포트를 듣는지. listen이 없으면 nginx 기본값인 80으로 본다. */
+        boolean listensPort80() {
+            Matcher m = LISTEN.matcher(withoutComments(text));
+            boolean any = false;
+            while (m.find()) {
+                any = true;
+                if (PORT_80.matcher(m.group(2).trim().split("\\s+")[0]).matches()) {
+                    return true;
+                }
+            }
+            return !any;
+        }
     }
 
     private RawHttps() {
     }
 
-    /** HTTP(ssl이 아닌) server 블록의 server_name. 와일드카드·정규식·"_"는 뺀다. */
+    /** 80 포트를 듣는 HTTP(ssl이 아닌) server 블록의 server_name. 와일드카드·정규식·"_"는 뺀다. */
     public static List<String> domains(String content) {
         Set<String> names = new LinkedHashSet<>();
         for (Block block : httpBlocks(content)) {
@@ -57,7 +70,7 @@ public final class RawHttps {
         return List.copyOf(names);
     }
 
-    /** 인증 경로가 없는 HTTP server 블록마다 맨 앞에 인증 경로를 더한다. 이미 있으면 그대로 돌려준다. */
+    /** 인증 경로가 없는 80 포트 HTTP server 블록마다 맨 앞에 인증 경로를 더한다. 인증 요청은 80으로만 온다. 이미 있으면 그대로 돌려준다. */
     public static String withAcmeChallenge(String content) {
         StringBuilder out = new StringBuilder(content);
         List<Block> blocks = httpBlocks(content);
@@ -81,7 +94,7 @@ public final class RawHttps {
     }
 
     /**
-     * 첫 HTTP server 블록을 본떠 443 server 블록을 그 뒤에 더한다. listen만 443 ssl로 바꾸고 인증서 경로를 넣는다.
+     * 80 포트를 듣는 첫 HTTP server 블록을 본떠 443 server 블록을 그 뒤에 더한다. listen만 443 ssl로 바꾸고 인증서 경로를 넣는다.
      * HTTPS server 블록이 이미 있거나 HTTP server 블록이 없으면 그대로 돌려준다.
      */
     public static String withHttps(String content, String certPath, String keyPath) {
@@ -155,8 +168,9 @@ public final class RawHttps {
         return block.substring(0, open) + "\n" + indent(block) + lines + block.substring(open);
     }
 
+    /** 80 포트를 듣는 HTTP server 블록. 다른 포트(예: 9000)를 듣는 블록은 인증서 발급과 상관없다. */
     private static List<Block> httpBlocks(String content) {
-        return serverBlocks(content).stream().filter(b -> !b.listensSsl()).toList();
+        return serverBlocks(content).stream().filter(b -> !b.listensSsl() && b.listensPort80()).toList();
     }
 
     /** 맨 바깥(또는 http { } 바로 안)의 server 블록. 주석과 따옴표 안의 괄호는 세지 않는다. */

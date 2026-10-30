@@ -7,7 +7,9 @@
     <div class="title-row">
         <h1 th:text="#{versions.detail.title(${'' + version.id})}">버전 #3</h1>
         <span class="badge" th:classappend="${version.snapshot ? 'ok' : 'bad'}" th:text="#{|enum.VersionResult.${version.result.name()}|}">적용됨</span>
+        <a class="button secondary" th:if="${domain}" th:href="@{/versions(domain=${domain})}" th:text="#{versions.site.back(${domain})}">app.local 이력으로</a>
     </div>
+    <p class="hint" th:if="${domain}" th:text="#{versions.site.filesOnly(${domain})}">app.local 사이트의 파일만 보입니다.</p>
 
     <section class="card result" th:if="${param.unchanged}">
         <p th:text="#{versions.detail.unchanged}">서버의 설정이 이미 이 버전과 같아 바꿀 것이 없습니다.</p>
@@ -44,12 +46,12 @@
             </dd>
             <dt th:text="#{versions.detail.message}">메모</dt><dd th:text="${version.message ?: '-'}">메모</dd>
         </dl>
-        <form th:if="${version.snapshot and currentUser.canEdit()}" th:action="@{/versions/{id}/rollback(id=${version.id})}"
+        <form th:if="${version.snapshot and currentUser.isAdmin()}" th:action="@{/versions/{id}/rollback(id=${version.id})}"
               method="post" class="actions">
             <button type="submit" th:text="#{versions.detail.rollback}">이 버전으로 되돌리기</button>
             <span class="muted small" th:text="#{versions.detail.rollback.note}">적용과 같이 문법 검증 → reload → 상태 확인을 거칩니다.</span>
         </form>
-        <p class="hint" th:if="${version.snapshot and currentUser.canEdit()}" th:text="#{versions.detail.rollback.hint}">이 버전의 파일 내용으로 서버 설정을 바꾸고, 그 결과를 새 버전으로 기록합니다. 기존 이력은 지워지지 않으며, 적용 대기 중인 초안이 있으면 되돌릴 수 없습니다.</p>
+        <p class="hint" th:if="${version.snapshot and currentUser.isAdmin()}" th:text="#{versions.detail.rollback.hint}">이 버전의 파일 내용으로 서버 설정을 바꾸고, 그 결과를 새 버전으로 기록합니다. 기존 이력은 지워지지 않으며, 적용 대기 중인 초안이 있으면 되돌릴 수 없습니다.</p>
     </section>
 
     <section class="card">

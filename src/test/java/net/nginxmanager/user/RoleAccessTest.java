@@ -45,7 +45,7 @@ class RoleAccessTest extends ConfigRootTest {
             "POST, /streams/new,         ADMIN",
             "GET,  /apply,               MEMBER",
             "POST, /apply,               MEMBER",
-            "GET,  /versions,            ADMIN",
+            "GET,  /versions,            MEMBER",
             "POST, /versions/1/rollback, ADMIN",
             "POST, /drift/import,        ADMIN",
             "GET,  /users,               ADMIN",

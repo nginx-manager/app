@@ -95,4 +95,32 @@ class RawHttpsTest {
         assertThat(RawHttps.serverBlocks(content)).hasSize(1);
         assertThat(RawHttps.serverBlocks(content).getFirst().text()).endsWith("\"}\";\n}");
     }
+
+    static final String TWO_PORTS = """
+            server {
+                listen 80;
+                server_name storage.example.com;
+                location / { proxy_pass http://minio_console; }
+            }
+
+            server {
+                listen 9000;
+                listen [::]:9000;
+                server_name s3.example.com;
+                location / { proxy_pass http://minio_s3; }
+            }
+            """;
+
+    @Test
+    void onlyServerBlocksListeningOnPort80GetTheChallengePathAndCertificate() {
+        String acme = RawHttps.withAcmeChallenge(TWO_PORTS);
+
+        assertThat(acme.split("acme-challenge", -1)).hasSize(2);
+        assertThat(acme.indexOf("acme-challenge")).isLessThan(acme.indexOf("listen 9000;"));
+        assertThat(RawHttps.domains(TWO_PORTS)).containsExactly("storage.example.com");
+
+        String https = RawHttps.withHttps(acme, "/c.pem", "/k.pem");
+        assertThat(https).contains("listen 9000;").contains("listen [::]:9000;");
+        assertThat(https.indexOf("listen 443 ssl;")).isLessThan(https.indexOf("listen 9000;"));
+    }
 }
