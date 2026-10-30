@@ -319,6 +319,40 @@ class ImageModuleOptionsTest {
         assertThat(status("worker.local")).isEqualTo("200");
     }
 
+    @Test
+    @DisplayName("사용자 지정 헤더(022): 응답 헤더가 붙고, 백엔드는 바꾼 Host와 더한 헤더를 받는다")
+    void customHeadersReachTheClientAndTheBackend() throws Exception {
+        // 백엔드(8089)는 받은 요청 헤더를 응답 헤더로 되돌려 준다
+        createStatic("echo.local", "/etc/nginx/html", Map.of("listenHttpPort", "8089",
+                "options.responseHeaders", "X-Seen-Tenant: $http_x_tenant\nX-Seen-Host: $host"));
+        create("headers.local", "PROXY", Map.of("proxyTarget", "http://127.0.0.1:8089",
+                "options.requestHeaders", "Host: echo.local\nX-Tenant: acme",
+                "options.responseHeaders", "Access-Control-Allow-Origin: *\nContent-Security-Policy: default-src 'self'; img-src *"));
+        apply("custom headers");
+
+        awaitStatus("headers.local", "200");
+        String headers = stack.nginxExec("curl", "--noproxy", "*", "-s", "-o", "/dev/null", "-D", "-",
+                "-H", "Host: headers.local", "http://127.0.0.1/").getStdout();
+        assertThat(headers).containsIgnoringCase("Access-Control-Allow-Origin: *")
+                .containsIgnoringCase("Content-Security-Policy: default-src 'self'; img-src *")
+                .containsIgnoringCase("X-Seen-Tenant: acme")
+                .containsIgnoringCase("X-Seen-Host: echo.local");
+    }
+
+    @Test
+    @DisplayName("대표 도메인으로 모으기(023): 추가 도메인은 경로를 유지해 301, 대표 도메인은 내용")
+    void extraDomainsRedirectToThePrimaryDomain() throws Exception {
+        createStatic("canon.local", "/etc/nginx/html", Map.of("extraDomains", "www.canon.local",
+                "options.redirectToPrimary", "true"));
+        apply("primary domain");
+
+        awaitStatus("www.canon.local", "301");
+        String headers = stack.nginxExec("curl", "--noproxy", "*", "-s", "-o", "/dev/null", "-D", "-",
+                "-H", "Host: www.canon.local", "http://127.0.0.1/a/b?c=1").getStdout();
+        assertThat(headers).containsIgnoringCase("Location: http://canon.local/a/b?c=1");
+        assertThat(status("canon.local")).isEqualTo("200");
+    }
+
     private static void createStatic(String domain, String root, Map<String, String> fields) throws Exception {
         Map<String, String> all = new LinkedHashMap<>(Map.of("staticRoot", root));
         all.putAll(fields);

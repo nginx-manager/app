@@ -5,6 +5,7 @@
 <nav th:replace="~{fragments/layout :: nav}"></nav>
 <main class="page">
     <h1 th:text="#{sites.form.title}">사이트 추가</h1>
+    <p class="notice" th:if="${copiedFrom}" th:text="#{sites.form.copied(${copiedFrom})}">app.local의 설정을 복사했습니다.</p>
     <div class="columns">
         <section class="card">
             <form th:action="@{/sites/new}" th:object="${form}" method="post" id="site-form">
@@ -18,6 +19,8 @@
                     <input type="text" th:field="*{extraDomains}" placeholder="www.app.example.com">
                     <span class="error" th:errors="*{extraDomainsValid}"></span>
                 </label>
+                <label class="inline"><input type="checkbox" th:field="*{options.redirectToPrimary}" value="true"> <th:block th:text="#{sites.opt.redirectToPrimary}">추가 도메인을 대표 도메인으로 보내기</th:block></label>
+                <p class="hint" th:text="#{sites.opt.redirectToPrimary.hint}">설명</p>
                 <fieldset>
                     <legend th:text="#{sites.field.type}">유형</legend>
                     <label class="inline"><input type="radio" th:field="*{type}" value="PROXY"> <th:block th:text="#{sites.field.type.PROXY}">리버스 프록시</th:block></label>

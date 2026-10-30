@@ -39,6 +39,9 @@ import java.util.regex.Pattern;
  * @param maintenance 점검 모드(021). 사이트 내용 요청에 503과 안내 페이지를 준다
  * @param maintenanceMessage 점검 안내 문구. 비우면 기본 문구
  * @param maintenanceAllowFrom 점검 중에도 평소처럼 들어올 수 있는 주소(작업자)
+ * @param responseHeaders 응답에 붙일 헤더(022). 줄마다 "이름: 값"
+ * @param requestHeaders 백엔드로 보낼 헤더(022). 줄마다 "이름: 값". 리버스 프록시에서만 쓴다
+ * @param redirectToPrimary 추가 도메인으로 온 요청을 대표 도메인으로 301 보낸다(023)
  */
 public record SiteOptions(
         Boolean gzip,
@@ -74,11 +77,14 @@ public record SiteOptions(
         Integer upstreamKeepalive,
         Boolean maintenance,
         String maintenanceMessage,
-        String maintenanceAllowFrom) {
+        String maintenanceAllowFrom,
+        String responseHeaders,
+        String requestHeaders,
+        Boolean redirectToPrimary) {
 
     public static final SiteOptions DEFAULTS = new SiteOptions(false, false, false, false, null, null, null, null,
             false, null, null, null, null, null, null, false, null, null, null, null, null, null, null, false, null,
-            null);
+            null, null, null, false);
 
     /** 점검 안내 문구에 쓸 수 없는 문자: nginx 문자열('…')과 변수를 깨뜨린다. */
     private static final Pattern MAINTENANCE_FORBIDDEN = Pattern.compile("['\\\\${}]");
@@ -117,6 +123,27 @@ public record SiteOptions(
         backupTargets = backupTargets == null || backupTargets.isBlank() ? null : backupTargets;
         maintenance = maintenance != null && maintenance;
         maintenanceMessage = maintenanceMessage == null || maintenanceMessage.isBlank() ? null : maintenanceMessage.strip();
+        responseHeaders = responseHeaders == null || responseHeaders.isBlank() ? null : responseHeaders;
+        requestHeaders = requestHeaders == null || requestHeaders.isBlank() ? null : requestHeaders;
+        redirectToPrimary = redirectToPrimary != null && redirectToPrimary;
+    }
+
+    public List<CustomHeader> responseHeaderList() {
+        return CustomHeader.parse(responseHeaders);
+    }
+
+    public List<CustomHeader> requestHeaderList() {
+        return CustomHeader.parse(requestHeaders);
+    }
+
+    @AssertTrue(message = "{msg.validation.headers}")
+    public boolean isResponseHeadersValid() {
+        return CustomHeader.valid(responseHeaders, false);
+    }
+
+    @AssertTrue(message = "{msg.validation.requestHeaders}")
+    public boolean isRequestHeadersValid() {
+        return CustomHeader.valid(requestHeaders, true);
     }
 
     public List<String> maintenanceAllowList() {
@@ -219,7 +246,16 @@ public record SiteOptions(
                 rateLimit == null ? null : rateBurst, connLimit, normalized(realIpFrom), realIpHeader, cacheMinutes,
                 autoindex, authRequestUrl, authSignInUrl, PathRoute.normalized(pathRoutes), normalized(backupTargets),
                 upstreamMaxFails, upstreamFailTimeout, upstreamKeepalive, maintenance, maintenanceMessage,
-                normalized(maintenanceAllowFrom));
+                normalized(maintenanceAllowFrom), CustomHeader.normalized(responseHeaders),
+                CustomHeader.normalized(requestHeaders), redirectToPrimary);
+    }
+
+    /** 비밀번호 보호 사용자를 뺀 값(024, 사이트 복제). 비밀번호는 해시로만 남아 옮길 수 없다. */
+    SiteOptions withoutAuthUsers() {
+        Properties values = new Properties();
+        store(values, "");
+        values.remove("authUsers");
+        return load(values, "");
     }
 
     /** 사이트 유형에서 쓰지 않는 설정은 버린다(유형을 바꿨을 때 남은 값이 설정에 섞이지 않게). */
@@ -230,7 +266,8 @@ public record SiteOptions(
                 authSignInUrl, type == SiteType.PROXY || type == SiteType.STATIC ? pathRoutes : null,
                 type == SiteType.PROXY ? backupTargets : null, type == SiteType.PROXY ? upstreamMaxFails : null,
                 type == SiteType.PROXY ? upstreamFailTimeout : null, type == SiteType.PROXY ? upstreamKeepalive : null,
-                maintenance, maintenanceMessage, maintenanceAllowFrom);
+                maintenance, maintenanceMessage, maintenanceAllowFrom, responseHeaders,
+                type == SiteType.PROXY ? requestHeaders : null, redirectToPrimary);
     }
 
     @AssertTrue(message = "{msg.validation.addresses}")
@@ -355,6 +392,9 @@ public record SiteOptions(
         put(values, prefix + "maintenance", maintenance);
         put(values, prefix + "maintenanceMessage", maintenanceMessage);
         put(values, prefix + "maintenanceAllowFrom", maintenanceAllowFrom);
+        put(values, prefix + "responseHeaders", responseHeaders);
+        put(values, prefix + "requestHeaders", requestHeaders);
+        put(values, prefix + "redirectToPrimary", redirectToPrimary);
     }
 
     static SiteOptions load(Properties values, String prefix) {
@@ -371,7 +411,9 @@ public record SiteOptions(
                 values.getProperty(prefix + "pathRoutes"), values.getProperty(prefix + "backupTargets"),
                 integer(values, prefix + "upstreamMaxFails"), integer(values, prefix + "upstreamFailTimeout"),
                 integer(values, prefix + "upstreamKeepalive"), bool(values, prefix + "maintenance"),
-                values.getProperty(prefix + "maintenanceMessage"), values.getProperty(prefix + "maintenanceAllowFrom"));
+                values.getProperty(prefix + "maintenanceMessage"), values.getProperty(prefix + "maintenanceAllowFrom"),
+                values.getProperty(prefix + "responseHeaders"), values.getProperty(prefix + "requestHeaders"),
+                bool(values, prefix + "redirectToPrimary"));
     }
 
     private static void put(Properties values, String key, Object value) {

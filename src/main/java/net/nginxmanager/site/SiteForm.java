@@ -140,6 +140,16 @@ public record SiteForm(
             "https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?(/[A-Za-z0-9._~/%!&*+,=:@-]*)?(\\?[A-Za-z0-9._~/%!&*+,=:@?-]*)?";
     public static final List<Integer> REDIRECT_CODES = List.of(301, 302, 307, 308);
 
+    /**
+     * 이 사이트 값으로 채운 새 사이트 폼(024). 도메인은 겹칠 수 없어 비우고, 비밀번호 보호 사용자와
+     * 업로드 인증서(도메인이 다를 수 있다)는 옮기지 않는다. HTTPS면 Let's Encrypt로 받는다.
+     */
+    public SiteForm copyForNewSite() {
+        return new SiteForm("", "", type, listenHttpPort, staticRoot, proxyTarget, null, httpsEnabled,
+                redirectHttpToHttps, null, proxyWebsocket, proxyConnectTimeout, proxyReadTimeout, proxyLoadBalancing,
+                redirectTarget, redirectCode, redirectKeepPath, options.withoutAuthUsers());
+    }
+
     public static SiteForm empty() {
         return new SiteForm("", "", SiteType.PROXY, 80, "", "", null, false, true, null);
     }

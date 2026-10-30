@@ -106,9 +106,19 @@ public class SiteController {
         }
     }
 
+    /** @param copy 이 사이트 값으로 채운다(024, 사이트 복제). 원문 편집 사이트면 빈 폼 */
     @GetMapping("/new")
-    public String newForm(Model model) {
-        model.addAttribute("form", SiteForm.empty());
+    public String newForm(@RequestParam(required = false) Long copy, Authentication authentication, Model model) {
+        SiteForm form = SiteForm.empty();
+        if (copy != null) {
+            Site site = siteQueryRepository.findWithFile(copy).orElseThrow(() -> new NotFoundException("site " + copy));
+            access.check(site, authentication);
+            if (site.getType() != SiteType.RAW) {
+                form = rendering.formOf(site).copyForNewSite();
+                model.addAttribute("copiedFrom", site.getPrimaryDomain());
+            }
+        }
+        model.addAttribute("form", form);
         return "sites/form";
     }
 
