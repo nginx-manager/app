@@ -76,10 +76,9 @@ check "nginx 컨테이너는 그대로" [ "$(started_at nginx)" = "$nginx_before
 
 step "nginx 이미지 업그레이드: 새 nginx가 설정을 거부하면 바꾸지 않는다"
 "$dir/nm" upgrade --bundle "$work/b-$NEW/nginx-manager.tar.gz" >/dev/null 2>&1 || true
-touch "$dir/data/conf/BAD"
 printf 'this is not nginx config;\n' > "$work/bad.conf"
 docker run --rm -v "$dir/data/conf:/c" -v "$work/bad.conf:/bad.conf:ro" alpine:3.20 \
-    sh -c 'mkdir -p /c/conf.d/sites && cp /bad.conf /c/conf.d/sites/zz-bad.conf'
+    sh -c 'touch /c/BAD && mkdir -p /c/conf.d/sites && cp /bad.conf /c/conf.d/sites/zz-bad.conf'
 if "$dir/nm" upgrade --nginx --bundle "$work/b-$NEW/nginx-manager.tar.gz"; then
     fail "틀린 설정인데 nginx 이미지를 바꿈"
 fi
