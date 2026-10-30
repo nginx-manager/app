@@ -25,6 +25,17 @@
         <input type="number" th:field="*{idleTimeout}" min="1" max="86400" th:disabled="${!editable}">
         <span class="error" th:errors="*{idleTimeout}"></span>
     </label>
+    <label><th:block th:text="#{streams.field.allowFrom}">허용할 주소</th:block>
+        <span class="hint" th:text="#{streams.field.allowFrom.hint}">설명</span>
+        <textarea th:field="*{allowFrom}" rows="2" placeholder="10.0.0.0/8" th:disabled="${!editable}"></textarea>
+        <span class="error" th:errors="*{allowFromValid}"></span>
+    </label>
+    <label><th:block th:text="#{streams.field.denyFrom}">막을 주소</th:block>
+        <textarea th:field="*{denyFrom}" rows="2" placeholder="203.0.113.7" th:disabled="${!editable}"></textarea>
+        <span class="error" th:errors="*{denyFromValid}"></span>
+    </label>
+    <label class="inline"><input type="checkbox" th:field="*{proxyProtocol}" value="true" th:disabled="${!editable}"> <th:block th:text="#{streams.field.proxyProtocol}">PROXY protocol로 클라이언트 주소 넘기기 (TCP)</th:block></label>
+    <p class="hint" th:text="#{streams.field.proxyProtocol.hint}">설명</p>
     <label><th:block th:text="#{streams.field.note}">메모</th:block>
         <span class="hint" th:text="#{streams.field.note.hint}">설명</span>
         <input type="text" th:field="*{note}" maxlength="200" th:disabled="${!editable}">

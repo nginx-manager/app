@@ -25,6 +25,7 @@
                 </td>
                 <td th:text="${row.stream.note}"></td>
                 <td>
+                    <span th:if="${row.stream.accessRestricted}" class="badge" th:text="#{streams.badge.restricted}">접근 제한</span>
                     <span th:if="${row.pendingDelete()}" class="badge warn" th:text="#{files.list.badge.pendingDelete}">삭제 대기</span>
                     <span th:if="${row.pending() and !row.pendingDelete()}" class="badge warn" th:text="#{sites.status.pending}">적용 대기</span>
                 </td>

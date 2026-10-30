@@ -48,6 +48,18 @@ public class StreamProxy extends BaseEntity {
     @Column(length = 200)
     private String note;
 
+    /** 이 주소에서 오는 연결만 받는다(025). 줄마다 하나. */
+    @Column(name = "allow_from", columnDefinition = "TEXT")
+    private String allowFrom;
+
+    /** 이 주소에서 오는 연결을 막는다(025). 줄마다 하나. */
+    @Column(name = "deny_from", columnDefinition = "TEXT")
+    private String denyFrom;
+
+    /** 백엔드에 PROXY protocol로 클라이언트 주소를 넘긴다(025). */
+    @Column(name = "proxy_protocol", nullable = false)
+    private boolean proxyProtocol;
+
     /** 폼 밖에서 파일이 바뀌어 원문 편집으로만 다루는 스트림. */
     @Column(nullable = false)
     private boolean raw;
@@ -75,6 +87,13 @@ public class StreamProxy extends BaseEntity {
         this.connectTimeout = form.connectTimeout();
         this.idleTimeout = form.idleTimeout();
         this.note = form.noteNormalized();
+        this.allowFrom = joined(form.allowList());
+        this.denyFrom = joined(form.denyList());
+        this.proxyProtocol = form.proxyProtocol();
+    }
+
+    private static String joined(java.util.List<String> addresses) {
+        return addresses.isEmpty() ? null : String.join("\n", addresses);
     }
 
     void markRaw() {
@@ -95,6 +114,13 @@ public class StreamProxy extends BaseEntity {
         if (note != null) {
             values.setProperty("note", note);
         }
+        if (allowFrom != null) {
+            values.setProperty("allowFrom", allowFrom);
+        }
+        if (denyFrom != null) {
+            values.setProperty("denyFrom", denyFrom);
+        }
+        values.setProperty("proxyProtocol", Boolean.toString(proxyProtocol));
         StringWriter out = new StringWriter();
         try {
             values.store(out, null);
@@ -127,6 +153,9 @@ public class StreamProxy extends BaseEntity {
         idleTimeout = values.getProperty("idleTimeout") == null ? null
                 : Integer.valueOf(values.getProperty("idleTimeout"));
         note = values.getProperty("note");
+        allowFrom = values.getProperty("allowFrom");
+        denyFrom = values.getProperty("denyFrom");
+        proxyProtocol = Boolean.parseBoolean(values.getProperty("proxyProtocol"));
         return true;
     }
 
@@ -136,7 +165,7 @@ public class StreamProxy extends BaseEntity {
 
     StreamForm toForm() {
         return new StreamForm(protocol, listenPort, backends, loadBalancing, connectTimeout, idleTimeout, note,
-                getVersion());
+                getVersion(), allowFrom, denyFrom, proxyProtocol);
     }
 
     public StreamProtocol getProtocol() {
@@ -169,6 +198,23 @@ public class StreamProxy extends BaseEntity {
 
     public String getNote() {
         return note;
+    }
+
+    public String getAllowFrom() {
+        return allowFrom;
+    }
+
+    public String getDenyFrom() {
+        return denyFrom;
+    }
+
+    public boolean isProxyProtocol() {
+        return proxyProtocol;
+    }
+
+    /** 목록에 보일 접근 제한 여부. */
+    public boolean isAccessRestricted() {
+        return allowFrom != null || denyFrom != null;
     }
 
     public boolean isRaw() {

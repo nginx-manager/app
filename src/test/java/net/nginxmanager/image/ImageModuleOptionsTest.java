@@ -211,6 +211,40 @@ class ImageModuleOptionsTest {
                         .equals("200"));
     }
 
+    @Test
+    @DisplayName("스트림 접근 제한(025): 허용 주소 밖의 연결은 끊고, 허용 주소는 넘긴다")
+    void streamAccessRulesFilterClients() throws Exception {
+        createStatic("behind-guarded.local", "/etc/nginx/html", Map.of());
+        for (Map.Entry<String, String> stream : Map.of("15081", "10.99.0.0/16", "15082", "127.0.0.1").entrySet()) {
+            HttpResponse<String> created = client.post("/streams/new", Map.of("protocol", "TCP",
+                    "listenPort", stream.getKey(), "backends", "127.0.0.1:80", "loadBalancing", "ROUND_ROBIN",
+                    "allowFrom", stream.getValue()), "/streams/new");
+            assertThat(created.statusCode()).as(created.body()).isEqualTo(302);
+        }
+        apply("stream access");
+
+        assertThat(stack.nginxExec("cat", "/etc/nginx/stream.d/tcp-15081.conf").getStdout())
+                .contains("allow 10.99.0.0/16;", "deny all;");
+        await().atMost(Duration.ofSeconds(10)).pollInterval(Duration.ofMillis(200))
+                .until(() -> stack.curlStatus("-H", "Host: behind-guarded.local", "http://127.0.0.1:15082/")
+                        .equals("200"));
+        assertThat(stack.curlStatus("-H", "Host: behind-guarded.local", "http://127.0.0.1:15081/"))
+                .isNotEqualTo("200");
+    }
+
+    @Test
+    @DisplayName("백엔드 장애 안내(026): 죽은 백엔드는 502와 안내 문구")
+    void backendErrorPageReplacesTheDefault502() throws Exception {
+        create("down.local", "PROXY", Map.of("proxyTarget", "http://127.0.0.1:8098",
+                "options.backendErrorPage", "true", "options.backendErrorMessage", "잠시 후 다시 오세요"));
+        apply("backend error page");
+
+        awaitStatus("down.local", "502");
+        String body = stack.nginxExec("curl", "--noproxy", "*", "-s", "-H", "Host: down.local",
+                "http://127.0.0.1/").getStdout();
+        assertThat(body).contains("잠시 후 다시 오세요").doesNotContain("nginx</center>");
+    }
+
     private static String cacheStatus(String path) throws Exception {
         String headers = stack.nginxExec("curl", "--noproxy", "*", "-s", "-o", "/dev/null", "-D", "-",
                 "-H", "Host: cache.local", "http://127.0.0.1" + path).getStdout();

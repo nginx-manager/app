@@ -38,6 +38,16 @@
         </label>
     </details>
 
+    <details class="site-options type-fields type-proxy-php" th:open="${form?.options?.backendErrorPage == true}">
+        <summary th:text="#{sites.opt.backendError.title}">백엔드 장애 안내 페이지</summary>
+        <label class="inline"><input type="checkbox" th:field="*{options.backendErrorPage}" value="true" th:disabled="${!editable}"> <th:block th:text="#{sites.opt.backendErrorPage}">백엔드 장애 때 안내 페이지 보여 주기</th:block></label>
+        <p class="hint" th:text="#{sites.opt.backendErrorPage.hint}">설명</p>
+        <label><th:block th:text="#{sites.opt.backendErrorMessage}">안내 문구</th:block>
+            <textarea th:field="*{options.backendErrorMessage}" rows="2" maxlength="500" th:placeholder="#{sites.opt.backendErrorMessage.placeholder}" th:disabled="${!editable}"></textarea>
+            <span class="error" th:errors="*{options.backendErrorMessageValid}"></span>
+        </label>
+    </details>
+
     <details class="site-options type-fields type-proxy-static" th:open="${form?.options?.pathRoutes != null}">
         <summary th:text="#{sites.opt.routes.title}">경로별 라우팅 (location)</summary>
         <label><th:block th:text="#{sites.opt.pathRoutes}">경로와 대상</th:block>

@@ -38,7 +38,8 @@ class SiteModuleOptionsTest {
                 (Integer) values.get("upstreamKeepalive"), (Boolean) values.get("maintenance"),
                 (String) values.get("maintenanceMessage"), (String) values.get("maintenanceAllowFrom"),
                 (String) values.get("responseHeaders"), (String) values.get("requestHeaders"),
-                (Boolean) values.get("redirectToPrimary"));
+                (Boolean) values.get("redirectToPrimary"), (Boolean) values.get("backendErrorPage"),
+                (String) values.get("backendErrorMessage"));
     }
 
     static SiteOptions options(Object... keyValues) {

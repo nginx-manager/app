@@ -11,8 +11,17 @@
     </div>
     <p class="notice" th:if="${notice}" th:text="${notice}">완료</p>
     <p class="hint" th:unless="${currentUser.isAdmin()}" th:text="#{sites.list.memberHint}">내가 담당한 사이트만 보입니다.</p>
-    <form class="row-form card" th:if="${currentUser.isAdmin()}" th:action="@{/sites}" method="get">
-        <label><span th:text="#{sites.owner.filter}">담당자</span>
+    <form class="row-form card" th:action="@{/sites}" method="get">
+        <label><span th:text="#{sites.list.search}">검색</span>
+            <input type="search" name="q" th:value="${search.q}" th:placeholder="#{sites.list.search.placeholder}">
+        </label>
+        <label><span th:text="#{sites.list.search.status}">상태</span>
+            <select name="status">
+                <option value="" th:text="#{sites.list.search.status.all}">전체</option>
+                <option th:each="st : ${ {'enabled', 'disabled', 'pending', 'maintenance'} }" th:value="${st}" th:selected="${search.status == st}" th:text="#{|sites.list.search.status.${st}|}">활성</option>
+            </select>
+        </label>
+        <label th:if="${currentUser.isAdmin()}"><span th:text="#{sites.owner.filter}">담당자</span>
             <select name="owner">
                 <option value="" th:text="#{sites.owner.all}">전체</option>
                 <option value="none" th:selected="${ownerFilter == 'none'}" th:text="#{sites.owner.none}">담당자 없음</option>
@@ -20,9 +29,10 @@
             </select>
         </label>
         <button type="submit" class="secondary" th:text="#{sites.owner.apply}">거르기</button>
+        <a th:if="${search.active()}" th:href="@{/sites}" th:text="#{sites.list.search.clear}">지우기</a>
     </form>
     <section class="card">
-        <p th:if="${#lists.isEmpty(sites)}" class="muted" th:text="#{sites.list.empty}">등록된 사이트가 없습니다.</p>
+        <p th:if="${#lists.isEmpty(sites)}" class="muted" th:text="${search.active()} ? #{sites.list.search.empty} : #{sites.list.empty}">등록된 사이트가 없습니다.</p>
         <table th:unless="${#lists.isEmpty(sites)}">
             <thead>
             <tr><th th:text="#{sites.list.col.domain}">도메인</th><th th:text="#{sites.list.col.type}">유형</th><th th:text="#{sites.list.col.target}">대상</th><th th:text="#{sites.list.col.port}">포트</th><th th:text="#{sites.list.col.status}">상태</th><th th:if="${currentUser.isAdmin()}" th:text="#{sites.owner.label}">담당자</th></tr>

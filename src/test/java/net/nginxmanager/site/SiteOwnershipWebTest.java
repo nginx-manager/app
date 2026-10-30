@@ -75,6 +75,18 @@ class SiteOwnershipWebTest extends ConfigRootTest {
     }
 
     @Test
+    void searchStaysWithinTheMembersSites() throws Exception {
+        mvc.perform(get("/sites").param("q", "local").with(user("alice").roles("MEMBER")))
+                .andExpect(content().string(containsString("alice.local")))
+                .andExpect(content().string(not(containsString("bob.local"))));
+        mvc.perform(get("/sites").param("q", "BOB").with(user("admin").roles("ADMIN")))
+                .andExpect(content().string(containsString("bob.local")))
+                .andExpect(content().string(not(containsString("alice.local"))));
+        mvc.perform(get("/sites").param("q", "nothing-matches").with(user("admin").roles("ADMIN")))
+                .andExpect(content().string(containsString("조건에 맞는 사이트가 없습니다")));
+    }
+
+    @Test
     void memberCannotReachOtherSites() throws Exception {
         for (Site other : new Site[] {bobSite, unassigned}) {
             long version = siteRepository.findById(other.getId()).orElseThrow().getVersion();

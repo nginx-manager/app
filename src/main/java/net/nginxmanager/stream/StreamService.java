@@ -78,7 +78,8 @@ public class StreamService {
                 throw new IllegalStateException("raw streams are edited in the file editor");
             }
             StreamForm fixed = new StreamForm(stream.getProtocol(), stream.getListenPort(), form.backends(),
-                    form.loadBalancing(), form.connectTimeout(), form.idleTimeout(), form.note(), form.version());
+                    form.loadBalancing(), form.connectTimeout(), form.idleTimeout(), form.note(), form.version(),
+                    form.allowFrom(), form.denyFrom(), form.proxyProtocol());
             stream.applyForm(fixed);
             ConfigFile file = configFileRepository.findByPath(stream.getConfigPath())
                     .orElseGet(() -> configFileRepository.save(new ConfigFile(stream.getConfigPath(), true)));

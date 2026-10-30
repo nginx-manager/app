@@ -80,11 +80,14 @@ public class SiteController {
      * @param owner 관리자의 담당자 거르기: 비우면 전체, none이면 담당자 없음, 숫자면 그 사용자
      */
     @GetMapping
-    public String list(@RequestParam(required = false) String owner, Authentication authentication, Model model) {
+    public String list(@RequestParam(required = false) String owner, @RequestParam(required = false) String q,
+                       @RequestParam(required = false) String status, Authentication authentication, Model model) {
         SiteQueryRepository.OwnerFilter filter = access.memberId(authentication)
                 .<SiteQueryRepository.OwnerFilter>map(SiteQueryRepository.OwnerFilter.Owner::new)
                 .orElseGet(() -> adminFilter(owner));
-        model.addAttribute("sites", siteQueryRepository.findRows(filter));
+        SiteSearch search = new SiteSearch(q, status);
+        model.addAttribute("sites", search.filter(siteQueryRepository.findRows(filter)));
+        model.addAttribute("search", search);
         if (SiteAccess.isAdmin(authentication)) {
             model.addAttribute("users", userRepository.findAllByOrderByUsernameAsc());
             model.addAttribute("ownerFilter", owner == null ? "" : owner);
