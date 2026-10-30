@@ -343,8 +343,28 @@ APP_UID=10101
 import_roots() { env_get NGINX_MANAGER_IMPORT_ROOTS | tr ',' '\n' | sed '/^$/d'; }
 
 # compose.import.yml을 다시 쓰고, docker compose가 그 파일과 compose.override.yml을 함께 읽게 한다
+# 컨테이너가 쓰는 경로(/etc/nginx, /var/lib/nginx-manager, /var/log/nginx)나 시스템 경로와 겹치면 붙이지 않는다
+root_allowed() {
+    case "$1" in
+        /*) ;;
+        *) return 1 ;;
+    esac
+    case "$1" in
+        /|/etc|/etc/nginx|/etc/nginx/*|/proc*|/sys*|/dev*|/var/lib/docker*|/var/lib/nginx-manager*|/var/log/nginx*|"$DIR"|"$DIR"/*)
+            return 1 ;;
+    esac
+    return 0
+}
+
 write_import_compose() {
-    roots="$(import_roots)"
+    roots=""
+    for r in $(import_roots); do
+        if root_allowed "$r"; then
+            roots="$(printf '%s\n%s\n' "$roots" "$r" | sed '/^$/d')"
+        else
+            warn "주의: NGINX_MANAGER_IMPORT_ROOTS의 $r 는 붙일 수 없어 건너뜁니다"
+        fi
+    done
     if [ -z "$roots" ]; then
         rm -f "$IMPORT_FILE"
     else
@@ -394,9 +414,7 @@ cmd_import_root() {
             for d in "$@"; do
                 d="${d%/}"
                 case "$d" in /*) ;; *) die "절대 경로를 주세요: $d" ;; esac
-                case "$d" in
-                    /|/etc|/etc/*|/proc*|/sys*|/dev*|/var/lib/docker*|"$DIR"|"$DIR"/*) die "$d 는 붙일 수 없습니다" ;;
-                esac
+                root_allowed "$d" || die "$d 는 붙일 수 없습니다"
                 if [ "$sub" = add ]; then
                     [ -d "$d" ] || die "디렉터리가 없습니다: $d"
                     printf '%s\n' "$roots" | grep -qxF "$d" || roots="$(printf '%s\n%s\n' "$roots" "$d" | sed '/^$/d')"
@@ -581,6 +599,7 @@ nginx manager 운영 명령
   nm logs [manager|nginx]         로그 보기(따라가기)
   nm restart [manager|nginx]      다시 띄우기(기본 manager. .env를 바꾼 뒤)
   nm check-domain                 관리 도메인이 DNS에 있고 이 서버로 들어오는지 본다
+  nm reload                       nginx 설정을 검사하고 다시 읽는다(호스트 certbot 갱신 뒤 등. 끊김 없음)
   nm upgrade [버전] [--nginx]      manager를 올린다(nginx는 끊기지 않음). --nginx면 nginx 이미지도
              [--bundle 파일]       인터넷이 막힌 서버에서 미리 받은 묶음으로
   nm backup [--with-logs] [--keep N]   설정·인증서·DB를 backups/에 묶는다(nginx는 계속 돈다)
@@ -594,7 +613,10 @@ EOF
 }
 
 # compose.override.yml을 나중에 만들었어도 docker compose가 읽게 한다
-[ -f "$IMPORT_FILE" ] && sync_compose_files
+# .env의 NGINX_MANAGER_IMPORT_ROOTS를 직접 고쳐도 compose.import.yml이 따라가게 한다(적용은 nm up)
+if [ -n "$(import_roots)" ] || [ -f "$IMPORT_FILE" ]; then
+    write_import_compose 2>&1 >/dev/null | grep . >&2 || true
+fi
 
 cmd="${1:-help}"
 [ $# -gt 0 ] && shift
@@ -612,6 +634,10 @@ case "$cmd" in
         check_admin_domain || true
         ;;
     check-domain) check_admin_domain ;;
+    reload)
+        # 호스트의 certbot이 인증서를 갱신한 뒤 등: 설정을 검사하고 통과하면 nginx만 다시 읽힌다(끊김 없음)
+        dc exec -T nginx nginx -t && dc exec -T nginx nginx -s reload && say "nginx 설정을 다시 읽었습니다"
+        ;;
     upgrade) cmd_upgrade "$@" ;;
     backup) cmd_backup "$@" ;;
     restore) cmd_restore "$@" ;;

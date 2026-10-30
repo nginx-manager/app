@@ -51,7 +51,7 @@ curl -fsSL https://github.com/nginx-manager/app/releases/latest/download/install
 | `NGINX_BIND_ADDRESS` | `0.0.0.0` | nginx를 특정 IP에만 열 때 |
 | `NGINX_MANAGER_BACKUP_KEEP` | `14` | `nm backup`이 남길 백업 수 |
 | `TZ` | `Asia/Seoul` | 서버 시간대가 다를 때 |
-| `NGINX_MANAGER_IMPORT_ROOTS` | (비움) | `/etc/nginx` 밖의 설정 파일을 가져올 때. 직접 고치지 말고 `nm import-root add /home` |
+| `NGINX_MANAGER_IMPORT_ROOTS` | (비움) | `/etc/nginx` 밖의 설정 파일이나 그 설정이 쓰는 파일(예: `/home`, `/etc/letsencrypt`). 쉼표로 여럿. 고친 뒤 `nm up` |
 | `SPRING_MAIL_*` | (비움) | 메일 알림을 보낼 때 SMTP 서버 |
 
 개발·시험에는 저장소의 [docker/docker-compose.yml](docker/docker-compose.yml)을 씁니다(이름 붙은 볼륨, 관리 화면을 모든 주소에 엶).
