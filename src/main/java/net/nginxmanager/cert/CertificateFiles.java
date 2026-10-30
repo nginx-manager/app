@@ -17,6 +17,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -65,8 +66,9 @@ public class CertificateFiles {
     }
 
     /**
-     * 지금 쓰는 디렉터리와 바로 이전 몇 개만 남긴다. 설정 파일·초안·되돌릴 수 있는 버전이 아직 가리키는 디렉터리는
-     * 오래되었어도 남긴다(지우면 nginx가 시작하지 못하거나 되돌리기가 검증에서 실패한다).
+     * 지금 쓰는 디렉터리와 바로 이전 몇 개만 남긴다. 설정 파일·초안이 아직 가리키는 디렉터리는 오래되었어도 남긴다
+     * (지우면 nginx가 시작하지 못한다). 버전이 가리키는 옛 디렉터리는 지운다. 그 버전으로 되돌리면
+     * {@link #repointMissing}이 지금 파일로 바꾼다(011).
      *
      * @param referenced 디렉터리 경로를 받아 어딘가에서 아직 쓰는지 알려 준다
      */
@@ -88,7 +90,7 @@ public class CertificateFiles {
     }
 
     /**
-     * 지운 인증서의 디렉터리를 정리한다. 설정 파일·초안·되돌릴 수 있는 버전이 아직 가리키는 디렉터리는 남기고,
+     * 지운 인증서의 디렉터리를 정리한다. 설정 파일·초안이 아직 가리키는 디렉터리는 남기고,
      * 남은 것이 없으면 인증서 디렉터리도 지운다.
      */
     public void removeAll(String name, Predicate<String> referenced) {
@@ -122,6 +124,33 @@ public class CertificateFiles {
         return content
                 .replaceAll(base + Pattern.quote(FULLCHAIN), Matcher.quoteReplacement(fresh.certPath()))
                 .replaceAll(base + Pattern.quote(PRIVKEY), Matcher.quoteReplacement(fresh.keyPath()));
+    }
+
+    /**
+     * 이제 없는 인증서 디렉터리를 가리키는 경로를 같은 디렉터리 이름 인증서의 지금 경로로 바꾼다(011).
+     * 옛 디렉터리를 정리한 뒤 그 디렉터리를 가리키는 버전으로 되돌릴 때 쓴다.
+     *
+     * @param current 디렉터리 이름(certs/ 바로 아래)으로 지금 발급된 인증서의 경로를 찾는다. 없으면(null) 그대로 둔다
+     */
+    public String repointMissing(String content, Function<String, CertificatePaths> current) {
+        Matcher m = Pattern.compile(Pattern.quote(root.toString() + "/") + "([^/\\s;\"']+)/[^/\\s;\"']+/("
+                + Pattern.quote(FULLCHAIN) + "|" + Pattern.quote(PRIVKEY) + ")").matcher(content);
+        StringBuilder out = new StringBuilder();
+        while (m.find()) {
+            String replacement = m.group();
+            CertificatePaths now = Files.exists(Path.of(m.group())) ? null : current.apply(m.group(1));
+            if (now != null) {
+                replacement = FULLCHAIN.equals(m.group(2)) ? now.certPath() : now.keyPath();
+            }
+            m.appendReplacement(out, Matcher.quoteReplacement(replacement));
+        }
+        m.appendTail(out);
+        return out.toString();
+    }
+
+    /** 디렉터리 이름(certs/ 바로 아래). {@link #repointMissing}에 넘길 인증서를 찾을 때 쓴다. */
+    public static String directoryName(String certificateName) {
+        return safeName(certificateName);
     }
 
     /** 인증서 파일 경로를 이름·시각과 상관없는 같은 글자로 바꾼다. 경로만 다른 두 설정을 같다고 볼 때 쓴다. */

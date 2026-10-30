@@ -4,13 +4,16 @@ import net.nginxmanager.config.ConfigFile;
 import net.nginxmanager.config.ConfigFileRepository;
 import net.nginxmanager.config.ConfigFileStore;
 import net.nginxmanager.config.ConfigVersion;
+import net.nginxmanager.config.VersionContents;
 import net.nginxmanager.site.SiteReconciler;
 import net.nginxmanager.stream.StreamReconciler;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /** 디스크에 반영된 변경을 설정 파일 행과 사이트에 맞추고, 버전에 전체 스냅샷을 담는다. */
 @Component
@@ -20,9 +23,12 @@ public class ConfigSync {
     private final ConfigFileStore store;
     private final SiteReconciler siteReconciler;
     private final StreamReconciler streamReconciler;
+    private final VersionContents versionContents;
 
     public ConfigSync(ConfigFileRepository configFileRepository, ConfigFileStore store,
-                      SiteReconciler siteReconciler, StreamReconciler streamReconciler) {
+                      SiteReconciler siteReconciler, StreamReconciler streamReconciler,
+                      VersionContents versionContents) {
+        this.versionContents = versionContents;
         this.configFileRepository = configFileRepository;
         this.store = store;
         this.siteReconciler = siteReconciler;
@@ -68,11 +74,21 @@ public class ConfigSync {
     /** 관리 중인 파일 전체의 지금 디스크 내용을 버전에 담는다. */
     @Transactional(propagation = Propagation.MANDATORY)
     public void snapshot(ConfigVersion version) {
+        Map<String, String> files = new LinkedHashMap<>();
         for (ConfigFile file : configFileRepository.findAllByOrderByPathAsc()) {
             String content = store.read(file.getPath());
             if (content != null) {
-                version.addFile(file.getPath(), content);
+                files.put(file.getPath(), content);
             }
         }
+        versionContents.attach(version, files);
+    }
+
+    /** 실패한 버전: 시도한 파일만 담는다(지우려던 파일은 내용 없이). */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void attempted(ConfigVersion version, List<FileChange> changes) {
+        Map<String, String> files = new LinkedHashMap<>();
+        changes.forEach(c -> files.put(c.path(), c.content()));
+        versionContents.attach(version, files);
     }
 }

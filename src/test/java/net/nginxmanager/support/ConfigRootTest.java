@@ -3,6 +3,7 @@ package net.nginxmanager.support;
 import net.nginxmanager.audit.AuditLogRepository;
 import net.nginxmanager.cert.AcmeSettingsRepository;
 import net.nginxmanager.cert.TlsCertificateRepository;
+import net.nginxmanager.config.ConfigContentRepository;
 import net.nginxmanager.config.ConfigFileRepository;
 import net.nginxmanager.config.ConfigVersionRepository;
 import net.nginxmanager.history.DriftDetector;
@@ -46,6 +47,8 @@ public abstract class ConfigRootTest {
     @Autowired
     protected ConfigVersionRepository configVersionRepository;
     @Autowired
+    protected ConfigContentRepository configContentRepository;
+    @Autowired
     protected SiteRepository siteRepository;
     @Autowired
     protected UserRepository userRepository;
@@ -73,6 +76,7 @@ public abstract class ConfigRootTest {
         configFileRepository.deleteAll();
         // 되돌리기 버전이 이전 버전을 참조하므로 최신부터 지운다
         configVersionRepository.deleteAll(configVersionRepository.findAll(Sort.by(Sort.Direction.DESC, "id")));
+        configContentRepository.deleteAll();
         auditLogRepository.deleteAll();
         userRepository.deleteAll();
         driftDetector.invalidate();

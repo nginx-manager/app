@@ -3,6 +3,7 @@ package net.nginxmanager.history;
 import net.nginxmanager.apply.ApplyResult;
 import net.nginxmanager.apply.ApplyService;
 import net.nginxmanager.apply.FileChange;
+import net.nginxmanager.cert.CertificatePathRepair;
 import net.nginxmanager.common.NotFoundException;
 import net.nginxmanager.config.ConfigFile;
 import net.nginxmanager.config.ConfigFileRepository;
@@ -30,9 +31,12 @@ public class RollbackService {
     private final ConfigFileRepository configFileRepository;
     private final ConfigFileStore store;
     private final TransactionTemplate tx;
+    private final CertificatePathRepair certificatePathRepair;
 
     public RollbackService(ApplyService applyService, VersionQueryRepository versionQueryRepository,
-                           ConfigFileRepository configFileRepository, ConfigFileStore store, TransactionTemplate tx) {
+                           ConfigFileRepository configFileRepository, ConfigFileStore store, TransactionTemplate tx,
+                           CertificatePathRepair certificatePathRepair) {
+        this.certificatePathRepair = certificatePathRepair;
         this.applyService = applyService;
         this.versionQueryRepository = versionQueryRepository;
         this.configFileRepository = configFileRepository;
@@ -56,10 +60,12 @@ public class RollbackService {
         if (!target.isSnapshot()) {
             throw new RollbackRejectedException(RollbackRejectedException.Reason.NOT_A_SNAPSHOT);
         }
-        Map<String, String> wanted = new HashMap<>();
+        Map<String, String> files = new HashMap<>();
         for (ConfigVersionFile file : target.getFiles()) {
-            wanted.put(file.getPath(), file.getContent());
+            files.put(file.getPath(), file.getContent());
         }
+        // 정리된 옛 인증서 디렉터리를 가리키면 같은 인증서의 지금 파일로 바꾼다(011)
+        Map<String, String> wanted = certificatePathRepair.repair(files);
         List<FileChange> changes = new ArrayList<>();
         wanted.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(e -> {
             if (!Objects.equals(e.getValue(), store.read(e.getKey()))) {
