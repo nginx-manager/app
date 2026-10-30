@@ -109,6 +109,8 @@
                         <code th:text="${certificate.certPath}"></code>, <code th:text="${certificate.keyPath}"></code></p>
                     <form th:unless="${rawHasHttps}" th:action="@{/certs/letsencrypt/raw-https}" method="post">
                         <input type="hidden" name="siteId" th:value="${site.id}">
+                        <p><label class="inline"><input type="checkbox" name="redirectHttp" value="true" checked>
+                            <th:block th:text="#{sites.detail.https.rawRedirect}">HTTP(80) 요청을 HTTPS로 넘기기</th:block></label></p>
                         <button type="submit" th:text="#{sites.detail.https.rawAddBlock}">443 server 블록 초안에 더하기</button>
                         <p class="muted small" th:text="#{sites.detail.https.rawAddBlockNote}"></p>
                     </form>

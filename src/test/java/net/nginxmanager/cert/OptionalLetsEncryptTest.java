@@ -278,11 +278,13 @@ class OptionalLetsEncryptTest extends ConfigRootTest {
                 .andExpect(content().string(containsString(cert.getCertPath())))
                 .andExpect(content().string(containsString("443 server 블록 초안에 더하기")));
         mvc.perform(post("/certs/letsencrypt/raw-https").with(csrf()).with(user("ed").roles("ADMIN"))
-                        .param("siteId", site.getId().toString()))
+                        .param("siteId", site.getId().toString()).param("redirectHttp", "true"))
                 .andExpect(flash().attribute("notice", containsString("443 server 블록")));
         assertThat(applyService.applyPending("ed", "https").succeeded()).isTrue();
         assertThat(readFile(PATH)).contains("listen 443 ssl;", "ssl_certificate " + cert.getCertPath() + ";",
-                "client_max_body_size 0;");
+                "client_max_body_size 0;", "return 301 https://$host$request_uri;");
+        // 80은 넘기되 인증 경로는 남아 갱신할 수 있다
+        assertThat(readFile(PATH).indexOf("acme-challenge")).isLessThan(readFile(PATH).indexOf("return 301"));
         mvc.perform(get("/sites/" + site.getId()).with(user("ed").roles("ADMIN")))
                 .andExpect(content().string(not(containsString("443 server 블록 초안에 더하기"))));
 

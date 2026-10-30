@@ -14,6 +14,10 @@ import java.util.regex.Pattern;
 public final class RawHttps {
 
     public static final String ACME_PATH = "/.well-known/acme-challenge/";
+    private static final String WEBROOT = "/var/lib/nginx-manager/acme-webroot";
+    private static final String ACME_COMMENT = "# 관리도구가 Let's Encrypt 인증에 쓴다";
+    private static final Pattern ACME_SNIPPET = Pattern.compile("\\n[ \\t]*" + Pattern.quote(ACME_COMMENT)
+            + "\\n[ \\t]*location \\^~ " + Pattern.quote(ACME_PATH) + " \\{[^}]*\\}\\n");
     private static final Pattern LISTEN = Pattern.compile("(?m)^(\\s*)listen\\s+([^;]*);");
     private static final Pattern SERVER_NAME = Pattern.compile("(?<![\\w$])server_name\\s+([^;]+);");
     private static final Pattern PORT_80 = Pattern.compile("^(?:(.*):)?80$");
@@ -62,9 +66,9 @@ public final class RawHttps {
             if (withoutComments(block.text()).contains(ACME_PATH)) {
                 continue;
             }
-            out.insert(block.open(), "\n" + indent(block.text()) + "# 관리도구가 Let's Encrypt 인증에 쓴다\n"
+            out.insert(block.open(), "\n" + indent(block.text()) + ACME_COMMENT + "\n"
                     + indent(block.text()) + "location ^~ " + ACME_PATH + " {\n"
-                    + indent(block.text()) + "    root /var/lib/nginx-manager/acme-webroot;\n"
+                    + indent(block.text()) + "    root " + WEBROOT + ";\n"
                     + indent(block.text()) + "    default_type text/plain;\n"
                     + indent(block.text()) + "}\n");
         }
@@ -81,6 +85,15 @@ public final class RawHttps {
      * HTTPS server 블록이 이미 있거나 HTTP server 블록이 없으면 그대로 돌려준다.
      */
     public static String withHttps(String content, String certPath, String keyPath) {
+        return withHttps(content, certPath, keyPath, false);
+    }
+
+    /**
+     * {@link #withHttps(String, String, String)}에 더해, redirect면 본뜬 HTTP server 블록을 HTTPS로 넘기는 블록으로 바꾼다.
+     * 넘기는 블록에는 listen과 server_name, 인증 경로만 남긴다(갱신할 때 인증 요청은 넘기지 않는다).
+     * 원래 내용은 443 블록으로 옮겨졌고, 이전 버전으로 되돌릴 수 있다.
+     */
+    public static String withHttps(String content, String certPath, String keyPath, boolean redirect) {
         if (hasHttps(content)) {
             return content;
         }
@@ -102,14 +115,39 @@ public final class RawHttps {
             replaced = true;
         }
         m.appendTail(copy);
-        String https = copy.toString();
+        // 인증 요청은 80으로만 오므로 443 블록에는 관리도구가 더한 인증 경로를 옮기지 않는다
+        String https = ACME_SNIPPET.matcher(copy.toString()).replaceAll("");
         if (!replaced) {
             https = insertAfterOpen(https, "listen 443 ssl;");
         }
         String ind = indent(body);
         https = insertAfterOpen(https, "http2 on;\n" + ind + "ssl_certificate " + certPath + ";\n"
                 + ind + "ssl_certificate_key " + keyPath + ";");
-        return content.substring(0, http.end()) + "\n\n" + https + content.substring(http.end());
+        String first = redirect ? redirectBlock(body) : body;
+        return content.substring(0, http.start()) + first + "\n\n" + https + content.substring(http.end());
+    }
+
+    /** HTTP server 블록의 listen·server_name만 남기고, 인증 경로 밖의 요청은 HTTPS로 넘긴다. */
+    private static String redirectBlock(String body) {
+        String ind = indent(body);
+        StringBuilder out = new StringBuilder("server {\n");
+        Matcher listen = LISTEN.matcher(withoutComments(body));
+        while (listen.find()) {
+            out.append(ind).append("listen ").append(listen.group(2).trim()).append(";\n");
+        }
+        Matcher name = SERVER_NAME.matcher(withoutComments(body));
+        while (name.find()) {
+            out.append(ind).append("server_name ").append(name.group(1).trim()).append(";\n");
+        }
+        out.append("\n").append(ind).append(ACME_COMMENT + "\n")
+                .append(ind).append("location ^~ ").append(ACME_PATH).append(" {\n")
+                .append(ind).append("    root ").append(WEBROOT).append(";\n")
+                .append(ind).append("    default_type text/plain;\n")
+                .append(ind).append("}\n\n")
+                .append(ind).append("location / {\n")
+                .append(ind).append("    return 301 https://$host$request_uri;\n")
+                .append(ind).append("}\n}");
+        return out.toString();
     }
 
     private static String insertAfterOpen(String block, String lines) {

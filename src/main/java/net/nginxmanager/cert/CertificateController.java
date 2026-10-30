@@ -130,7 +130,8 @@ public class CertificateController {
 
     /** 원문 사이트에 발급된 인증서로 443 server 블록을 더한 초안을 만든다. 관리자만. */
     @PostMapping("/certs/letsencrypt/raw-https")
-    public String rawHttps(@RequestParam long siteId, Authentication authentication, RedirectAttributes redirect) {
+    public String rawHttps(@RequestParam long siteId, @RequestParam(defaultValue = "false") boolean redirectHttp,
+                           Authentication authentication, RedirectAttributes redirect) {
         Site site = access.require(siteId, authentication);
         if (site.getType() != SiteType.RAW || !SiteAccess.isAdmin(authentication) || site.getCertificateId() == null) {
             throw new NotFoundException("site " + siteId);
@@ -139,7 +140,8 @@ public class CertificateController {
                 .map(TlsCertificate::paths).orElse(null);
         if (paths == null) {
             redirect.addFlashAttribute("error", messages.get("msg.cert.rawHttpsNotIssued"));
-        } else if (siteService.addRawHttpsBlock(siteId, paths.certPath(), paths.keyPath(), authentication.getName())) {
+        } else if (siteService.addRawHttpsBlock(siteId, paths.certPath(), paths.keyPath(), redirectHttp,
+                authentication.getName())) {
             redirect.addFlashAttribute("notice", messages.get("msg.cert.rawHttpsDrafted"));
         } else {
             redirect.addFlashAttribute("notice", messages.get("msg.cert.rawHttpsExists"));

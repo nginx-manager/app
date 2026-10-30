@@ -568,8 +568,12 @@ public class SiteService {
         return new LetsEncryptRequest(certificateId, live);
     }
 
-    /** 원문 사이트에 발급된 인증서로 443 server 블록을 더한 초안을 만든다. 이미 HTTPS server 블록이 있으면 그대로 둔다. */
-    public boolean addRawHttpsBlock(long siteId, String certPath, String keyPath, String actor) {
+    /**
+     * 원문 사이트에 발급된 인증서로 443 server 블록을 더한 초안을 만든다. 이미 HTTPS server 블록이 있으면 그대로 둔다.
+     *
+     * @param redirect 본뜬 80 server 블록을 HTTPS로 넘기는 블록으로 바꾼다(인증 경로는 남긴다)
+     */
+    public boolean addRawHttpsBlock(long siteId, String certPath, String keyPath, boolean redirect, String actor) {
         return Boolean.TRUE.equals(locked(() -> {
             Site site = load(siteId);
             if (site.getType() != SiteType.RAW) {
@@ -580,13 +584,13 @@ public class SiteService {
             if (current == null) {
                 return false;
             }
-            String updated = RawHttps.withHttps(current, certPath, keyPath);
+            String updated = RawHttps.withHttps(current, certPath, keyPath, redirect);
             if (updated.equals(current)) {
                 return false;
             }
             file.stageContent(updated);
             events.publishEvent(new RawEditedEvent(file.getPath()));
-            events.publishEvent(AuditEvent.success(actor, AuditAction.SITE_SAVE, "site:" + site.getPrimaryDomain() + " https"));
+            events.publishEvent(AuditEvent.success(actor, AuditAction.SITE_SAVE, "site:" + site.getPrimaryDomain() + " https" + (redirect ? " redirect" : "")));
             return true;
         }));
     }

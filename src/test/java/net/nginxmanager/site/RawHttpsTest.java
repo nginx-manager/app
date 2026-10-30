@@ -60,6 +60,30 @@ class RawHttpsTest {
     }
 
     @Test
+    void redirectKeepsOnlyTheChallengeOnPort80() {
+        String https = RawHttps.withHttps(RawHttps.withAcmeChallenge(MINIO),
+                "/etc/nginx/certs/s/1/fullchain.pem", "/etc/nginx/certs/s/1/privkey.pem", true);
+
+        List<NginxConf.Directive> parsed = NginxConf.parse(https);
+        assertThat(parsed).extracting(NginxConf.Directive::name).containsExactly("upstream", "server", "server");
+        NginxConf.Directive http = parsed.get(1);
+        assertThat(http.block()).filteredOn(d -> d.name().equals("listen")).extracting(d -> d.arg(0))
+                .containsExactly("80", "[::]:80");
+        assertThat(http.block()).filteredOn(d -> d.name().equals("server_name")).extracting(NginxConf.Directive::args)
+                .containsExactly(List.of("storage.example.com", "www.storage.example.com", "*.cdn.example.com"));
+        assertThat(http.block()).filteredOn(d -> d.name().equals("location")).extracting(d -> d.args().getLast())
+                .containsExactly("/.well-known/acme-challenge/", "/");
+        assertThat(http.block().toString()).doesNotContain("proxy_pass", "client_max_body_size");
+        NginxConf.Directive copy = parsed.get(2);
+        assertThat(copy.block()).anySatisfy(d -> assertThat(d.name()).isEqualTo("client_max_body_size"));
+        // 인증 경로는 80에만 있으면 된다
+        assertThat(copy.block()).filteredOn(d -> d.name().equals("location")).extracting(d -> d.args().getLast())
+                .containsExactly("/");
+        assertThat(https).contains("return 301 https://$host$request_uri;");
+        assertThat(RawHttps.withHttps(https, "a", "b", true)).isEqualTo(https);
+    }
+
+    @Test
     void bracesInCommentsAndQuotesDoNotCount() {
         String content = """
                 server {
