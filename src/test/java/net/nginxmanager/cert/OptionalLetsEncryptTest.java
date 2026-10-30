@@ -241,25 +241,55 @@ class OptionalLetsEncryptTest extends ConfigRootTest {
     }
 
     @Test
-    void rawSitesAreRefusedWithAMessage() throws Exception {
+    void rawSitesGetACertificateAndAnHttpsBlock() throws Exception {
         siteService.create(new SiteForm(DOMAIN, "", SiteType.PROXY, 80, null, "http://10.0.0.1:3000", null), "ed");
         ConfigFile file = configFileRepository.findByPath(PATH).orElseThrow();
-        siteService.editRaw(file.getId(), "server { listen 80; server_name " + DOMAIN + "; }\n", file.getVersion(), "ed");
+        String raw = "server {\n    listen 80;\n    server_name " + DOMAIN + ";\n    client_max_body_size 0;\n"
+                + "    location / { proxy_pass http://10.0.0.1:3000; }\n}\n";
+        siteService.editRaw(file.getId(), raw, file.getVersion(), "ed");
+        assertThat(applyService.applyPending("ed", "raw").succeeded()).isTrue();
         Site site = siteRepository.findByPrimaryDomain(DOMAIN).orElseThrow();
 
+        // 인증서 화면에도 보인다
+        mvc.perform(get("/certs").with(user("ed").roles("ADMIN")))
+                .andExpect(content().string(containsString("<option value=\"" + site.getId() + "\">" + DOMAIN)));
+        // 멤버는 원문 사이트의 인증서를 켜지 못한다
+        mvc.perform(post("/certs/letsencrypt").with(csrf()).with(user("member").roles("MEMBER"))
+                        .param("siteId", site.getId().toString()))
+                .andExpect(status().isNotFound());
+
+        // 인증 경로가 없으므로 더한 초안을 만들고, 적용하면 발급한다
         mvc.perform(post("/certs/letsencrypt").with(csrf()).with(user("ed").roles("ADMIN"))
                         .param("siteId", site.getId().toString()))
                 .andExpect(redirectedUrl("/sites/" + site.getId() + "#https"))
-                .andExpect(flash().attribute("error", containsString("원문 편집 사이트")));
-        assertThat(certificateRepository.findAll()).isEmpty();
+                .andExpect(flash().attribute("notice", containsString("acme-challenge")));
+        assertThat(acme.calls).hasValue(0);
+        assertThat(configFileRepository.findByPath(PATH).orElseThrow().getDraftContent())
+                .contains("location ^~ /.well-known/acme-challenge/", "client_max_body_size 0;");
 
-        // 폼을 열어 둔 사이 원문 편집 사이트가 되었으면 폼 값으로 덮어쓰지 않고 이유를 보여 준다
-        mvc.perform(post("/sites/" + site.getId()).with(csrf()).with(user("ed").roles("ADMIN"))
-                        .param("primaryDomain", DOMAIN).param("type", "PROXY").param("listenHttpPort", "80")
-                        .param("proxyTarget", "http://10.0.0.9:3000").param("version", Long.toString(site.getVersion())))
-                .andExpect(redirectedUrl("/sites/" + site.getId() + "?rawOnly"));
-        mvc.perform(get("/sites/" + site.getId() + "?rawOnly").with(user("ed").roles("ADMIN")))
-                .andExpect(content().string(containsString("원문 편집기로 고친 사이트라")));
-        assertThat(configFileRepository.findByPath(PATH).orElseThrow().getDraftContent()).doesNotContain("10.0.0.9");
+        assertThat(applyService.applyPending("ed", "acme").succeeded()).isTrue();
+        TlsCertificate cert = await().until(() -> certificateRepository.findByName(DOMAIN).orElseThrow(),
+                c -> c.getStatus() == CertificateStatus.ACTIVE && !certificateService.isRunning(c.getId()));
+        assertThat(acme.calls).hasValue(1);
+        // 원문은 사용자가 정한 대로 둔다(443은 따로 더한다)
+        assertThat(readFile(PATH)).doesNotContain("listen 443");
+
+        mvc.perform(get("/sites/" + site.getId()).with(user("ed").roles("ADMIN")))
+                .andExpect(content().string(containsString(cert.getCertPath())))
+                .andExpect(content().string(containsString("443 server 블록 초안에 더하기")));
+        mvc.perform(post("/certs/letsencrypt/raw-https").with(csrf()).with(user("ed").roles("ADMIN"))
+                        .param("siteId", site.getId().toString()))
+                .andExpect(flash().attribute("notice", containsString("443 server 블록")));
+        assertThat(applyService.applyPending("ed", "https").succeeded()).isTrue();
+        assertThat(readFile(PATH)).contains("listen 443 ssl;", "ssl_certificate " + cert.getCertPath() + ";",
+                "client_max_body_size 0;");
+        mvc.perform(get("/sites/" + site.getId()).with(user("ed").roles("ADMIN")))
+                .andExpect(content().string(not(containsString("443 server 블록 초안에 더하기"))));
+
+        // 갱신하면 원문의 인증서 경로도 새 경로로 바뀐다
+        assertThat(certificateService.issueOrRenew(cert.getId())).isEmpty();
+        TlsCertificate renewed = certificateRepository.findById(cert.getId()).orElseThrow();
+        assertThat(renewed.getCertPath()).isNotEqualTo(cert.getCertPath());
+        assertThat(readFile(PATH)).contains("ssl_certificate " + renewed.getCertPath() + ";");
     }
 }
