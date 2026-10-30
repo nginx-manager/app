@@ -21,7 +21,7 @@ public class ConfigVersionFile extends BaseEntity {
     @Column(nullable = false)
     private String path;
 
-    /** 이 버전에서 파일이 지워졌으면 null. 같은 내용은 여러 버전이 함께 가리킨다(011). */
+    /** 이 버전에서 파일이 지워졌으면 null. 같은 내용은 여러 버전이 함께 가리킨다(012). */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "content_id")
     private ConfigContent content;

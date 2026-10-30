@@ -18,8 +18,10 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * 발급하지 못한(대기·실패) 인증서를 지운다(010). 지우면 자동 재시도도 멈춘다.
+ * 쓰지 않는 인증서를 지운다. 발급하지 못한(대기·실패) 인증서(010)와, 사이트를 지우거나 바꿔 아무도 쓰지 않는
+ * 발급된 인증서(013). 지우면 자동 재시도·갱신도 멈춘다.
  * 사이트나 관리 도메인이 아직 쓰는 인증서는 지우지 않는다. 지워도 다시 만들어져 재시도가 이어지기 때문이다.
+ * 지금 설정이나 초안이 파일을 가리키는 인증서도 지우지 않는다(nginx가 시작하지 못한다).
  */
 @Service
 public class CertificateDeletion {
@@ -28,8 +30,8 @@ public class CertificateDeletion {
 
     /** 지울 수 없는 이유. */
     public enum Blocker {
-        /** 발급된 인증서. 설정이 파일을 가리키고 있을 수 있다 */
-        ISSUED,
+        /** 지금 디스크의 설정이나 초안이 이 인증서 파일을 가리킨다(013) */
+        REFERENCED,
         /** 지금 발급 중 */
         RUNNING,
         /** 사이트가 쓰고 있다 */
@@ -85,14 +87,16 @@ public class CertificateDeletion {
      * @param sites 모든 사이트. 목록 화면에서 한 번 읽어 여러 인증서에 쓴다
      */
     public Optional<Blocker> blocker(TlsCertificate cert, Collection<Site> sites) {
-        if (cert.getStatus() != CertificateStatus.PENDING) {
-            return Optional.of(Blocker.ISSUED);
-        }
         if (adminDomain.enabled() && adminDomain.domain().equalsIgnoreCase(cert.getName())) {
             return Optional.of(Blocker.ADMIN_DOMAIN);
         }
         if (!usersOf(cert, sites).isEmpty()) {
             return Optional.of(Blocker.IN_USE);
+        }
+        CertificatePaths paths = cert.paths();
+        if (paths != null && (certificateService.referenced(paths.certPath())
+                || certificateService.referenced(paths.keyPath()))) {
+            return Optional.of(Blocker.REFERENCED);
         }
         return Optional.empty();
     }

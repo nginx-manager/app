@@ -21,7 +21,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** 같은 내용은 한 번만 저장하고, 버전은 여전히 그 시점의 전체 파일을 담는다(011). */
+/** 같은 내용은 한 번만 저장하고, 버전은 여전히 그 시점의 전체 파일을 담는다(012). */
 class VersionStorageTest extends ConfigRootTest {
 
     @Autowired

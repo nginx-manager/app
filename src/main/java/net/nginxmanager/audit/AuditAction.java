@@ -8,6 +8,7 @@ public enum AuditAction {
     SITE_SAVE,
     SITE_IMPORT,
     SITE_ASSIGN,
+    SITE_DELETE,
     APPLY,
     ROLLBACK,
     DRIFT_IMPORT,

@@ -6,7 +6,7 @@ import jakarta.persistence.Table;
 import net.nginxmanager.common.BaseEntity;
 
 /**
- * 버전에 남긴 파일 내용(011). 같은 내용은 해시로 한 번만 저장하고 여러 버전 파일이 함께 가리킨다. 바꾸지 않는다.
+ * 버전에 남긴 파일 내용(012). 같은 내용은 해시로 한 번만 저장하고 여러 버전 파일이 함께 가리킨다. 바꾸지 않는다.
  */
 @Entity
 @Table(name = "config_content")

@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 버전 파일 내용을 해시로 한 번만 저장한다(011). 해시(SHA-256)는 SQL로 계산할 수 없어 Java 마이그레이션으로 한다.
+ * 버전 파일 내용을 해시로 한 번만 저장한다(012). 해시(SHA-256)는 SQL로 계산할 수 없어 Java 마이그레이션으로 한다.
  * 내용 행의 생성 시각은 그 내용을 처음 담은 버전 파일의 시각을 쓴다.
  */
 public class V11__dedupe_version_content extends BaseJavaMigration {

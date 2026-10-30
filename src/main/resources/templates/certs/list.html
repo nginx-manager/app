@@ -55,10 +55,20 @@
                     <span th:each="d, s : ${sitesByCert.get(c.id)}" th:text="${d} + (${s.last} ? '' : ', ')">app.local</span>
                 </td>
                 <td>
-                    <form th:if="${currentUser.canEdit() and c.source.name() == 'LETS_ENCRYPT'}"
-                          th:action="@{/certs/{id}/renew(id=${c.id})}" method="post" class="inline">
-                        <button type="submit" class="link" th:text="#{certs.list.renewNow}">지금 갱신</button>
-                    </form>
+                    <div class="row-actions">
+                        <form th:if="${currentUser.canEdit() and c.source.name() == 'LETS_ENCRYPT'}"
+                              th:action="@{/certs/{id}/renew(id=${c.id})}" method="post" class="inline">
+                            <button type="submit" class="link" th:text="#{certs.list.renewNow}">지금 갱신</button>
+                        </form>
+                        <!-- 아무도 쓰지 않는 발급된 인증서(012). 쓰는 인증서는 이유를 따로 보이지 않는다(대부분 쓰는 중이다) -->
+                        <form th:if="${currentUser.isAdmin() and !deleteBlocked.containsKey(c.id) and !#lists.contains(running, c.id)}"
+                              th:action="@{/certs/{id}/delete(id=${c.id})}" method="post" class="inline"
+                              th:attr="data-confirm=#{certs.list.deleteIssuedConfirm(${c.name})}">
+                            <input type="hidden" name="tab" value="issued">
+                            <button type="submit" class="link danger" th:text="#{certs.list.delete}">삭제</button>
+                        </form>
+                    </div>
+                    <div class="small muted" th:if="${currentUser.isAdmin() and !deleteBlocked.containsKey(c.id)}" th:text="#{certs.list.unused}">쓰는 사이트가 없습니다.</div>
                 </td>
             </tr>
             </tbody>
