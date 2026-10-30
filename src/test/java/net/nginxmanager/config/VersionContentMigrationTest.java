@@ -14,7 +14,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** v1.2.3 이하에서 쌓인 버전 파일 내용을 해시로 합쳐도 버전마다 내용이 그대로인지 본다(011, SC-1102). */
+/** v1.2.3 이하에서 쌓인 버전 파일 내용을 해시로 합쳐도 버전마다 내용이 그대로인지 본다(012, SC-1202). */
 class VersionContentMigrationTest {
 
     @TempDir

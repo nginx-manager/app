@@ -206,7 +206,7 @@ class RenewFailureTest extends ConfigRootTest {
 
         scheduler.renewDue();
 
-        // 꺼 둔 사이트의 인증서는 ACME에 요청하지 않는다(012)
+        // 꺼 둔 사이트의 인증서는 ACME에 요청하지 않는다(013)
         assertThat(acme.lastReplaces).isSameAs(untouched);
         assertThat(certificateRepository.findById(cert.getId()).orElseThrow().getCertPath()).isEqualTo(cert.getCertPath());
     }

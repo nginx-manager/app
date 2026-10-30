@@ -17,7 +17,7 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** 옛 인증서 디렉터리는 버전이 가리켜도 정리하고, 그 버전으로 되돌리면 지금 파일로 바꾼다(011). */
+/** 옛 인증서 디렉터리는 버전이 가리켜도 정리하고, 그 버전으로 되돌리면 지금 파일로 바꾼다(012). */
 class CertificatePruneTest extends ConfigRootTest {
 
     static final String NAME = "secure.example.com";

@@ -202,7 +202,7 @@ public class CertificateController {
         return "redirect:/certs";
     }
 
-    /** 쓰지 않는 인증서를 지운다(010, 012). 관리자만. 확인은 화면에서 받는다. */
+    /** 쓰지 않는 인증서를 지운다(010, 013). 관리자만. 확인은 화면에서 받는다. */
     @PostMapping("/certs/{id}/delete")
     public String delete(@PathVariable long id, @RequestParam(required = false) String tab,
                          Authentication authentication, RedirectAttributes redirect) {

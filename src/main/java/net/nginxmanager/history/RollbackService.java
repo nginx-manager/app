@@ -64,7 +64,7 @@ public class RollbackService {
         for (ConfigVersionFile file : target.getFiles()) {
             files.put(file.getPath(), file.getContent());
         }
-        // 정리된 옛 인증서 디렉터리를 가리키면 같은 인증서의 지금 파일로 바꾼다(011)
+        // 정리된 옛 인증서 디렉터리를 가리키면 같은 인증서의 지금 파일로 바꾼다(012)
         Map<String, String> wanted = certificatePathRepair.repair(files);
         List<FileChange> changes = new ArrayList<>();
         wanted.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(e -> {

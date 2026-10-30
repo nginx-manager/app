@@ -198,7 +198,7 @@ public class SiteController {
         return "redirect:/sites/" + id + "?saved";
     }
 
-    /** 사이트를 지우는 초안을 만든다(012). 한 번도 적용하지 않은 사이트는 바로 없어진다. 확인은 화면에서 받는다. */
+    /** 사이트를 지우는 초안을 만든다(013). 한 번도 적용하지 않은 사이트는 바로 없어진다. 확인은 화면에서 받는다. */
     @PostMapping("/{id}/delete")
     public String delete(@PathVariable long id, @RequestParam long version, Authentication authentication,
                          RedirectAttributes redirect) {

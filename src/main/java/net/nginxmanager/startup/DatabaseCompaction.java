@@ -8,7 +8,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 /**
- * 시작한 뒤 DB 파일에 빈 페이지가 많으면 줄인다(011). 버전 내용을 합치는 마이그레이션 뒤에 한 번 돈다.
+ * 시작한 뒤 DB 파일에 빈 페이지가 많으면 줄인다(012). 버전 내용을 합치는 마이그레이션 뒤에 한 번 돈다.
  * PRAGMA와 VACUUM은 JPA로 쓸 수 없어 JDBC로 직접 실행한다.
  */
 @Component

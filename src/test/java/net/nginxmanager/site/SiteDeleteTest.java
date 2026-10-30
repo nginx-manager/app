@@ -24,7 +24,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** 사이트를 지우는 초안을 만들고, 적용하면 사이트가 없어지는지 본다(012). */
+/** 사이트를 지우는 초안을 만들고, 적용하면 사이트가 없어지는지 본다(013). */
 class SiteDeleteTest extends ConfigRootTest {
 
     static final String DOMAIN = "old.example.com";

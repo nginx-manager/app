@@ -63,7 +63,7 @@ public class CertificateScheduler {
 
     /**
      * 켜진 사이트가 HTTPS로 쓰는 인증서. 쓰지 않는 인증서는 갱신하지도, 만료를 알리지도 않는다. 꺼 둔 사이트는 nginx가
-     * 서비스하지 않아 도메인 확인이 실패하므로 뺀다(012). 다시 켜서 적용하면 필요할 때 발급한다.
+     * 서비스하지 않아 도메인 확인이 실패하므로 뺀다(013). 다시 켜서 적용하면 필요할 때 발급한다.
      */
     private Set<Long> inUse() {
         return siteRepository.findByCertificateIdIsNotNull().stream()
