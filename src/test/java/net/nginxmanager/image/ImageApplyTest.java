@@ -90,7 +90,7 @@ class ImageApplyTest {
                 location -> assertThat(location).doesNotContain("rejected").doesNotContain("unchanged"));
 
         assertThat(get(rollback.headers().firstValue("Location").orElseThrow()
-                .replaceFirst("^https?://[^/]+", "")).body()).contains("되돌리기").contains("적용됨");
+                .replaceFirst("^https?://[^/]+", "")).body()).contains("롤백").contains("적용됨");
         await().atMost(Duration.ofSeconds(10)).pollInterval(Duration.ofMillis(200))
                 .until(() -> siteStatus().equals("404"));
     }
@@ -105,7 +105,7 @@ class ImageApplyTest {
         assertThat(imported.statusCode()).isEqualTo(302);
 
         String versions = get("/versions").body();
-        assertThat(versions).contains("외부 변경 가져오기").doesNotContain("id=\"drift\"");
+        assertThat(versions).contains("드리프트 가져오기").doesNotContain("id=\"drift\"");
     }
 
     private static String siteStatus() throws Exception {

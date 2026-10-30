@@ -162,7 +162,7 @@ class CertificateDeleteTest extends ConfigRootTest {
         mvc.perform(get("/certs").with(user("ed").roles("ADMIN")))
                 .andExpect(content().string(not(containsString("/certs/" + referenced.getId() + "/delete"))));
         mvc.perform(post("/certs/" + referenced.getId() + "/delete").with(csrf()).with(user("ed").roles("ADMIN")))
-                .andExpect(flash().attribute("error", containsString("설정이나 적용하지 않은 초안이")));
+                .andExpect(flash().attribute("error", containsString("설정이나 적용 대기 변경이")));
         assertThat(certificateRepository.existsById(referenced.getId())).isTrue();
     }
 

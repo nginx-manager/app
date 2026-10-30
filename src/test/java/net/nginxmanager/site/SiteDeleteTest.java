@@ -80,7 +80,7 @@ class SiteDeleteTest extends ConfigRootTest {
         assertThat(readFile(path)).isNotNull();
         mvc.perform(get("/sites/" + site.getId()).with(user("admin").roles("ADMIN")))
                 .andExpect(content().string(containsString("삭제 대기")))
-                .andExpect(content().string(containsString("사이트를 지우는 초안이 있습니다")));
+                .andExpect(content().string(containsString("사이트 삭제가 적용 대기 중입니다")));
         mvc.perform(get("/sites").with(user("admin").roles("ADMIN")))
                 .andExpect(content().string(containsString("삭제 대기")));
 

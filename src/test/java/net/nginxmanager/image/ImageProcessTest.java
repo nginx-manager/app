@@ -50,7 +50,7 @@ class ImageProcessTest {
         await().atMost(Duration.ofSeconds(20)).pollInterval(Duration.ofMillis(500))
                 .until(() -> client.get("/").body().contains("(PID " + pid + " → "));
         await().atMost(Duration.ofSeconds(10)).until(() -> curl("http://127.0.0.1/").equals("404"));
-        assertThat(client.get("/audit?action=NGINX_RESTART").body()).contains("다시 시작");
+        assertThat(client.get("/audit?action=NGINX_RESTART").body()).contains("nginx 재시작");
 
         // 관리도구 컨테이너가 죽어도 nginx 컨테이너는 계속 서비스한다
         stack.killManager();

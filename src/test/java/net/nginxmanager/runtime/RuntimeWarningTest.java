@@ -71,7 +71,7 @@ class RuntimeWarningTest extends ConfigRootTest {
         nginx.agent = new AgentInfo(true, "2.0.0", AgentNginxRuntime.PROTOCOL + 1, "not supported");
 
         mvc.perform(get("/").with(user("admin").roles("ADMIN")))
-                .andExpect(content().string(containsString("API 판이 맞지 않아")));
+                .andExpect(content().string(containsString("API 버전이 맞지 않아")));
     }
 
     @Test

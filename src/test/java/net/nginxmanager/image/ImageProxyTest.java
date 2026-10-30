@@ -79,7 +79,7 @@ class ImageProxyTest {
 
         String result = client.post("/apply", Map.of("message", "port clash"), "/apply").body();
 
-        assertThat(result).contains("직전 설정으로 되돌렸습니다").contains("Address already in use");
+        assertThat(result).contains("직전 설정으로 자동 롤백했습니다").contains("Address already in use");
         assertThat(stack.nginxExec("cat", "/etc/nginx/conf.d/sites/port.local.conf").getStdout())
                 .contains("listen 18090;");
         assertThat(status("port.local", 18090)).isEqualTo("200");

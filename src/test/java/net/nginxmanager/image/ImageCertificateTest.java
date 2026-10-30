@@ -106,7 +106,7 @@ class ImageCertificateTest {
         client.post("/certs/letsencrypt", Map.of("siteId", siteId, "from", "certs"), "/certs");
         assertThat(client.post("/apply", Map.of("message", "acme"), "/apply").body()).contains("모두 통과했습니다");
         await().atMost(Duration.ofSeconds(60)).pollInterval(Duration.ofMillis(500))
-                .until(() -> client.get("/sites/" + siteId).body().contains("443 server 블록 초안에 더하기"));
+                .until(() -> client.get("/sites/" + siteId).body().contains("443 server 블록 추가"));
 
         client.post("/certs/letsencrypt/raw-https", Map.of("siteId", siteId, "redirectHttp", "true"),
                 "/sites/" + siteId);

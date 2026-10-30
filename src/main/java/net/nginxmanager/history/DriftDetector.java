@@ -107,7 +107,7 @@ public class DriftDetector {
                     .toList();
             sync.sync(changes, true);
             ConfigVersion version = new ConfigVersion(userRepository.findByUsername(actor).orElse(null),
-                    "서버에서 직접 바뀐 설정 가져오기", VersionSource.DRIFT_IMPORT, VersionResult.SUCCESS, null);
+                    "드리프트 가져오기(서버에서 직접 바뀐 설정)", VersionSource.DRIFT_IMPORT, VersionResult.SUCCESS, null);
             sync.snapshot(version);
             return versionRepository.save(version).getId();
         }));

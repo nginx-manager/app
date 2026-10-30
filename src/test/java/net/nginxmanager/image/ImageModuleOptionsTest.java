@@ -113,7 +113,7 @@ class ImageModuleOptionsTest {
     }
 
     @Test
-    @DisplayName("리디렉션 사이트는 경로와 쿼리를 유지해 넘긴다")
+    @DisplayName("리다이렉트 사이트는 경로와 쿼리를 유지해 넘긴다")
     void redirectKeepsPathAndQuery() throws Exception {
         create("old.local", "REDIRECT", Map.of("redirectTarget", "https://new.example.com/",
                 "redirectCode", "308", "redirectKeepPath", "true"));
@@ -141,7 +141,7 @@ class ImageModuleOptionsTest {
     }
 
     @Test
-    @DisplayName("디렉터리 목록: index.html이 없는 폴더는 파일 목록을 보여 준다")
+    @DisplayName("디렉터리 리스팅: index.html이 없는 폴더는 파일 목록을 보여 준다")
     void autoindexListsFiles() throws Exception {
         stack.nginxExec("sh", "-c", "mkdir -p /tmp/listing/docs && echo x > /tmp/listing/docs/report-2026.txt");
         createStatic("files.local", "/tmp/listing", Map.of("options.autoindex", "true"));
