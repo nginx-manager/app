@@ -12,9 +12,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.util.List;
 import java.util.regex.Pattern;
 
-/** 알림 채널 설정(ADMIN). */
+/** 알림 채널 설정(ADMIN). 채널마다 받을 알림 종류를 고른다(028). */
 @Controller
 @RequestMapping("/settings/notifications")
 public class NotificationController {
@@ -36,6 +37,7 @@ public class NotificationController {
     @GetMapping
     public String list(Model model) {
         model.addAttribute("channels", channelRepository.findAllByOrderByIdAsc());
+        model.addAttribute("kinds", NotificationEvent.values());
         return "settings/notifications";
     }
 
@@ -56,6 +58,16 @@ public class NotificationController {
     @Transactional
     public String setEnabled(@PathVariable long id, @RequestParam boolean enabled) {
         load(id).setEnabled(enabled);
+        return "redirect:/settings/notifications";
+    }
+
+    /** 받을 알림 종류를 바꾼다(028). 모두 끄면 그 채널로는 시험 알림만 간다. */
+    @PostMapping("/{id}/events")
+    @Transactional
+    public String setEvents(@PathVariable long id, @RequestParam(required = false) List<NotificationEvent> events,
+                            RedirectAttributes redirect) {
+        load(id).setEvents(events == null ? List.of() : events);
+        redirect.addFlashAttribute("notice", messages.get("msg.notify.eventsSaved"));
         return "redirect:/settings/notifications";
     }
 

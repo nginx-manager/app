@@ -157,6 +157,15 @@
         });
         document.querySelectorAll('.nav-toggle').forEach(setupNavToggle);
         document.querySelectorAll('form.version-compare').forEach(setupVersionCompare);
+        // 사이트 목록의 모두 고르기: 같은 폼에 묶인 고르기 칸을 함께 켜고 끈다
+        document.querySelectorAll('input.select-all').forEach(function (all) {
+            const boxes = document.querySelectorAll('input[name=ids][form="' + all.dataset.form + '"]');
+            all.addEventListener('change', function () {
+                boxes.forEach(function (box) {
+                    box.checked = all.checked;
+                });
+            });
+        });
         document.querySelectorAll('pre.diff').forEach(colorDiff);
         document.querySelectorAll('.theme-toggle').forEach(function (button) {
             button.addEventListener('click', toggleTheme);
