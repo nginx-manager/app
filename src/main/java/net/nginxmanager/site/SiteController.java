@@ -9,6 +9,7 @@ import net.nginxmanager.cert.TlsCertificate;
 import net.nginxmanager.cert.TlsCertificateRepository;
 import net.nginxmanager.config.ConfigFileStore;
 import net.nginxmanager.user.UserRepository;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -20,7 +21,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.web.util.UriComponentsBuilder;
 
+import java.util.List;
 import java.util.Locale;
 
 @Controller
@@ -226,6 +229,44 @@ public class SiteController {
             return "redirect:/sites/" + id;
         }
         return "redirect:/sites/" + id + "?deleting";
+    }
+
+    /**
+     * 목록에서 고른 사이트를 한꺼번에 켜고 끄거나 담당자를 정한다(029). 다룰 수 없는 사이트가 하나라도 섞이면 아무것도
+     * 바꾸지 않는다. 담당자 지정은 관리자만 한다. 목록의 검색 조건을 유지해 돌아간다.
+     *
+     * @param action enable, disable, owner
+     */
+    @PostMapping("/bulk")
+    public String bulk(@RequestParam(required = false) List<Long> ids, @RequestParam String action,
+                       @RequestParam(required = false) Long owner, @RequestParam(required = false) String q,
+                       @RequestParam(required = false) String status,
+                       @RequestParam(name = "ownerFilter", required = false) String ownerFilter,
+                       Authentication authentication, RedirectAttributes redirect) {
+        String back = UriComponentsBuilder.fromPath("/sites")
+                .queryParamIfPresent("q", java.util.Optional.ofNullable(q).filter(v -> !v.isBlank()))
+                .queryParamIfPresent("status", java.util.Optional.ofNullable(status).filter(v -> !v.isBlank()))
+                .queryParamIfPresent("owner", java.util.Optional.ofNullable(ownerFilter).filter(v -> !v.isBlank()))
+                .encode().build().toUriString();
+        if (ids == null || ids.isEmpty()) {
+            redirect.addFlashAttribute("notice", messages.get("msg.site.bulk.none"));
+            return "redirect:" + back;
+        }
+        ids.forEach(id -> access.require(id, authentication));
+        SiteService.BulkResult result = switch (action) {
+            case "enable", "disable" -> siteService.setEnabledAll(ids, action.equals("enable"), authentication.getName());
+            case "owner" -> {
+                if (!SiteAccess.isAdmin(authentication)) {
+                    throw new AccessDeniedException("bulk owner");
+                }
+                yield siteService.assignOwnerAll(ids, owner, authentication.getName());
+            }
+            default -> throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "action " + action);
+        };
+        redirect.addFlashAttribute("notice", messages.get(
+                action.equals("owner") ? "msg.site.bulk.owner" : "msg.site.bulk.enabled", result.changed(), result.skipped()));
+        return "redirect:" + back;
     }
 
     /** 관리자가 담당자를 지정·변경·해제한다(SecurityConfig에서 관리자 전용). 설정 파일은 바뀌지 않는다. */

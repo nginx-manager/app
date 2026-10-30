@@ -33,12 +33,28 @@
     </form>
     <section class="card">
         <p th:if="${#lists.isEmpty(sites)}" class="muted" th:text="${search.active()} ? #{sites.list.search.empty} : #{sites.list.empty}">등록된 사이트가 없습니다.</p>
+        <form id="bulk" class="row-form bulk-bar" th:if="${!#lists.isEmpty(sites) and currentUser.canEdit()}" th:action="@{/sites/bulk}" method="post">
+            <input type="hidden" name="q" th:value="${search.q}">
+            <input type="hidden" name="status" th:value="${search.status}">
+            <input type="hidden" name="ownerFilter" th:value="${ownerFilter}">
+            <button type="submit" class="secondary" name="action" value="enable" th:text="#{sites.bulk.enable}">켜기</button>
+            <button type="submit" class="secondary" name="action" value="disable" th:text="#{sites.bulk.disable}">끄기</button>
+            <th:block th:if="${currentUser.isAdmin()}">
+                <select name="owner" th:attr="aria-label=#{sites.owner.label}">
+                    <option value="" th:text="#{sites.owner.none}">담당자 없음</option>
+                    <option th:each="u : ${users}" th:value="${u.id}" th:text="${u.username}">alice</option>
+                </select>
+                <button type="submit" class="secondary" name="action" value="owner" th:text="#{sites.bulk.assign}">담당자 지정</button>
+            </th:block>
+            <span class="hint" th:text="#{sites.bulk.hint}">고른 사이트를 한꺼번에 켜고 끕니다.</span>
+        </form>
         <table th:unless="${#lists.isEmpty(sites)}">
             <thead>
-            <tr><th th:text="#{sites.list.col.domain}">도메인</th><th th:text="#{sites.list.col.type}">유형</th><th th:text="#{sites.list.col.target}">대상</th><th th:text="#{sites.list.col.port}">포트</th><th th:text="#{sites.list.col.status}">상태</th><th th:if="${currentUser.isAdmin()}" th:text="#{sites.owner.label}">담당자</th></tr>
+            <tr><th th:if="${currentUser.canEdit()}" class="select"><input type="checkbox" class="select-all" data-form="bulk" th:attr="aria-label=#{sites.bulk.selectAll}" th:title="#{sites.bulk.selectAll}"></th><th th:text="#{sites.list.col.domain}">도메인</th><th th:text="#{sites.list.col.type}">유형</th><th th:text="#{sites.list.col.target}">대상</th><th th:text="#{sites.list.col.port}">포트</th><th th:text="#{sites.list.col.status}">상태</th><th th:if="${currentUser.isAdmin()}" th:text="#{sites.owner.label}">담당자</th></tr>
             </thead>
             <tbody>
             <tr th:each="s : ${sites}">
+                <td th:if="${currentUser.canEdit()}" class="select"><input type="checkbox" name="ids" form="bulk" th:value="${s.id}" th:attr="aria-label=|#{sites.bulk.select} ${s.primaryDomain}|"></td>
                 <td>
                     <a th:href="@{/sites/{id}(id=${s.id})}" th:text="${s.primaryDomain}">app.local</a>
                     <div class="muted small" th:if="${s.extraDomains}" th:text="${s.extraDomains}">www.app.local</div>

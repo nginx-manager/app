@@ -19,6 +19,8 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Supplier;
@@ -145,6 +147,48 @@ public class SiteService {
 
     private String ownerName(Long userId) {
         return userId == null ? null : userRepository.findById(userId).map(User::getUsername).orElse(null);
+    }
+
+    /** 여러 사이트를 한꺼번에 바꾼 결과(029). */
+    public record BulkResult(int changed, int skipped) {
+    }
+
+    /**
+     * 고른 사이트를 모두 켜거나 끄는 초안을 만든다(029). 이미 그 상태이거나 지우는 중인 사이트는 건너뛴다.
+     * 목록에서 고른 뒤 바뀐 사이트가 있어도 결과가 같으므로 버전은 확인하지 않는다.
+     */
+    public BulkResult setEnabledAll(Collection<Long> siteIds, boolean enabled, String actor) {
+        return locked(() -> {
+            int changed = 0;
+            for (Long id : new LinkedHashSet<>(siteIds)) {
+                Site site = load(id);
+                if (site.isEnabled() == enabled || site.getConfigFile().isDraftDelete()) {
+                    continue;
+                }
+                doSetEnabled(id, enabled, site.getVersion(), actor);
+                changed++;
+            }
+            return new BulkResult(changed, new LinkedHashSet<>(siteIds).size() - changed);
+        });
+    }
+
+    /** 고른 사이트의 담당자를 한꺼번에 정한다(029). 이미 그 담당자인 사이트는 건너뛴다. */
+    public BulkResult assignOwnerAll(Collection<Long> siteIds, Long ownerId, String actor) {
+        return locked(() -> {
+            if (ownerId != null && ownerName(ownerId) == null) {
+                throw new NotFoundException("user " + ownerId);
+            }
+            int changed = 0;
+            for (Long id : new LinkedHashSet<>(siteIds)) {
+                Site site = load(id);
+                if (java.util.Objects.equals(site.getOwnerId(), ownerId)) {
+                    continue;
+                }
+                doAssignOwner(id, ownerId, site.getVersion(), actor);
+                changed++;
+            }
+            return new BulkResult(changed, new LinkedHashSet<>(siteIds).size() - changed);
+        });
     }
 
     /** 활성/비활성은 파일을 conf.d/sites 와 sites-disabled 사이로 옮기는 초안이다. */
