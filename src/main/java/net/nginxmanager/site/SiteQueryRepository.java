@@ -20,7 +20,7 @@ public class SiteQueryRepository {
     public record SiteRow(Long id, String primaryDomain, String extraDomains, SiteType type, int listenHttpPort,
                           boolean enabled, boolean pending, Long configFileId, boolean httpsEnabled,
                           String proxyTarget, String staticRoot, String redirectTarget,
-                          Long ownerId, String ownerName, Boolean ownerEnabled) {
+                          Long ownerId, String ownerName, Boolean ownerEnabled, boolean deleting) {
 
         /** 목록의 대상 칸. 프록시는 백엔드 주소들, 정적은 문서 루트, 리디렉션은 보낼 주소. 원문 편집 사이트는 비운다 */
         public List<String> targets() {
@@ -76,7 +76,7 @@ public class SiteQueryRepository {
                         site.enabled,
                         configFile.draftContent.isNotNull().or(configFile.draftDelete.isTrue()),
                         configFile.id, site.httpsEnabled, site.proxyTarget, site.staticRoot, site.redirectTarget,
-                        site.ownerId, user.username, user.enabled))
+                        site.ownerId, user.username, user.enabled, configFile.draftDelete))
                 .from(site)
                 .join(site.configFile, configFile)
                 .leftJoin(user).on(user.id.eq(site.ownerId))

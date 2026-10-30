@@ -172,6 +172,39 @@ public class SiteService {
     }
 
     /**
+     * 사이트를 지우는 초안을 만든다(012). 사이트 파일과 비밀번호 파일을 지우는 초안이며, 적용하면 {@link SiteReconciler}가
+     * 파일이 사라진 사이트를 지운다. 디스크에 한 번도 쓰지 않은 사이트는 사이트째 없앤다.
+     *
+     * @return 사이트가 바로 없어졌으면 true(한 번도 적용하지 않은 사이트), 적용을 기다리면 false
+     * @throws SitePendingException 사이트 파일이나 비밀번호 파일에 적용하지 않은 변경이 있으면
+     */
+    public boolean delete(long siteId, long expectedVersion, String actor) {
+        return Boolean.TRUE.equals(locked(() -> {
+            Site site = load(siteId);
+            requireVersion(site.getVersion(), expectedVersion, "site " + site.getPrimaryDomain());
+            ConfigFile file = site.getConfigFile();
+            String domain = site.getPrimaryDomain();
+            if (isNeverWritten(file)) {
+                doDiscard(file.getId(), actor);
+                events.publishEvent(AuditEvent.success(actor, AuditAction.SITE_DELETE, "site:" + domain));
+                return true;
+            }
+            ConfigFile htpasswd = configFileRepository.findByPath(Htpasswd.path(domain)).orElse(null);
+            if (file.hasPendingChange() || (htpasswd != null && htpasswd.hasPendingChange())
+                    || configFileRepository.findByPath(SitePaths.of(domain, !site.isEnabled()))
+                            .filter(ConfigFile::hasPendingChange).isPresent()) {
+                throw new SitePendingException(domain);
+            }
+            file.stageDelete();
+            if (htpasswd != null && store.read(htpasswd.getPath()) != null) {
+                htpasswd.stageDelete();
+            }
+            events.publishEvent(AuditEvent.success(actor, AuditAction.SITE_DELETE, "site:" + domain));
+            return false;
+        }));
+    }
+
+    /**
      * 가져올 파일.
      *
      * @param sourcePath   화면에 보일 원본 위치(절대 경로, 올린 파일이면 파일 이름)

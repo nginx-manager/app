@@ -187,6 +187,7 @@ button:focus-visible, a:focus-visible { outline: none; box-shadow: 0 0 0 3px var
 button:disabled { opacity: .55; cursor: not-allowed; }
 button.secondary, a.button.secondary { background: var(--field); border-color: var(--line-strong); color: var(--fg); }
 button.secondary:hover, a.button.secondary:hover { background: var(--subtle); }
+button.secondary.danger { color: var(--bad); }
 button.link { padding: 0; border: 0; background: none; color: var(--accent); font-weight: 500; }
 button.link:hover { background: none; text-decoration: underline; text-underline-offset: 2px; }
 form > button[type=submit] { margin-top: .25rem; }

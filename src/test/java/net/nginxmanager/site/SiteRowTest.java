@@ -9,7 +9,7 @@ class SiteRowTest {
 
     private static SiteRow row(SiteType type, String proxyTarget, String staticRoot, String redirectTarget) {
         return new SiteRow(1L, "app.local", null, type, 80, true, false, 1L, false,
-                proxyTarget, staticRoot, redirectTarget, null, null, null);
+                proxyTarget, staticRoot, redirectTarget, null, null, null, false);
     }
 
     @Test

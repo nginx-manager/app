@@ -1,6 +1,7 @@
 package net.nginxmanager.cert;
 
 import net.nginxmanager.audit.AuditAction;
+import net.nginxmanager.config.ConfigFile;
 import net.nginxmanager.site.Site;
 import net.nginxmanager.support.ConfigRootTest;
 import net.nginxmanager.user.Role;
@@ -130,15 +131,39 @@ class CertificateDeleteTest extends ConfigRootTest {
     }
 
     @Test
-    void adminDomainAndIssuedCertificatesAreNotDeleted() throws Exception {
+    void adminDomainCertificateIsNotDeleted() throws Exception {
         TlsCertificate admin = failed(ADMIN_DOMAIN);
-        TlsCertificate ok = issued("ok.example.com");
 
         mvc.perform(post("/certs/" + admin.getId() + "/delete").with(csrf()).with(user("ed").roles("ADMIN")))
                 .andExpect(flash().attribute("error", containsString("관리 화면 도메인")));
-        mvc.perform(post("/certs/" + ok.getId() + "/delete").with(csrf()).with(user("ed").roles("ADMIN")))
-                .andExpect(flash().attribute("error", containsString("발급된 인증서는 지울 수 없습니다")));
-        assertThat(certificateRepository.count()).isEqualTo(2);
+        assertThat(certificateRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void unusedIssuedCertificateIsDeleted() throws Exception {
+        TlsCertificate unused = issued("old.example.com");
+
+        mvc.perform(get("/certs").with(user("ed").roles("ADMIN")))
+                .andExpect(content().string(containsString("/certs/" + unused.getId() + "/delete")))
+                .andExpect(content().string(containsString("쓰는 사이트가 없습니다")));
+        mvc.perform(post("/certs/" + unused.getId() + "/delete").param("tab", "issued")
+                        .with(csrf()).with(user("ed").roles("ADMIN")))
+                .andExpect(redirectedUrl("/certs?tab=issued"))
+                .andExpect(flash().attribute("notice", containsString("지웠습니다")));
+        assertThat(certificateRepository.existsById(unused.getId())).isFalse();
+    }
+
+    @Test
+    void issuedCertificateReferencedByConfigIsNotDeleted() throws Exception {
+        TlsCertificate referenced = issued("ref.example.com");
+        writeFile("conf.d/tls.conf", "ssl_certificate /x/fullchain.pem;\n");
+        configFileRepository.save(new ConfigFile("conf.d/tls.conf", false));
+
+        mvc.perform(get("/certs").with(user("ed").roles("ADMIN")))
+                .andExpect(content().string(not(containsString("/certs/" + referenced.getId() + "/delete"))));
+        mvc.perform(post("/certs/" + referenced.getId() + "/delete").with(csrf()).with(user("ed").roles("ADMIN")))
+                .andExpect(flash().attribute("error", containsString("설정이나 적용하지 않은 초안이")));
+        assertThat(certificateRepository.existsById(referenced.getId())).isTrue();
     }
 
     @Test

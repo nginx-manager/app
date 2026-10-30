@@ -79,10 +79,10 @@ public class CertificateController {
         model.addAttribute("issuedCount", issued.size());
         model.addAttribute("pendingCount", pending.size());
         model.addAttribute("hasAny", !all.isEmpty());
-        // 지울 수 없는 대기·실패 인증서와 그 이유
-        List<Site> sites = pendingTab ? siteRepository.findAll() : List.of();
+        // 지울 수 없는 인증서와 그 이유(사이트는 한 번만 읽는다)
+        List<Site> sites = siteRepository.findAll();
         Map<Long, String> deleteBlocked = new java.util.HashMap<>();
-        for (TlsCertificate c : pendingTab ? pending : List.<TlsCertificate>of()) {
+        for (TlsCertificate c : certificates) {
             deletion.blocker(c, sites).ifPresent(b -> deleteBlocked.put(c.getId(),
                     blockedMessage(b, CertificateDeletion.usersOf(c, sites))));
         }
@@ -202,21 +202,22 @@ public class CertificateController {
         return "redirect:/certs";
     }
 
-    /** 발급하지 못한(대기·실패) 인증서를 지운다. 관리자만. 확인은 화면에서 받는다. */
+    /** 쓰지 않는 인증서를 지운다(010, 012). 관리자만. 확인은 화면에서 받는다. */
     @PostMapping("/certs/{id}/delete")
-    public String delete(@PathVariable long id, Authentication authentication, RedirectAttributes redirect) {
+    public String delete(@PathVariable long id, @RequestParam(required = false) String tab,
+                         Authentication authentication, RedirectAttributes redirect) {
         try {
             String name = deletion.delete(id, authentication.getName());
             redirect.addFlashAttribute("notice", messages.get("msg.cert.deleted", name));
         } catch (CertificateDeletion.BlockedException e) {
             redirect.addFlashAttribute("error", blockedMessage(e.blocker(), e.sites()));
         }
-        return "redirect:/certs?tab=" + PENDING_TAB;
+        return "redirect:/certs?tab=" + (ISSUED_TAB.equals(tab) ? ISSUED_TAB : PENDING_TAB);
     }
 
     private String blockedMessage(CertificateDeletion.Blocker blocker, List<String> sites) {
         return switch (blocker) {
-            case ISSUED -> messages.get("msg.cert.delete.issued");
+            case REFERENCED -> messages.get("msg.cert.delete.referenced");
             case RUNNING -> messages.get("msg.cert.delete.running");
             case IN_USE -> messages.get("msg.cert.delete.inUse", String.join(", ", sites));
             case ADMIN_DOMAIN -> messages.get("msg.cert.delete.adminDomain");

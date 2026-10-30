@@ -1,6 +1,7 @@
 package net.nginxmanager.site;
 
 import jakarta.validation.Valid;
+import net.nginxmanager.common.Messages;
 import net.nginxmanager.common.NotFoundException;
 import net.nginxmanager.cert.CertificateService;
 import net.nginxmanager.cert.CertificateSource;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.Locale;
 
@@ -34,11 +36,13 @@ public class SiteController {
     private final ImportFiles importFiles;
     private final SiteAccess access;
     private final UserRepository userRepository;
+    private final Messages messages;
 
     public SiteController(SiteService siteService, SiteQueryRepository siteQueryRepository,
                           SiteRendering rendering, ConfigFileStore store,
                           TlsCertificateRepository certificateRepository, CertificateService certificateService,
-                          ImportFiles importFiles, SiteAccess access, UserRepository userRepository) {
+                          ImportFiles importFiles, SiteAccess access, UserRepository userRepository, Messages messages) {
+        this.messages = messages;
         this.access = access;
         this.userRepository = userRepository;
         this.importFiles = importFiles;
@@ -192,6 +196,23 @@ public class SiteController {
         access.require(id, authentication);
         siteService.setEnabled(id, enabled, version, authentication.getName());
         return "redirect:/sites/" + id + "?saved";
+    }
+
+    /** 사이트를 지우는 초안을 만든다(012). 한 번도 적용하지 않은 사이트는 바로 없어진다. 확인은 화면에서 받는다. */
+    @PostMapping("/{id}/delete")
+    public String delete(@PathVariable long id, @RequestParam long version, Authentication authentication,
+                         RedirectAttributes redirect) {
+        Site site = access.require(id, authentication);
+        try {
+            if (siteService.delete(id, version, authentication.getName())) {
+                redirect.addFlashAttribute("notice", messages.get("msg.site.deleted", site.getPrimaryDomain()));
+                return "redirect:/sites";
+            }
+        } catch (SitePendingException e) {
+            redirect.addFlashAttribute("error", messages.get("msg.site.deletePending"));
+            return "redirect:/sites/" + id;
+        }
+        return "redirect:/sites/" + id + "?deleting";
     }
 
     /** 관리자가 담당자를 지정·변경·해제한다(SecurityConfig에서 관리자 전용). 설정 파일은 바뀌지 않는다. */

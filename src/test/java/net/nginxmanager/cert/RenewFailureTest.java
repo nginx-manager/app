@@ -192,6 +192,26 @@ class RenewFailureTest extends ConfigRootTest {
     }
 
     @Test
+    void certificatesOfDisabledSitesAreNotRenewed() {
+        TlsCertificate cert = issuedSite();
+        var site = siteRepository.findByPrimaryDomain(DOMAIN).orElseThrow();
+        siteService.setEnabled(site.getId(), false, site.getVersion(), "editor");
+        assertThat(applyService.applyPending("editor", "off").succeeded()).isTrue();
+        // 갱신 때가 된 것으로 만든다
+        TlsCertificate due = certificateRepository.findById(cert.getId()).orElseThrow();
+        due.activate(due.paths(), due.getNotBefore(), due.getNotAfter(), Instant.now().minusSeconds(60), Instant.now());
+        certificateRepository.save(due);
+        X509CertificateHolder untouched = new X509CertificateHolder(null);
+        acme.lastReplaces = untouched;
+
+        scheduler.renewDue();
+
+        // 꺼 둔 사이트의 인증서는 ACME에 요청하지 않는다(012)
+        assertThat(acme.lastReplaces).isSameAs(untouched);
+        assertThat(certificateRepository.findById(cert.getId()).orElseThrow().getCertPath()).isEqualTo(cert.getCertPath());
+    }
+
+    @Test
     void firstIssuanceFailureKeepsTheSiteOnHttpAndShowsWhyAndWhen() throws Exception {
         acme.failure = new AcmeClient.AcmeFailure("발급 한도에 걸렸습니다", Instant.now().plusSeconds(7200), null);
         siteService.create(new SiteForm(DOMAIN, "", SiteType.STATIC, 80, "/srv/www/shop", null,
