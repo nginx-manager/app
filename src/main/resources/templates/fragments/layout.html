@@ -57,6 +57,8 @@
 <footer class="footer" th:fragment="footer">
     <span>nginx manager</span>
     <a th:href="${appVersion.releaseNotesUrl()}" th:text="${appVersion.label()}" th:title="#{footer.releaseNotes}" target="_blank" rel="noopener">v1.0.0</a>
+    <span aria-hidden="true">·</span>
+    <a th:href="${appVersion.manualUrl()}" th:text="#{footer.manual}" target="_blank" rel="noopener">사용 설명서</a>
 </footer>
 </body>
 </html>
