@@ -81,6 +81,7 @@ public class SiteConfigRenderer {
     }
 
     private static void content(StringBuilder out, String primaryDomain, SiteForm form, boolean https) {
+        maintenanceLocation(out, form.options());
         authRequestLocations(out, form.options());
         pathRouteLocations(out, primaryDomain, form, https);
         switch (form.type()) {
@@ -107,6 +108,41 @@ public class SiteConfigRenderer {
             case PHP -> phpLocations(out, primaryDomain, form, https);
             case RAW -> throw new IllegalArgumentException("raw sites are not rendered");
         }
+    }
+
+    static final String MAINTENANCE_LOCATION = "@nginx_manager_maintenance";
+    static final String DEFAULT_MAINTENANCE_MESSAGE =
+            "서비스 점검 중입니다. 잠시 후 다시 접속해 주세요.\nWe are down for maintenance. Please try again soon.";
+
+    /**
+     * 점검 모드(021): 내용 location이 돌려준 503을 안내 페이지로 바꾼다. 문구는 HTML로 이스케이프하고,
+     * nginx 문자열을 깨는 문자(', \, $, {, })는 검증에서 막는다.
+     */
+    private static void maintenanceLocation(StringBuilder out, SiteOptions options) {
+        if (!options.maintenance()) {
+            return;
+        }
+        String message = options.maintenanceMessage() == null ? DEFAULT_MAINTENANCE_MESSAGE : options.maintenanceMessage();
+        String html = "<!doctype html><html><head><meta charset=\"utf-8\">"
+                + "<meta name=\"viewport\" content=\"width=device-width\"><title>503</title></head>"
+                + "<body style=\"font-family:sans-serif;max-width:40rem;margin:4rem auto;padding:0 1rem\"><p>"
+                + String.join("<br>", message.lines().map(SiteConfigRenderer::escapeHtml).toList())
+                + "</p></body></html>";
+        out.append("    error_page 503 ").append(MAINTENANCE_LOCATION).append(";\n")
+                .append("    location ").append(MAINTENANCE_LOCATION).append(" {\n")
+                .append("        default_type text/html;\n")
+                .append("        add_header Retry-After 600 always;\n")
+                .append("        add_header Cache-Control no-store always;\n")
+                .append("        return 503 '").append(html).append("';\n")
+                .append("    }\n\n");
+    }
+
+    private static String escapeHtml(String value) {
+        return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
+    }
+
+    private static String maintenanceVariable(String primaryDomain) {
+        return "$nm_maintenance_" + identifier(primaryDomain);
     }
 
     /**
@@ -216,6 +252,16 @@ public class SiteConfigRenderer {
         SiteOptions options = form.options();
         String id = identifier(primaryDomain);
         boolean any = false;
+        if (options.maintenance()) {
+            // 점검 중 막을 요청(1)과 작업자 주소(0)를 나눈다(021)
+            out.append("geo ").append(maintenanceVariable(primaryDomain)).append(" {\n")
+                    .append("    default 1;\n");
+            for (String address : options.maintenanceAllowList()) {
+                out.append("    ").append(address).append(" 0;\n");
+            }
+            out.append("}\n");
+            any = true;
+        }
         if (options.rateLimit() != null) {
             out.append("limit_req_zone $binary_remote_addr zone=req_").append(id).append(":10m rate=")
                     .append(options.rateLimit()).append("r/s;\n");
@@ -283,6 +329,12 @@ public class SiteConfigRenderer {
         String id = identifier(primaryDomain);
         boolean access = options.accessRestricted();
         boolean auth = options.authEnabled() || options.authRequestEnabled();
+        if (options.maintenance()) {
+            // rewrite 단계라 접근 제한·인증보다 먼저 503을 준다. if 안에서 return만 쓰는 것은 안전한 형태다
+            out.append("        if (").append(maintenanceVariable(primaryDomain)).append(") {\n")
+                    .append("            return 503;\n")
+                    .append("        }\n");
+        }
         if (access && auth) {
             out.append("        satisfy ").append(options.satisfyAny() ? "any" : "all").append(";\n");
         }

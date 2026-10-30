@@ -134,7 +134,8 @@ public class SiteImporter {
                 imported.type() == SiteType.PROXY ? o.backupTargets() : null,
                 imported.type() == SiteType.PROXY ? o.upstreamMaxFails() : null,
                 imported.type() == SiteType.PROXY ? o.upstreamFailTimeout() : null,
-                imported.type() == SiteType.PROXY ? o.upstreamKeepalive() : null);
+                imported.type() == SiteType.PROXY ? o.upstreamKeepalive() : null, o.maintenance(),
+                o.maintenanceMessage(), o.maintenanceAllowFrom());
         return new SiteForm(current.primaryDomain(), imported.extraDomains(), imported.type(),
                 imported.listenHttpPort(), imported.staticRoot(), imported.proxyTarget(), current.version(),
                 current.httpsEnabled(), current.redirectHttpToHttps(), current.certificateId(),
@@ -278,7 +279,7 @@ public class SiteImporter {
                     ? redirectTarget.substring(0, redirectTarget.length() - "$request_uri".length())
                     : redirectTarget;
             SiteOptions options = new SiteOptions(gzip, false, false, false, maxBodySizeMb, null, null, null, false,
-                    null, null, null, null, null, null, autoindex, null, null, null, null, null, null, null);
+                    null, null, null, null, null, null, autoindex, null, null, null, null, null, null, null, false, null, null);
             String extra = String.join(" ", domains.subList(1, domains.size()));
             return new SiteForm(primary, extra, type, port == null ? 80 : port,
                     usesRoot ? root : null, targets, null, false, true, null,

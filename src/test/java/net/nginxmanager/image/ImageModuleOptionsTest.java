@@ -303,6 +303,22 @@ class ImageModuleOptionsTest {
         assertThat(status("failover.local")).isEqualTo("200");
     }
 
+    @Test
+    @DisplayName("점검 모드(021): 방문자는 503과 안내 문구, 허용 주소는 평소대로")
+    void maintenanceModeShowsThePageExceptToAllowedAddresses() throws Exception {
+        createStatic("closed.local", "/etc/nginx/html", Map.of("options.maintenance", "true",
+                "options.maintenanceMessage", "DB 작업 중입니다", "options.maintenanceAllowFrom", "10.99.0.0/16"));
+        createStatic("worker.local", "/etc/nginx/html", Map.of("options.maintenance", "true",
+                "options.maintenanceAllowFrom", "127.0.0.1"));
+        apply("maintenance");
+
+        awaitStatus("closed.local", "503");
+        String body = stack.nginxExec("curl", "--noproxy", "*", "-s", "-H", "Host: closed.local",
+                "http://127.0.0.1/").getStdout();
+        assertThat(body).contains("DB 작업 중입니다");
+        assertThat(status("worker.local")).isEqualTo("200");
+    }
+
     private static void createStatic(String domain, String root, Map<String, String> fields) throws Exception {
         Map<String, String> all = new LinkedHashMap<>(Map.of("staticRoot", root));
         all.putAll(fields);
