@@ -106,6 +106,9 @@ class AdminDomainIssueTest extends ConfigRootTest {
                 .until(() -> certificateRepository.findByName(DOMAIN).orElseThrow(),
                         c -> c.getStatus() == CertificateStatus.ACTIVE);
 
+        // 발급이 끝나면 다음 확인 주기를 기다리지 않고 HTTPS로 바뀐다
+        await().atMost(Duration.ofSeconds(10)).pollInterval(Duration.ofMillis(100))
+                .until(() -> readFile(AdminConfigRenderer.PATH), c -> c.contains("return 301"));
         assertThat(adminDomain.sync().state()).isEqualTo(AdminDomainService.State.ACTIVE);
         assertThat(readFile(AdminConfigRenderer.PATH))
                 .contains("return 301 https://$host$request_uri;")

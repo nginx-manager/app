@@ -153,7 +153,8 @@ public class AdminDomainService {
             }
         }
         if (cert.isDue(clock.instant()) && !certificateService.isRunning(cert.getId())) {
-            certificateService.submit(cert.getId());
+            // 발급되면 다음 확인 주기를 기다리지 않고 바로 HTTPS로 바꾼다
+            certificateService.submit(cert.getId(), this::sync);
         }
         return paths == null
                 ? new Status(State.WAITING_CERTIFICATE, domain, cert.getLastError())

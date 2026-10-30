@@ -117,7 +117,12 @@ public class CertificateService {
 
     /** 백그라운드에서 발급·갱신한다. */
     public void submit(long certificateId) {
-        executor.execute(() -> issueOrRenew(certificateId));
+        submit(certificateId, () -> { });
+    }
+
+    /** 백그라운드에서 발급·갱신하고, 성공하면 (진행 중 표시를 풀기 전에) afterSuccess를 부른다. */
+    public void submit(long certificateId, Runnable afterSuccess) {
+        executor.execute(() -> issueOrRenew(certificateId, afterSuccess));
     }
 
     /**
@@ -126,11 +131,19 @@ public class CertificateService {
      * @return 실패 사유. 성공하면 비어 있다
      */
     public Optional<String> issueOrRenew(long certificateId) {
+        return issueOrRenew(certificateId, () -> { });
+    }
+
+    private Optional<String> issueOrRenew(long certificateId, Runnable afterSuccess) {
         if (!running.add(certificateId)) {
             return Optional.of("이미 진행 중입니다.");
         }
         try {
-            return run(certificateId);
+            Optional<String> failure = run(certificateId);
+            if (failure.isEmpty()) {
+                afterSuccess.run();
+            }
+            return failure;
         } catch (RuntimeException e) {
             log.error("certificate {} failed", certificateId, e);
             fail(certificateId, false, "예상하지 못한 오류: " + e.getMessage(), null);
