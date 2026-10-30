@@ -36,4 +36,5 @@ nginx manager의 버전별 변경 내용입니다. 최신 버전이 위에 있�
    ```bash
    git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z
    ```
+   태그를 밀 수 없으면 Actions의 `Release images`에서 Run workflow를 main으로 고르고 `release`에 `vX.Y.Z`를 넣어 돌립니다. 워크플로가 main의 마지막 커밋에 태그를 달고 이어서 게시합니다.
 4. **소개 페이지**: 조직 소개([nginx-manager/.github](https://github.com/nginx-manager/.github)의 `profile/README.md`)의 릴리스 표와 release·nginx 배지는 그 저장소의 `Sync releases` 워크플로가 이 표(날짜가 적힌 줄)와 최신 노트의 nginx 버전을 읽어 한 시간 안에 맞춥니다. 바로 반영하려면 그 저장소 Actions에서 Run workflow를 누릅니다.
