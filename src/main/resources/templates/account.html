@@ -18,6 +18,29 @@
             <button type="submit" th:text="#{account.submit}">변경</button>
         </form>
     </section>
+
+    <section class="card narrow" id="two-factor" th:if="${me != null}">
+        <h2 th:text="#{account.2fa.heading}">2단계 인증</h2>
+        <p class="notice" th:if="${param['2fa-off']}" th:text="#{account.2fa.off}">2단계 인증을 껐습니다.</p>
+        <p class="error" th:if="${param['2fa-error']}" th:text="#{msg.account.wrongPassword}">현재 비밀번호가 맞지 않습니다.</p>
+        <th:block th:unless="${me.totpEnabled}">
+            <p><span class="badge" th:text="#{account.2fa.statusOff}">꺼짐</span>
+                <span th:text="#{account.2fa.intro}">로그인할 때 비밀번호와 함께 휴대폰 인증 앱의 코드를 넣게 합니다. 관리 화면을 인터넷에 열어 두었다면 켜 두세요.</span></p>
+            <a th:href="@{/account/2fa}" class="button" th:text="#{account.2fa.start}">켜기</a>
+        </th:block>
+        <th:block th:if="${me.totpEnabled}">
+            <p><span class="badge ok" th:text="#{account.2fa.statusOn}">켜짐</span>
+                <span th:text="#{account.2fa.codesLeft(${me.recoveryCodesLeft})}">남은 복구 코드 10개</span></p>
+            <form th:action="@{/account/2fa/recovery-codes}" method="post" class="row-form">
+                <label><span th:text="#{account.currentPassword}">현재 비밀번호</span> <input type="password" name="currentPassword" autocomplete="current-password" required></label>
+                <button type="submit" class="secondary" th:text="#{account.2fa.regenerate}">복구 코드 새로 만들기</button>
+            </form>
+            <form th:action="@{/account/2fa/disable}" method="post" class="row-form">
+                <label><span th:text="#{account.currentPassword}">현재 비밀번호</span> <input type="password" name="currentPassword" autocomplete="current-password" required></label>
+                <button type="submit" class="secondary danger" th:text="#{account.2fa.disable}">끄기</button>
+            </form>
+        </th:block>
+    </section>
 </main>
 <footer th:replace="~{fragments/layout :: footer}"></footer>
 </body>

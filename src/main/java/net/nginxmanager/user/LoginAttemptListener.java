@@ -33,7 +33,12 @@ public class LoginAttemptListener {
     @Transactional
     public void onSuccess(AuthenticationSuccessEvent event) {
         String username = event.getAuthentication().getName();
-        userRepository.findByUsername(username).ifPresent(User::recordLoginSuccess);
+        var user = userRepository.findByUsername(username);
+        // 2단계 인증이 켜져 있으면 코드까지 맞아야 로그인이다. 실패 횟수도 그때 지운다(비밀번호만 맞히며 코드를 계속 시도하지 못하게)
+        if (user.isPresent() && user.get().isTotpEnabled()) {
+            return;
+        }
+        user.ifPresent(User::recordLoginSuccess);
         events.publishEvent(AuditEvent.success(username, AuditAction.LOGIN, null));
     }
 

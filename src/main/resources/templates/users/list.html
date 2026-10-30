@@ -38,6 +38,11 @@
                 <td>
                     <span class="badge" th:classappend="${u.enabled ? 'ok' : 'bad'}" th:text="${u.enabled} ? #{users.list.active} : #{users.list.inactive}">활성</span>
                     <span class="badge warn" th:if="${u.lockedNow}" th:text="#{users.list.locked}" th:title="#{users.list.lockedHint}">잠김</span>
+                    <span class="badge ok" th:if="${u.totpEnabled}" th:text="#{users.list.twoFactor}" th:title="#{users.list.twoFactorHint}">2단계 인증</span>
+                    <form th:if="${u.totpEnabled and u.username != currentUser.username}" th:action="@{/users/{id}/2fa/reset(id=${u.id})}" method="post" class="inline">
+                        <input type="hidden" name="version" th:value="${u.version}">
+                        <button type="submit" class="link" th:text="#{users.list.twoFactorReset}" th:title="#{users.list.twoFactorResetHint}">2단계 인증 해제</button>
+                    </form>
                     <form th:unless="${u.username == currentUser.username}" th:action="@{/users/{id}/enabled(id=${u.id})}" method="post" class="inline">
                         <input type="hidden" name="version" th:value="${u.version}">
                         <input type="hidden" name="enabled" th:value="${!u.enabled}">

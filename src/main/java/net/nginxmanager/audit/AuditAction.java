@@ -3,6 +3,7 @@ package net.nginxmanager.audit;
 public enum AuditAction {
     LOGIN,
     ACCOUNT_LOCKED,
+    TWO_FACTOR,
     USER_CREATE,
     USER_CHANGE,
     SITE_SAVE,

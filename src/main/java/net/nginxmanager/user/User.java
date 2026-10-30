@@ -9,6 +9,7 @@ import net.nginxmanager.common.BaseEntity;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 
 @Entity
 @Table(name = "users")
@@ -32,6 +33,18 @@ public class User extends BaseEntity {
 
     @Column(name = "locked_until")
     private Instant lockedUntil;
+
+    @Column(name = "totp_secret", length = 64)
+    private String totpSecret;
+
+    @Column(name = "totp_enabled", nullable = false)
+    private boolean totpEnabled;
+
+    @Column(name = "totp_last_step")
+    private Long totpLastStep;
+
+    @Column(name = "recovery_codes")
+    private String recoveryCodes;
 
     protected User() {
     }
@@ -78,6 +91,54 @@ public class User extends BaseEntity {
     public void recordLoginSuccess() {
         failedLoginCount = 0;
         lockedUntil = null;
+    }
+
+    /** 켜기 전 비밀 키를 둔다(켜기 화면을 다시 열어도 같은 QR 코드). */
+    void prepareTotp(String secret) {
+        this.totpSecret = secret;
+        this.totpEnabled = false;
+        this.totpLastStep = null;
+    }
+
+    void enableTotp(long usedStep, List<String> recoveryCodeHashes) {
+        this.totpEnabled = true;
+        this.totpLastStep = usedStep;
+        this.recoveryCodes = String.join("\n", recoveryCodeHashes);
+    }
+
+    void disableTotp() {
+        this.totpSecret = null;
+        this.totpEnabled = false;
+        this.totpLastStep = null;
+        this.recoveryCodes = null;
+    }
+
+    void useTotpStep(long step) {
+        this.totpLastStep = step;
+    }
+
+    List<String> recoveryCodeHashes() {
+        return recoveryCodes == null || recoveryCodes.isBlank() ? List.of() : List.of(recoveryCodes.split("\n"));
+    }
+
+    void replaceRecoveryCodes(List<String> hashes) {
+        this.recoveryCodes = hashes.isEmpty() ? null : String.join("\n", hashes);
+    }
+
+    public boolean isTotpEnabled() {
+        return totpEnabled;
+    }
+
+    String getTotpSecret() {
+        return totpSecret;
+    }
+
+    Long getTotpLastStep() {
+        return totpLastStep;
+    }
+
+    public int getRecoveryCodesLeft() {
+        return recoveryCodeHashes().size();
     }
 
     public String getUsername() {

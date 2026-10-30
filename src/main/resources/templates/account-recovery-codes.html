@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="ko" th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(#{account.recovery.title})}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<main class="page">
+    <h1 th:text="#{account.recovery.title}">복구 코드</h1>
+    <section class="card narrow">
+        <p class="notice" th:if="${enabled}" th:text="#{account.recovery.enabled}">2단계 인증을 켰습니다.</p>
+        <p th:text="#{account.recovery.intro}">휴대폰을 잃었을 때 인증 코드 대신 쓰는 코드입니다. 코드마다 한 번만 쓸 수 있고, 이 화면을 벗어나면 다시 볼 수 없습니다. 비밀번호 관리자나 종이에 적어 안전한 곳에 두세요.</p>
+        <ul class="recovery-codes" id="recovery-codes">
+            <li th:each="c : ${recoveryCodes}"><code th:text="${c}">abcde-12345</code></li>
+        </ul>
+        <a th:href="@{/account}" class="button" th:text="#{account.recovery.done}">적어 두었습니다</a>
+    </section>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>
