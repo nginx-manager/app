@@ -530,4 +530,5 @@ body > footer, .footer { padding: 1.25rem 2rem 2rem; text-align: center; color: 
     .js .nav.open .langs a { width: auto; }
 }
 .footer { box-sizing: border-box; width: calc(100% - 4rem); max-width: calc(1200px - 4rem); margin: 0 auto; padding: .75rem 0 1.5rem; display: flex; gap: .5rem; color: var(--muted); font-size: .8rem; border-top: 1px solid var(--line); }
-.footer a { color: var(--muted); }
+.footer a { color: var(--muted); display: inline-flex; align-items: center; gap: .3rem; }
+.footer .icon-github { width: 14px; height: 14px; fill: currentColor; stroke: none; }

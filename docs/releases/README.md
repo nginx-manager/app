@@ -19,7 +19,7 @@ nginx manager의 버전별 변경 내용입니다. 최신 버전이 위에 있�
 
 ## 릴리스 절차
 
-1. **노트 쓰기**: [TEMPLATE.md](TEMPLATE.md)를 복사해 `vX.Y.Z.md`를 쓰고, 이 표 맨 위에 한 줄을 더합니다.
+1. **노트 쓰기**: [TEMPLATE.md](TEMPLATE.md)를 복사해 `vX.Y.Z.md`를 쓰고, 이 표 맨 위에 한 줄을 더합니다. 이번 버전의 기능이 [사용 설명서](../manual/README.md)에 모두 들어갔는지 확인하고, 설명서 차례의 기준 버전을 올립니다.
 2. **화면 찍기**: 릴리스할 커밋으로 두 이미지를 빌드해 빈 볼륨으로 띄우고 스크립트로 찍습니다. 그림은 2배 해상도로 찍히고, 노트에서는 `width`로 1배 크기에 맞춰 보여 줍니다.
    ```bash
    docker build -f docker/nginx/Dockerfile --build-arg APP_VERSION=X.Y.Z -t ghcr.io/nginx-manager/nginx:X.Y.Z .

@@ -12,6 +12,9 @@ public class AppVersion {
 
     static final String RELEASE_NOTES_BASE = "https://github.com/nginx-manager/app/blob/main/docs/releases/";
 
+    /** footer의 사용 설명서 링크. 설명서는 늘 최신 기능까지 담으므로 main을 가리킨다. */
+    public static final String MANUAL_URL = "https://github.com/nginx-manager/app/blob/main/docs/manual/README.md";
+
     private static final Pattern RELEASE = Pattern.compile("v?\\d+\\.\\d+\\.\\d+");
 
     private final ObjectProvider<BuildProperties> buildProperties;
@@ -33,6 +36,11 @@ public class AppVersion {
     /** footer 버전을 누르면 열 릴리스 노트. */
     public String releaseNotesUrl() {
         return releaseNotesUrl(current());
+    }
+
+    /** footer에서 여는 사용 설명서. */
+    public String manualUrl() {
+        return MANUAL_URL;
     }
 
     static String label(String version) {
