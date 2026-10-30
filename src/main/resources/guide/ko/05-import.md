@@ -79,6 +79,30 @@ sudo /opt/nginx-manager/nm import-root grant /home/alice/nginx /home/alice/www
 - `setfacl`이 없으면 `acl` 패키지를 설치합니다(`apt install acl`). ACL을 지원하지 않는 파일시스템이면 `chmod o+rX`로 대신합니다.
 - 권한을 바꿀 수 없으면 **내 PC의 파일 올리기**로 내용만 가져옵니다. 이때는 원본이 바뀌어도 알 수 없고, 설정이 가리키는 파일(`root` 등)은 nginx가 읽을 수 있는 곳에 따로 두어야 합니다.
 
+### Certbot 인증서를 그대로 쓰기
+
+서버의 Certbot이 받은 인증서(`/etc/letsencrypt`)를 그대로 쓰는 설정도 가져올 수 있습니다. 관리도구가 인증서를 새로 받게 하는 편(80 server만 가져온 뒤 사이트 화면에서 HTTPS 켜기)이 더 간단하지만, Certbot을 계속 쓰려면 이렇게 합니다.
+
+1. `.env`의 가져오기 디렉터리에 `/etc/letsencrypt`를 더하고(쉼표로 여럿) 다시 띄웁니다. `nm import-root add /etc/letsencrypt`와 같습니다.
+   ```
+   NGINX_MANAGER_IMPORT_ROOTS=/home,/etc/letsencrypt
+   ```
+   ```bash
+   sudo /opt/nginx-manager/nm up
+   ```
+2. Certbot은 `live/`·`archive/`를 `700`, 개인 키를 `600`으로 둡니다. UID 10101에게 읽기만 줍니다(`live/`의 링크가 가리키는 `archive/`까지).
+   ```bash
+   sudo /opt/nginx-manager/nm import-root grant /etc/letsencrypt/live /etc/letsencrypt/archive
+   sudo /opt/nginx-manager/nm import-root check '/home/*/nginx/*.conf'
+   ```
+3. Certbot이 인증서를 갱신하면 nginx가 새 파일을 읽도록 갱신 후 훅을 둡니다. `nm reload`는 설정을 검사하고 통과하면 끊김 없이 다시 읽힙니다.
+   ```bash
+   printf '#!/bin/sh\n/opt/nginx-manager/nm reload\n' | sudo tee /etc/letsencrypt/renewal-hooks/deploy/nginx-manager.sh
+   sudo chmod 755 /etc/letsencrypt/renewal-hooks/deploy/nginx-manager.sh
+   ```
+
+갱신된 개인 키는 Certbot이 이전 키의 권한을 따라 만들기 때문에 2에서 준 읽기 권한이 이어집니다. 갱신 뒤 `nm import-root check`로 한 번 확인해 두세요. `include /etc/letsencrypt/options-ssl-nginx.conf`, `ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem`도 같은 디렉터리라 함께 보입니다.
+
 ## 미리 보기
 
 검사 결과에서 **미리 보기**를 누르면 파일 하나를 자세히 봅니다.

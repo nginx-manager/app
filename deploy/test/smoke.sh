@@ -115,6 +115,31 @@ else
     printf 'skip: setfacl이나 sudo가 없어 grant는 건너뜀\n'
 fi
 
+step "Certbot 인증서 디렉터리를 .env로 붙이고, 링크와 600 키를 확인한다"
+le="$work/letsencrypt"
+mkdir -p "$le/archive/c.example.com" "$le/live/c.example.com"
+echo cert > "$le/archive/c.example.com/fullchain1.pem"
+echo key > "$le/archive/c.example.com/privkey1.pem"
+ln -s ../../archive/c.example.com/fullchain1.pem "$le/live/c.example.com/fullchain.pem"
+ln -s ../../archive/c.example.com/privkey1.pem "$le/live/c.example.com/privkey.pem"
+chmod 700 "$le/archive" "$le/live"
+chmod 600 "$le/archive/c.example.com/privkey1.pem"
+printf 'server { listen 443 ssl; server_name c.example.com;\n  ssl_certificate %s;\n  ssl_certificate_key %s;\n}\n' \
+    "$le/live/c.example.com/fullchain.pem" "$le/live/c.example.com/privkey.pem" > "$home/alice/nginx/c.conf"
+sed -i "s|^NGINX_MANAGER_IMPORT_ROOTS=.*|NGINX_MANAGER_IMPORT_ROOTS=$home,$le|" "$dir/.env"
+"$dir/nm" up >/dev/null 2>&1 || true
+check ".env만 고쳐도 compose.import.yml에 들어감" grep -q "$le:$le:ro" "$dir/compose.import.yml"
+check "nginx에 인증서 디렉터리가 붙음" sh -c "docker inspect -f '{{range .Mounts}}{{.Destination}} {{end}}' \"\$(cd '$dir' && docker compose ps -q nginx)\" | grep -q '$le'"
+"$dir/nm" import-root check "$home/alice/nginx/c.conf" > "$work/le.out" 2>&1 || true
+check "링크 너머 600 키를 못 읽는다고 알림" grep -q "$le/live/c.example.com/privkey.pem" "$work/le.out"
+if command -v setfacl >/dev/null 2>&1 && { [ "$(id -u)" = 0 ] || sudo -n true 2>/dev/null; }; then
+    sudo_="$( [ "$(id -u)" = 0 ] || echo sudo -n )"
+    $sudo_ "$dir/nm" import-root grant "$le/live" "$le/archive"
+    check "권한을 준 뒤 인증서와 키가 읽힘" "$dir/nm" import-root check "$home/alice/nginx/c.conf"
+fi
+check "nm reload" "$dir/nm" reload
+rm -f "$home/alice/nginx/c.conf"
+
 step "관리 도메인 점검: DNS에 없는 도메인을 알린다"
 cp "$dir/.env" "$work/env.bak"
 sed -i 's/^NGINX_MANAGER_ADMIN_DOMAIN=.*/NGINX_MANAGER_ADMIN_DOMAIN=nm-typo.example.invalid/' "$dir/.env"

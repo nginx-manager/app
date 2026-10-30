@@ -62,7 +62,7 @@ ssh -L 9000:127.0.0.1:9000 <서버>
 | `NGINX_BIND_ADDRESS` | `0.0.0.0` | nginx를 특정 IP에만 열 때 |
 | `NGINX_MANAGER_BACKUP_KEEP` | `14` | `nm backup`이 남길 백업 수 |
 | `TZ` | `Asia/Seoul` | 서버 시간대가 다를 때 |
-| `NGINX_MANAGER_IMPORT_ROOTS` | (비움) | `/etc/nginx` 밖의 설정 파일을 가져올 때. 직접 고치지 말고 `nm import-root add /home` |
+| `NGINX_MANAGER_IMPORT_ROOTS` | (비움) | `/etc/nginx` 밖의 설정 파일이나 그 설정이 쓰는 파일(예: `/home`, `/etc/letsencrypt`). 쉼표로 여럿. 고친 뒤 `nm up`(또는 `nm import-root add`) |
 | `SPRING_MAIL_*` | (비움) | 메일 알림을 보낼 때 SMTP 서버 |
 
 자세한 내용은 [관리 도메인](#관리-도메인으로-https-열기), [포트](#포트), [환경 변수](#환경-변수)에 있습니다.
@@ -149,6 +149,7 @@ services:
 | --- | --- |
 | `nm status` | 컨테이너 상태와 버전, 관리 화면 주소, 관리 도메인 점검 |
 | `nm check-domain` | 관리 도메인이 DNS에 있고 이 서버의 nginx로 들어오는지 확인([13장](13-troubleshooting.md#관리-도메인이-열리지-않을-때)) |
+| `nm reload` | nginx 설정을 검사하고 끊김 없이 다시 읽기(호스트 Certbot이 인증서를 갱신한 뒤 등, [5장](05-import.md#certbot-인증서를-그대로-쓰기)) |
 | `nm version` | 설치된 버전과 최신 릴리스 |
 | `nm logs [manager\|nginx]` | 로그 보기 |
 | `nm restart [manager\|nginx]` | 다시 띄우기(기본 manager). `.env`를 바꾼 뒤 |
