@@ -98,5 +98,11 @@
         document.querySelectorAll('.theme-toggle').forEach(function (button) {
             button.addEventListener('click', toggleTheme);
         });
+        // 설명서 목차: 좁은 화면에서는 접어 두고 본문부터 보인다
+        if (window.matchMedia('(max-width: 860px)').matches) {
+            document.querySelectorAll('.guide-toc details').forEach(function (toc) {
+                toc.open = false;
+            });
+        }
     });
 })();

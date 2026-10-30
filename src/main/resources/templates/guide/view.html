@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ko" th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(${isIndex} ? #{guide.title} : ${chapter.title} + ' · ' + #{guide.title})}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<main class="page guide">
+    <!-- 왼쪽: 장 목차. 좁은 화면에서는 본문 위로 접힌다 -->
+    <aside class="guide-toc">
+        <details open>
+            <summary th:text="#{guide.toc}">차례</summary>
+            <a th:href="${home}" th:classappend="${isIndex} ? 'active'" th:text="#{guide.home}">설명서 처음</a>
+            <a th:each="c : ${toc}" th:href="${c.url()}" th:classappend="${c.slug() == chapter.slug()} ? 'active'" th:attr="aria-current=${c.slug() == chapter.slug()} ? 'page'" th:text="${c.title()}">1. 설치와 실행</a>
+        </details>
+    </aside>
+    <article class="guide-body">
+        <p class="guide-lang" th:if="${koreanOnly}" th:text="#{guide.koreanOnly}">설명서 본문은 한국어로만 제공됩니다.</p>
+        <div class="markdown" th:utext="${chapter.html()}"></div>
+        <nav class="guide-pager" th:aria-label="#{guide.pager}">
+            <a class="prev" th:if="${prev != null}" th:href="${prev.url()}"><span th:text="#{guide.prev}">이전</span><strong th:text="${prev.index()} ? #{guide.home} : ${prev.title()}">처음 시작하기</strong></a>
+            <a class="next" th:if="${next != null}" th:href="${next.url()}"><span th:text="#{guide.next}">다음</span><strong th:text="${next.title()}">대시보드</strong></a>
+        </nav>
+    </article>
+    <!-- 오른쪽: 이 장의 ## 소제목. 넓은 화면에서만 보인다 -->
+    <aside class="guide-onpage" th:if="${!chapter.sections().isEmpty()}">
+        <p th:text="#{guide.onThisPage}">이 장의 내용</p>
+        <a th:each="s : ${chapter.sections()}" th:href="'#' + ${s.id()}" th:text="${s.title()}">환경 변수</a>
+    </aside>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>
