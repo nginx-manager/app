@@ -119,7 +119,7 @@
                         <input type="hidden" name="siteId" th:value="${site.id}">
                         <p><label class="inline"><input type="checkbox" name="redirectHttp" value="true" checked>
                             <th:block th:text="#{sites.detail.https.rawRedirect}">HTTP(80) 요청을 HTTPS로 넘기기</th:block></label></p>
-                        <button type="submit" th:text="#{sites.detail.https.rawAddBlock}">443 server 블록 초안에 더하기</button>
+                        <button type="submit" th:text="#{sites.detail.https.rawAddBlock}">443 server 블록 추가</button>
                         <p class="muted small" th:text="#{sites.detail.https.rawAddBlockNote}"></p>
                     </form>
                 </th:block>
@@ -128,7 +128,7 @@
                 <p class="muted" th:text="#{sites.detail.https.none}">HTTPS를 쓰지 않습니다.</p>
                 <form th:if="${currentUser.canEdit()}" th:action="@{/certs/letsencrypt}" method="post">
                     <input type="hidden" name="siteId" th:value="${site.id}">
-                    <button type="submit" th:text="#{sites.detail.https.enable}">Let's Encrypt 인증서 발급받기</button>
+                    <button type="submit" th:text="#{sites.detail.https.enable}">Let's Encrypt 인증서 발급</button>
                     <th:block th:if="${site.type.name() == 'RAW'}">
                         <p class="muted small" th:text="#{sites.detail.https.rawEnableNote}"></p>
                     </th:block>
@@ -141,7 +141,7 @@
             </th:block>
         </section>
         <section class="card" th:if="${site.type.name() == 'RAW'}">
-            <h2 th:text="#{sites.detail.raw.title}">원문 편집 사이트</h2>
+            <h2 th:text="#{sites.detail.raw.title}">Raw 설정 사이트</h2>
             <p th:text="#{sites.detail.raw.body}">이 사이트는 원문으로만 관리합니다. 폼이 설정을 다시 덮어쓰지 않습니다.</p>
             <p class="hint" th:unless="${currentUser.isAdmin()}" th:text="#{sites.detail.raw.memberHint}">원문 편집은 관리자에게 요청하세요.</p>
         </section>
@@ -149,7 +149,7 @@
         <section class="card">
             <div class="title-row">
                 <h2 th:text="${site.configFile.path}">conf.d/sites/app.local.conf</h2>
-                <a th:if="${currentUser.isAdmin()}" th:href="@{/files/{id}(id=${site.configFile.id})}" th:text="#{sites.detail.editRaw}">원문 편집</a>
+                <a th:if="${currentUser.isAdmin()}" th:href="@{/files/{id}(id=${site.configFile.id})}" th:text="#{sites.detail.editRaw}">Raw 편집</a>
             </div>
             <pre class="code" th:text="${content}"></pre>
         </section>

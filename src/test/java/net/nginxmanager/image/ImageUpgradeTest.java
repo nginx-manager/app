@@ -47,7 +47,7 @@ class ImageUpgradeTest {
         assertThat(curl()).isEqualTo("000");
         // 관리도구는 에이전트가 새로 뜬 것을 알아채고 시작 검사 결과를 다시 읽는다
         await().atMost(Duration.ofSeconds(30)).pollInterval(Duration.ofSeconds(1))
-                .until(() -> client.get("/").body().contains("시작 검사 실패"));
+                .until(() -> client.get("/").body().contains("시작 시 nginx -t 실패"));
         String dashboard = client.get("/").body();
         assertThat(dashboard).contains("unknown_upgrade_directive").contains("/etc/nginx/nginx.conf:");
 
@@ -66,7 +66,7 @@ class ImageUpgradeTest {
         client.post("/runtime/start", Map.of(), "/");
 
         await().atMost(Duration.ofSeconds(15)).until(() -> curl().equals("404"));
-        assertThat(client.get("/").body()).doesNotContain("시작 검사 실패").contains("실행 중");
+        assertThat(client.get("/").body()).doesNotContain("시작 시 nginx -t 실패").contains("실행 중");
     }
 
     private static String curl() throws Exception {

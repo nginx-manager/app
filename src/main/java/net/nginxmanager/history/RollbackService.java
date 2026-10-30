@@ -46,7 +46,7 @@ public class RollbackService {
 
     public ApplyResult rollback(long versionId, String actor) {
         return applyService.applyChanges(() -> tx.execute(status -> changesTo(versionId)),
-                new ApplyService.Origin(actor, "버전 #" + versionId + "(으)로 되돌리기", VersionSource.ROLLBACK,
+                new ApplyService.Origin(actor, "버전 #" + versionId + "(으)로 롤백", VersionSource.ROLLBACK,
                         versionId));
     }
 

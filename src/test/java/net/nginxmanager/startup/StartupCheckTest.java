@@ -89,7 +89,7 @@ class StartupCheckTest extends ConfigRootTest {
         startupCheckService.record("1.31.6", "0.1.0");
 
         mvc.perform(get("/").with(user("admin").roles("ADMIN")))
-                .andExpect(content().string(containsString("시작 검사 실패")))
+                .andExpect(content().string(containsString("시작 시 nginx -t 실패")))
                 .andExpect(content().string(containsString("/etc/nginx/nginx.conf:12")))
                 .andExpect(content().string(containsString("1.29.0")))
                 .andExpect(content().string(containsString("0.1.0-nginx1.29.0")))

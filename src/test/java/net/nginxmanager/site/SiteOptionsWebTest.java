@@ -154,7 +154,7 @@ class SiteOptionsWebTest extends ConfigRootTest {
         assertThat(siteRepository.findByPrimaryDomain("old.local").orElseThrow().getType()).isEqualTo(SiteType.REDIRECT);
 
         mvc.perform(get("/sites").with(user("ed").roles("ADMIN")))
-                .andExpect(content().string(containsString("리디렉션")));
+                .andExpect(content().string(containsString("리다이렉트")));
     }
 
     @Test
