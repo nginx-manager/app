@@ -1,4 +1,4 @@
-// 화면 공통 동작: diff 줄 색상, 테마(라이트·다크) 전환, 좁은 화면의 메뉴 버튼, 로그인 화면의 비밀번호 보기. 스크립트가 없어도 화면은 그대로 쓸 수 있다.
+// 화면 공통 동작: diff 줄 색상, 테마(라이트·다크) 전환, 좁은 화면의 메뉴 버튼, 변경 이력의 비교 단추, 로그인 화면의 비밀번호 보기. 스크립트가 없어도 화면은 그대로 쓸 수 있다.
 (function () {
     // diff를 줄마다 나눠 더한 줄·뺀 줄에 색을 입힌다. 글자는 textContent로만 다룬다
     function colorDiff(pre) {
@@ -104,6 +104,24 @@
         box.textContent = text;
     }
 
+    // 변경 이력의 비교: 변경 전은 변경 후보다 앞선 버전만 고를 수 있게 나머지 단추를 막는다
+    function setupVersionCompare(form) {
+        const befores = form.querySelectorAll('input[name=a]');
+        const afters = form.querySelectorAll('input[name=b]');
+        function update() {
+            const before = form.querySelector('input[name=a]:checked');
+            const after = form.querySelector('input[name=b]:checked');
+            befores.forEach(function (input) {
+                input.disabled = after !== null && Number(input.value) >= Number(after.value);
+            });
+            afters.forEach(function (input) {
+                input.disabled = before !== null && Number(input.value) <= Number(before.value);
+            });
+        }
+        form.addEventListener('change', update);
+        update();
+    }
+
     document.addEventListener('htmx:responseError', showRequestError);
     document.addEventListener('htmx:sendError', showRequestError);
     document.addEventListener('htmx:beforeRequest', function (event) {
@@ -130,6 +148,7 @@
             }
         });
         document.querySelectorAll('.nav-toggle').forEach(setupNavToggle);
+        document.querySelectorAll('form.version-compare').forEach(setupVersionCompare);
         document.querySelectorAll('pre.diff').forEach(colorDiff);
         document.querySelectorAll('.theme-toggle').forEach(function (button) {
             button.addEventListener('click', toggleTheme);
