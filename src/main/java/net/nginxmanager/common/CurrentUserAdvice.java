@@ -16,8 +16,9 @@ public class CurrentUserAdvice {
 
     public record CurrentUser(String username, Set<String> roles) {
 
+        /** 로그인한 사용자는 모두 본인 사이트를 고칠 수 있다. 어느 사이트인지는 컨트롤러가 거른다 */
         public boolean canEdit() {
-            return roles.contains("ROLE_EDITOR") || isAdmin();
+            return roles.contains("ROLE_MEMBER") || isAdmin();
         }
 
         public boolean isAdmin() {

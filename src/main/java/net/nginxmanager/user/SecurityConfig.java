@@ -27,16 +27,14 @@ public class SecurityConfig {
                 .addFilterBefore(new SetupRedirectFilter(setupState), UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/setup", "/login", "/css/**", "/js/**", "/webjars/**", "/favicon.ico", "/favicon.svg", "/favicon-32.png", "/apple-touch-icon.png", "/actuator/health", "/actuator/health/liveness", "/actuator/health/readiness", "/error").permitAll()
-                        .requestMatchers("/users/**", "/audit/**", "/settings/**", "/runtime/**").hasRole("ADMIN")
-                        // 본인 비밀번호 변경은 역할과 관계없이 허용한다
-                        .requestMatchers("/account").authenticated()
-                        // 적용 화면은 diff 미리보기도 편집자부터 본다
-                        .requestMatchers("/apply/**").hasRole("EDITOR")
-                        // 가져오기는 허용한 디렉터리의 파일 내용을 보여 주므로 편집자부터 쓴다
-                        .requestMatchers("/sites/import", "/sites/import/**").hasRole("EDITOR")
-                        // 조회는 VIEWER부터, 변경 요청은 EDITOR부터 허용한다
-                        .requestMatchers(HttpMethod.GET, "/**").hasRole("VIEWER")
-                        .anyRequest().hasRole("EDITOR"))
+                        // 여러 사이트에 걸치거나 서버 전체에 영향을 주는 기능은 관리자만 쓴다(006)
+                        .requestMatchers("/users/**", "/audit/**", "/settings/**", "/runtime/**", "/files/**",
+                                "/streams/**", "/versions/**", "/drift/**", "/sites/import", "/sites/import/**",
+                                "/sites/*/owner", "/sites/*/reimport").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/certs").hasRole("ADMIN")
+                        .requestMatchers("/certs/upload").hasRole("ADMIN")
+                        // 나머지(사이트, 적용, 로그, 사이트 화면의 인증서 발급·갱신)는 멤버부터. 사이트 단위 권한은 SiteAccess가 본다
+                        .anyRequest().hasRole("MEMBER"))
                 .formLogin(form -> form
                         .loginPage("/login")
                         .defaultSuccessUrl("/", true)
@@ -54,8 +52,7 @@ public class SecurityConfig {
     @Bean
     public RoleHierarchy roleHierarchy() {
         return RoleHierarchyImpl.withDefaultRolePrefix()
-                .role("ADMIN").implies("EDITOR")
-                .role("EDITOR").implies("VIEWER")
+                .role("ADMIN").implies("MEMBER")
                 .build();
     }
 

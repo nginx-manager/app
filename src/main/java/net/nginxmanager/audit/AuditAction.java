@@ -7,6 +7,7 @@ public enum AuditAction {
     USER_CHANGE,
     SITE_SAVE,
     SITE_IMPORT,
+    SITE_ASSIGN,
     APPLY,
     ROLLBACK,
     DRIFT_IMPORT,

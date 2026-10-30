@@ -8,7 +8,7 @@
     <p class="notice" th:if="${notice}" th:text="${notice}">완료</p>
     <pre class="error code" th:if="${error}" th:text="${error}">오류</pre>
 
-    <section class="card bad-card" id="startup-check" th:if="${dashboard.failedStartupCheck}">
+    <section class="card bad-card" id="startup-check" th:if="${dashboard.failedStartupCheck != null and currentUser.isAdmin()}">
         <h2 th:text="#{dashboard.startup.title}">nginx를 띄우지 않았습니다: 시작 검사 실패</h2>
         <p>
             <th:block th:text="#{dashboard.startup.checkedBefore}">컨테이너가 시작될 때 지금 설정을 이 이미지의 nginx(</th:block><strong th:text="${status.version} ?: #{dashboard.unknown}">1.31.6</strong><th:block th:text="#{dashboard.startup.checkedAfter}">)로 검증했는데 통과하지 못했습니다</th:block><span th:if="${dashboard.versionChange != null and dashboard.versionChange.nginxChanged()}"><th:block th:text="#{dashboard.startup.changedBefore}">. 이번 시작에서 nginx가</th:block>
@@ -29,7 +29,7 @@
         </ol>
     </section>
 
-    <section class="card" id="version-change" th:if="${dashboard.versionChange != null and dashboard.failedStartupCheck == null}">
+    <section class="card" id="version-change" th:if="${dashboard.versionChange != null and dashboard.failedStartupCheck == null and currentUser.isAdmin()}">
         <p><th:block th:text="#{dashboard.versionChanged}">이번 시작에서 버전이 바뀌었습니다:</th:block> <strong th:text="${dashboard.versionChange.describe()}">nginx 1.29.0 → 1.31.6</strong></p>
     </section>
 
@@ -37,7 +37,8 @@
         <h2 th:text="#{dashboard.certWarnings.title}">인증서 확인 필요</h2>
         <ul>
             <li th:each="w : ${dashboard.certificateWarnings}">
-                <a th:href="@{/certs#cert-{id}(id=${w.id})}" th:text="${w.name}">app.local</a>
+                <a th:if="${currentUser.isAdmin()}" th:href="@{/certs#cert-{id}(id=${w.id})}" th:text="${w.name}">app.local</a>
+                <strong th:unless="${currentUser.isAdmin()}" th:text="${w.name}">app.local</strong>
                 <span th:if="${w.failing}" class="badge bad" th:text="#{dashboard.certWarnings.failing}">발급·갱신 실패</span>
                 <span th:if="${w.notAfter != null}" class="badge warn" th:text="#{dashboard.certWarnings.daysLeft(${'' + w.daysLeft})}">10일 뒤 만료</span>
                 <span class="small error" th:if="${w.failing}" th:text="${w.lastError}"></span>
@@ -56,12 +57,12 @@
             <strong class="stat-value" th:text="${dashboard.enabledSiteCount}">3</strong>
             <span class="stat-sub" th:text="#{dashboard.stats.sitesSub(${'' + dashboard.siteCount})}">전체 4개</span>
         </a>
-        <a class="stat" th:href="${currentUser.canEdit()} ? @{/apply} : @{/versions}" th:classappend="${pendingCount > 0} ? 'warn'">
+        <a class="stat" th:href="@{/apply}" th:classappend="${pendingCount > 0} ? 'warn'">
             <span class="stat-label" th:text="#{dashboard.stats.pending}">적용 대기</span>
             <strong class="stat-value" th:text="${pendingCount}">0</strong>
             <span class="stat-sub" th:text="${pendingCount > 0} ? #{dashboard.stats.pendingSub} : #{dashboard.stats.pendingNone}">적용 화면에서 반영하세요</span>
         </a>
-        <a class="stat" th:href="@{/certs}" th:classappend="${!#lists.isEmpty(dashboard.certificateWarnings)} ? 'warn'">
+        <a class="stat" th:href="${currentUser.isAdmin()} ? @{/certs} : @{/sites}" th:classappend="${!#lists.isEmpty(dashboard.certificateWarnings)} ? 'warn'">
             <span class="stat-label" th:text="#{dashboard.stats.certs}">인증서 경고</span>
             <strong class="stat-value" th:text="${#lists.size(dashboard.certificateWarnings)}">0</strong>
             <span class="stat-sub" th:text="${#lists.isEmpty(dashboard.certificateWarnings)} ? #{dashboard.stats.certsNone} : #{dashboard.stats.certsSub}">모두 정상</span>
@@ -101,11 +102,13 @@
                 <dd th:text="${status.masterPid} ?: '-'">1</dd>
                 <dt th:text="#{dashboard.facts.sites}">사이트</dt>
                 <dd><a th:href="@{/sites}" th:text="#{dashboard.facts.siteCount(${'' + dashboard.enabledSiteCount}, ${'' + dashboard.siteCount})}">3 / 4</a></dd>
-                <dt th:text="#{dashboard.facts.dbSize}">DB 크기</dt>
-                <dd th:text="${#numbers.formatDecimal(dashboard.databaseBytes / 1048576.0, 1, 1)} + ' MB'">1.2 MB</dd>
+                <th:block th:if="${currentUser.isAdmin()}">
+                    <dt th:text="#{dashboard.facts.dbSize}">DB 크기</dt>
+                    <dd th:text="${#numbers.formatDecimal(dashboard.databaseBytes / 1048576.0, 1, 1)} + ' MB'">1.2 MB</dd>
+                </th:block>
             </dl>
         </section>
-        <section class="card">
+        <section class="card" th:if="${currentUser.isAdmin()}">
             <div class="title-row">
                 <h2 th:text="#{dashboard.recent.title}">최근 적용</h2>
                 <a th:href="@{/versions}" th:text="#{dashboard.recent.all}">전체 이력</a>

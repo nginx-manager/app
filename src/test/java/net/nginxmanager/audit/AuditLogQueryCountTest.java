@@ -42,7 +42,7 @@ class AuditLogQueryCountTest {
     private void seedLogsByDistinctUsers(int n) {
         tx.executeWithoutResult(status -> {
             for (int i = 0; i < n; i++) {
-                User user = userRepository.save(new User("user-" + System.nanoTime() + "-" + i, "x", Role.VIEWER));
+                User user = userRepository.save(new User("user-" + System.nanoTime() + "-" + i, "x", Role.MEMBER));
                 auditLogRepository.save(new AuditLog(user, user.getUsername(), AuditAction.LOGIN, null,
                         AuditResult.SUCCESS, null));
             }

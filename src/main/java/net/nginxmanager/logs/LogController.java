@@ -1,8 +1,8 @@
 package net.nginxmanager.logs;
 
-import net.nginxmanager.common.NotFoundException;
 import net.nginxmanager.site.Site;
-import net.nginxmanager.site.SiteRepository;
+import net.nginxmanager.site.SiteAccess;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,20 +21,21 @@ public class LogController {
     /** 검색 한 번에 파일 끝에서 읽는 최대 양. */
     static final long SEARCH_MAX_BYTES = 64L * 1024 * 1024;
 
-    private final SiteRepository siteRepository;
+    private final SiteAccess access;
     private final LogFiles logFiles;
     private final LogTailService tailService;
 
-    public LogController(SiteRepository siteRepository, LogFiles logFiles, LogTailService tailService) {
-        this.siteRepository = siteRepository;
+    public LogController(SiteAccess access, LogFiles logFiles, LogTailService tailService) {
+        this.access = access;
         this.logFiles = logFiles;
         this.tailService = tailService;
     }
 
     @GetMapping("/logs/{siteId}")
     public String search(@PathVariable long siteId, @RequestParam(defaultValue = "ACCESS") LogType type,
-                         @RequestParam(required = false) String q, Model model) throws IOException {
-        Site site = load(siteId);
+                         @RequestParam(required = false) String q, Authentication authentication,
+                         Model model) throws IOException {
+        Site site = access.require(siteId, authentication);
         String query = q == null ? null : q.strip();
         model.addAttribute("site", site);
         model.addAttribute("type", type);
@@ -46,12 +47,8 @@ public class LogController {
 
     @GetMapping(path = "/logs/{siteId}/stream", produces = "text/event-stream")
     @ResponseBody
-    public SseEmitter stream(@PathVariable long siteId, @RequestParam(defaultValue = "ACCESS") LogType type)
-            throws IOException {
-        return tailService.open(logFiles.of(load(siteId), type));
-    }
-
-    private Site load(long siteId) {
-        return siteRepository.findById(siteId).orElseThrow(() -> new NotFoundException("site " + siteId));
+    public SseEmitter stream(@PathVariable long siteId, @RequestParam(defaultValue = "ACCESS") LogType type,
+                             Authentication authentication) throws IOException {
+        return tailService.open(logFiles.of(access.require(siteId, authentication), type));
     }
 }

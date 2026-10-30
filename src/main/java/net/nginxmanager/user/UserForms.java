@@ -20,7 +20,7 @@ public final class UserForms {
             @NotNull Role role) {
 
         public static Invite empty() {
-            return new Invite("", "", Role.VIEWER);
+            return new Invite("", "", Role.MEMBER);
         }
     }
 

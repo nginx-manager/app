@@ -1,6 +1,6 @@
 # 6. 스트림 (TCP/UDP)
 
-데이터베이스, MQTT, SSH, DNS, 게임 서버처럼 HTTP가 아닌 서비스를 nginx 뒤에 둡니다. 받은 TCP/UDP 연결을 내용을 보지 않고 그대로 백엔드로 넘깁니다(nginx stream 모듈).
+데이터베이스, MQTT, SSH, DNS, 게임 서버처럼 HTTP가 아닌 서비스를 nginx 뒤에 둡니다. 받은 TCP/UDP 연결을 내용을 보지 않고 그대로 백엔드로 넘깁니다(nginx stream 모듈). 포트는 서버 전체가 함께 쓰므로 스트림은 관리자가 다룹니다.
 
 ## 스트림 만들기
 

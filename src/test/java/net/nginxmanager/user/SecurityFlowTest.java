@@ -81,7 +81,7 @@ class SecurityFlowTest {
 
     @Test
     void fiveFailuresLockTheAccount() throws Exception {
-        userRepository.save(new User("editor", passwordEncoder.encode("correct-horse-battery"), Role.EDITOR));
+        userRepository.save(new User("editor", passwordEncoder.encode("correct-horse-battery"), Role.MEMBER));
 
         for (int i = 0; i < LoginAttemptListener.MAX_ATTEMPTS; i++) {
             mvc.perform(formLogin().user("editor").password("wrong")).andExpect(unauthenticated());
@@ -93,13 +93,13 @@ class SecurityFlowTest {
     }
 
     @Test
-    void viewerCanReadButNotChange() throws Exception {
-        userRepository.save(new User("viewer", "x", Role.VIEWER));
+    void memberCannotUseAdminPages() throws Exception {
+        userRepository.save(new User("viewer", "x", Role.MEMBER));
 
-        mvc.perform(get("/").with(user("viewer").roles("VIEWER"))).andExpect(status().isOk());
-        mvc.perform(post("/anything").with(csrf()).with(user("viewer").roles("VIEWER")))
+        mvc.perform(get("/").with(user("viewer").roles("MEMBER"))).andExpect(status().isOk());
+        mvc.perform(post("/files/new").with(csrf()).with(user("viewer").roles("MEMBER")))
                 .andExpect(status().isForbidden());
-        mvc.perform(get("/users").with(user("viewer").roles("VIEWER"))).andExpect(status().isForbidden());
+        mvc.perform(get("/users").with(user("viewer").roles("MEMBER"))).andExpect(status().isForbidden());
     }
 
     @Test

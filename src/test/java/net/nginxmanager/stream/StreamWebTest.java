@@ -47,7 +47,7 @@ class StreamWebTest extends ConfigRootTest {
     }
 
     private static MockHttpServletRequestBuilder create(String protocol, int port, String backends) {
-        return post("/streams/new").with(csrf()).with(user("ed").roles("EDITOR"))
+        return post("/streams/new").with(csrf()).with(user("ed").roles("ADMIN"))
                 .param("protocol", protocol).param("listenPort", Integer.toString(port)).param("backends", backends);
     }
 
@@ -59,7 +59,7 @@ class StreamWebTest extends ConfigRootTest {
     }
 
     private MockHttpServletRequestBuilder update(StreamProxy stream, String backends) {
-        return post("/streams/" + stream.getId()).with(csrf()).with(user("ed").roles("EDITOR"))
+        return post("/streams/" + stream.getId()).with(csrf()).with(user("ed").roles("ADMIN"))
                 .param("protocol", "TCP").param("listenPort", "5432").param("backends", backends)
                 .param("version", Long.toString(stream.getVersion()));
     }
@@ -80,10 +80,10 @@ class StreamWebTest extends ConfigRootTest {
         assertThat(stream.isRaw()).isFalse();
         assertThat(stream.hasApplied()).isTrue();
 
-        mvc.perform(get("/streams").with(user("v").roles("VIEWER")))
+        mvc.perform(get("/streams").with(user("v").roles("ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("10.0.0.5:5432, 10.0.0.6:5432")));
-        mvc.perform(get("/streams/" + stream.getId()).with(user("v").roles("VIEWER")))
+        mvc.perform(get("/streams/" + stream.getId()).with(user("v").roles("ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("proxy_pass stream_tcp_5432;")));
     }
@@ -108,7 +108,7 @@ class StreamWebTest extends ConfigRootTest {
     void deleteStagesAFileDeleteAndApplyRemovesTheStream() throws Exception {
         StreamProxy stream = createApplied();
 
-        mvc.perform(post("/streams/" + stream.getId() + "/delete").with(csrf()).with(user("ed").roles("EDITOR"))
+        mvc.perform(post("/streams/" + stream.getId() + "/delete").with(csrf()).with(user("ed").roles("ADMIN"))
                         .param("version", Long.toString(stream.getVersion())))
                 .andExpect(status().is3xxRedirection());
         assertThat(configFileRepository.findByPath(PATH).orElseThrow().isDraftDelete()).isTrue();
@@ -138,7 +138,7 @@ class StreamWebTest extends ConfigRootTest {
         siteService.editRaw(file.getId(), readFile(PATH) + "# hand edit\n", file.getVersion(), "ed");
 
         assertThat(streamProxyRepository.findById(stream.getId()).orElseThrow().isRaw()).isTrue();
-        mvc.perform(get("/streams").with(user("ed").roles("EDITOR")))
+        mvc.perform(get("/streams").with(user("ed").roles("ADMIN")))
                 .andExpect(content().string(containsString("badge")));
     }
 
@@ -180,7 +180,7 @@ class StreamWebTest extends ConfigRootTest {
         mvc.perform(create("UDP", 8053, "10.0.0.7:53")).andExpect(status().is3xxRedirection());
 
         // 반대 방향도 막는다: nginx -t는 통과하지만 reload에서 포트를 열지 못한다
-        mvc.perform(post("/sites/new").with(csrf()).with(user("ed").roles("EDITOR"))
+        mvc.perform(post("/sites/new").with(csrf()).with(user("ed").roles("ADMIN"))
                         .param("primaryDomain", "db.local").param("type", "PROXY").param("listenHttpPort", "5432")
                         .param("proxyTarget", "http://10.0.0.1:3000"))
                 .andExpect(status().isOk())
@@ -189,7 +189,7 @@ class StreamWebTest extends ConfigRootTest {
 
         Site site = siteService.create(new SiteForm("db.local", "", SiteType.PROXY, 80, null, "http://10.0.0.1:3000",
                 null), "ed");
-        mvc.perform(post("/sites/" + site.getId()).with(csrf()).with(user("ed").roles("EDITOR"))
+        mvc.perform(post("/sites/" + site.getId()).with(csrf()).with(user("ed").roles("ADMIN"))
                         .param("primaryDomain", "db.local").param("type", "PROXY").param("listenHttpPort", "5432")
                         .param("proxyTarget", "http://10.0.0.1:3000").param("version", Long.toString(site.getVersion())))
                 .andExpect(status().isOk())
@@ -203,10 +203,10 @@ class StreamWebTest extends ConfigRootTest {
 
     @Test
     void newFormAndPreviewRender() throws Exception {
-        mvc.perform(get("/streams/new").with(user("ed").roles("EDITOR")))
+        mvc.perform(get("/streams/new").with(user("ed").roles("ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("name=\"backends\"")));
-        mvc.perform(post("/streams/preview").with(csrf()).with(user("ed").roles("EDITOR"))
+        mvc.perform(post("/streams/preview").with(csrf()).with(user("ed").roles("ADMIN"))
                         .param("protocol", "UDP").param("listenPort", "53").param("backends", "10.0.0.2:53"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("listen 53 udp;")));
@@ -214,7 +214,7 @@ class StreamWebTest extends ConfigRootTest {
 
     @Test
     void viewersCannotChangeStreams() throws Exception {
-        mvc.perform(post("/streams/new").with(csrf()).with(user("v").roles("VIEWER"))
+        mvc.perform(post("/streams/new").with(csrf()).with(user("v").roles("MEMBER"))
                         .param("protocol", "TCP").param("listenPort", "5432").param("backends", "10.0.0.5:5432"))
                 .andExpect(status().isForbidden());
     }

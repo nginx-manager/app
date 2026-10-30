@@ -6,6 +6,7 @@
 <main class="page">
     <h1 th:text="#{apply.title}">적용</h1>
     <p class="hint" th:text="#{apply.help.intro}">초안으로 저장한 변경은 여기서 적용해야 서버에 반영됩니다.</p>
+    <p class="hint" th:unless="${currentUser.isAdmin()}" th:text="#{apply.help.member}">내가 담당한 사이트의 변경만 보이고, 적용하면 그 변경만 반영됩니다.</p>
 
     <div id="result" th:fragment="result">
         <th:block th:if="${result != null}">

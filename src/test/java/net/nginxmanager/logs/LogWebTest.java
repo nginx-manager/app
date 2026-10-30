@@ -2,6 +2,7 @@ package net.nginxmanager.logs;
 
 import net.nginxmanager.config.ConfigFile;
 import net.nginxmanager.site.Site;
+import net.nginxmanager.site.SiteService;
 import net.nginxmanager.site.SiteType;
 import net.nginxmanager.support.ConfigRootTest;
 import net.nginxmanager.user.Role;
@@ -43,6 +44,8 @@ class LogWebTest extends ConfigRootTest {
     SetupState setupState;
     @Autowired
     LogTailService tailService;
+    @Autowired
+    SiteService siteService;
 
     Site site;
 
@@ -52,6 +55,9 @@ class LogWebTest extends ConfigRootTest {
         setupState.reset();
         ConfigFile file = configFileRepository.save(new ConfigFile("conf.d/sites/app.local.conf", true));
         site = siteRepository.save(new Site("app.local", SiteType.STATIC, file));
+        // 멤버 v가 담당하는 사이트다(006)
+        User v = userRepository.save(new User("v", "{noop}unused-password", Role.MEMBER));
+        site = siteService.assignOwner(site.getId(), v.getId(), site.getVersion(), "admin");
         Files.createDirectories(LOG_DIR.resolve("sites"));
         Files.writeString(LOG_DIR.resolve("sites/app.local.access.log"),
                 "1.2.3.4 \"GET / HTTP/1.1\" 200\n5.6.7.8 \"GET /<script>alert(1)</script> HTTP/1.1\" 404\n");
@@ -60,22 +66,33 @@ class LogWebTest extends ConfigRootTest {
 
     @Test
     void viewerSearchesSiteLogsAndContentIsEscaped() throws Exception {
-        mvc.perform(get("/logs/" + site.getId()).param("q", "404").with(user("v").roles("VIEWER")))
+        mvc.perform(get("/logs/" + site.getId()).param("q", "404").with(user("v").roles("MEMBER")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("&lt;script&gt;alert(1)&lt;/script&gt;")))
                 .andExpect(content().string(not(containsString("<script>alert(1)"))))
                 .andExpect(content().string(not(containsString("1.2.3.4"))));
 
-        mvc.perform(get("/logs/" + site.getId()).param("type", "ERROR").with(user("v").roles("VIEWER")))
+        mvc.perform(get("/logs/" + site.getId()).param("type", "ERROR").with(user("v").roles("MEMBER")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("upstream timed out")));
+    }
+
+    @Test
+    void otherMembersCannotSeeTheLogs() throws Exception {
+        userRepository.save(new User("other", "{noop}unused-password", Role.MEMBER));
+        mvc.perform(get("/logs/" + site.getId()).with(user("other").roles("MEMBER")))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/logs/" + site.getId() + "/stream").with(user("other").roles("MEMBER")))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/logs/" + site.getId()).with(user("admin").roles("ADMIN")))
+                .andExpect(status().isOk());
     }
 
     @Test
     void missingLogFileIsExplained() throws Exception {
         Files.delete(LOG_DIR.resolve("sites/app.local.error.log"));
 
-        mvc.perform(get("/logs/" + site.getId()).param("type", "ERROR").with(user("v").roles("VIEWER")))
+        mvc.perform(get("/logs/" + site.getId()).param("type", "ERROR").with(user("v").roles("MEMBER")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("로그 파일이 아직 없습니다")));
     }
@@ -84,7 +101,7 @@ class LogWebTest extends ConfigRootTest {
     void streamOpensServerSentEvents() throws Exception {
         int before = tailService.openStreams();
 
-        MvcResult result = mvc.perform(get("/logs/" + site.getId() + "/stream").with(user("v").roles("VIEWER")))
+        MvcResult result = mvc.perform(get("/logs/" + site.getId() + "/stream").with(user("v").roles("MEMBER")))
                 .andExpect(request().asyncStarted())
                 .andReturn();
 
@@ -96,7 +113,7 @@ class LogWebTest extends ConfigRootTest {
 
     @Test
     void unknownSiteIs404() throws Exception {
-        mvc.perform(get("/logs/999999").with(user("v").roles("VIEWER"))).andExpect(status().isNotFound());
+        mvc.perform(get("/logs/999999").with(user("v").roles("MEMBER"))).andExpect(status().isNotFound());
     }
 
     private static Path tempDir() {

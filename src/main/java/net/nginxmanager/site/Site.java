@@ -103,6 +103,10 @@ public class Site extends BaseEntity {
     @Column(name = "import_hash", length = 64)
     private String importHash;
 
+    /** 담당 사용자(users.id). null이면 관리자만 본다. 연관 대신 id만 두어 목록 조회에서 추가 쿼리가 생기지 않게 한다. */
+    @Column(name = "owner_id")
+    private Long ownerId;
+
     @OneToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "config_file_id")
     private ConfigFile configFile;
@@ -372,6 +376,14 @@ public class Site extends BaseEntity {
 
     public Long getCertificateId() {
         return certificateId;
+    }
+
+    void assignOwner(Long ownerId) {
+        this.ownerId = ownerId;
+    }
+
+    public Long getOwnerId() {
+        return ownerId;
     }
 
     public String getPrimaryDomain() {
