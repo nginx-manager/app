@@ -39,7 +39,8 @@ class SiteModuleOptionsTest {
                 (String) values.get("maintenanceMessage"), (String) values.get("maintenanceAllowFrom"),
                 (String) values.get("responseHeaders"), (String) values.get("requestHeaders"),
                 (Boolean) values.get("redirectToPrimary"), (Boolean) values.get("backendErrorPage"),
-                (String) values.get("backendErrorMessage"));
+                (String) values.get("backendErrorMessage"), (String) values.get("note"),
+                (String) values.get("serverDirectives"));
     }
 
     static SiteOptions options(Object... keyValues) {

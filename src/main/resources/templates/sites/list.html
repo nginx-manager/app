@@ -58,6 +58,7 @@
                 <td>
                     <a th:href="@{/sites/{id}(id=${s.id})}" th:text="${s.primaryDomain}">app.local</a>
                     <div class="muted small" th:if="${s.extraDomains}" th:text="${s.extraDomains}">www.app.local</div>
+                    <div class="site-note small" th:if="${s.note()}" th:title="${s.note()}" th:text="${s.note().lines().findFirst().orElse('')}">결제 팀 담당</div>
                 </td>
                 <td th:switch="${s.type.name()}">
                     <span th:case="'STATIC'" th:text="#{sites.list.type.STATIC}">정적</span>

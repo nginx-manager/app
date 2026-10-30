@@ -22,6 +22,10 @@ public class SiteConfigRenderer {
     /** @param tls 사이트에 쓸 인증서. HTTPS를 켰어도 null이면 아직 발급 전이라 HTTP만 만든다 */
     public String render(String primaryDomain, SiteForm form, CertificatePaths tls) {
         StringBuilder out = new StringBuilder(HEADER);
+        List<String> note = form.options().noteLines();
+        for (int i = 0; i < note.size(); i++) {
+            out.append(i == 0 ? "# 메모: " : "#       ").append(note.get(i).stripTrailing()).append('\n');
+        }
         boolean https = form.httpsEnabled() && tls != null;
         if (form.httpsEnabled() && tls == null) {
             out.append(HTTPS_PENDING);
@@ -55,6 +59,7 @@ public class SiteConfigRenderer {
         } else {
             content(out, primaryDomain, form, false);
         }
+        serverDirectives(out, form);
         out.append("}\n");
         if (https) {
             out.append("\nserver {\n")
@@ -71,6 +76,7 @@ public class SiteConfigRenderer {
             logs(out, primaryDomain);
             serverOptions(out, form);
             content(out, primaryDomain, form, true);
+            serverDirectives(out, form);
             out.append("}\n");
         }
         if (redirectExtras) {
@@ -111,6 +117,18 @@ public class SiteConfigRenderer {
             logs(out, primaryDomain);
             out.append("    return 301 ").append(target).append("$request_uri;\n")
                     .append("}\n");
+        }
+    }
+
+    /** 관리자가 적은 추가 지시어(032)를 server 블록 끝에 그대로 넣는다. 문법은 적용할 때 nginx -t가 본다. */
+    private static void serverDirectives(StringBuilder out, SiteForm form) {
+        String directives = form.options().serverDirectives();
+        if (directives == null) {
+            return;
+        }
+        out.append("\n    # 추가 지시어\n");
+        for (String line : directives.split("\n")) {
+            out.append(line.isBlank() ? "" : "    " + line.stripTrailing()).append('\n');
         }
     }
 

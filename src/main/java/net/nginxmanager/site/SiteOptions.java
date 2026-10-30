@@ -84,11 +84,13 @@ public record SiteOptions(
         String requestHeaders,
         Boolean redirectToPrimary,
         Boolean backendErrorPage,
-        String backendErrorMessage) {
+        String backendErrorMessage,
+        String note,
+        String serverDirectives) {
 
     public static final SiteOptions DEFAULTS = new SiteOptions(false, false, false, false, null, null, null, null,
             false, null, null, null, null, null, null, false, null, null, null, null, null, null, null, false, null,
-            null, null, null, false, false, null);
+            null, null, null, false, false, null, null, null);
 
     /** 점검 안내 문구에 쓸 수 없는 문자: nginx 문자열('…')과 변수를 깨뜨린다. */
     private static final Pattern MAINTENANCE_FORBIDDEN = Pattern.compile("['\\\\${}]");
@@ -132,6 +134,9 @@ public record SiteOptions(
         redirectToPrimary = redirectToPrimary != null && redirectToPrimary;
         backendErrorPage = backendErrorPage != null && backendErrorPage;
         backendErrorMessage = backendErrorMessage == null || backendErrorMessage.isBlank() ? null : backendErrorMessage.strip();
+        note = note == null || note.isBlank() ? null : note.replace("\r\n", "\n").strip();
+        serverDirectives = serverDirectives == null || serverDirectives.isBlank() ? null
+                : serverDirectives.replace("\r\n", "\n").stripTrailing();
     }
 
     public List<CustomHeader> responseHeaderList() {
@@ -172,6 +177,59 @@ public record SiteOptions(
     }
 
     /** 안내 페이지 문구(점검 모드, 백엔드 장애): nginx 문자열('…')에 넣으므로 그 문자열을 깨는 문자를 막는다. */
+    static final int MAX_NOTE = 500;
+    static final int MAX_SERVER_DIRECTIVES = 4000;
+    /** 줄바꿈·탭 말고는 제어 문자를 받지 않는다. */
+    private static final Pattern CONTROL = Pattern.compile("[\\p{Cntrl}&&[^\\n\\t]]");
+
+    @AssertTrue(message = "{msg.validation.note}")
+    public boolean isNoteValid() {
+        return note == null || (note.length() <= MAX_NOTE && !CONTROL.matcher(note).find());
+    }
+
+    /**
+     * 추가 지시어(032)는 nginx -t가 문법을 본다. 여기서는 server 블록 밖으로 새지 않도록 중괄호와 따옴표 짝만 본다.
+     * 따옴표 안의 중괄호와 주석(#부터 줄 끝)은 세지 않는다.
+     */
+    @AssertTrue(message = "{msg.validation.serverDirectives}")
+    public boolean isServerDirectivesValid() {
+        if (serverDirectives == null) {
+            return true;
+        }
+        if (serverDirectives.length() > MAX_SERVER_DIRECTIVES || CONTROL.matcher(serverDirectives).find()) {
+            return false;
+        }
+        int depth = 0;
+        char quote = 0;
+        boolean comment = false;
+        for (int i = 0; i < serverDirectives.length(); i++) {
+            char c = serverDirectives.charAt(i);
+            if (comment) {
+                comment = c != '\n';
+            } else if (quote != 0) {
+                if (c == '\\') {
+                    i++;
+                } else if (c == quote) {
+                    quote = 0;
+                }
+            } else if (c == '"' || c == '\'') {
+                quote = c;
+            } else if (c == '#') {
+                comment = true;
+            } else if (c == '{') {
+                depth++;
+            } else if (c == '}' && --depth < 0) {
+                return false;
+            }
+        }
+        return depth == 0 && quote == 0;
+    }
+
+    /** 메모를 설정 파일 주석으로(031). */
+    public List<String> noteLines() {
+        return note == null ? List.of() : List.of(note.split("\n"));
+    }
+
     private static boolean validNotice(String message) {
         return message == null || (message.length() <= MAX_MAINTENANCE_MESSAGE
                 && !MAINTENANCE_FORBIDDEN.matcher(message).find());
@@ -263,7 +321,8 @@ public record SiteOptions(
                 autoindex, authRequestUrl, authSignInUrl, PathRoute.normalized(pathRoutes), normalized(backupTargets),
                 upstreamMaxFails, upstreamFailTimeout, upstreamKeepalive, maintenance, maintenanceMessage,
                 normalized(maintenanceAllowFrom), CustomHeader.normalized(responseHeaders),
-                CustomHeader.normalized(requestHeaders), redirectToPrimary, backendErrorPage, backendErrorMessage);
+                CustomHeader.normalized(requestHeaders), redirectToPrimary, backendErrorPage, backendErrorMessage,
+                note, serverDirectives);
     }
 
     /** 비밀번호 보호 사용자를 뺀 값(024, 사이트 복제). 비밀번호는 해시로만 남아 옮길 수 없다. */
@@ -272,6 +331,15 @@ public record SiteOptions(
         store(values, "");
         values.remove("authUsers");
         return load(values, "");
+    }
+
+    /** 추가 지시어만 바꾼 값(032). 멤버가 보낸 값은 이것으로 기존 값으로 되돌린다. */
+    SiteOptions withServerDirectives(String value) {
+        return new SiteOptions(gzip, securityHeaders, hsts, http3, maxBodySizeMb, allowFrom, denyFrom, authUsers,
+                satisfyAny, rateLimit, rateBurst, connLimit, realIpFrom, realIpHeader, cacheMinutes, autoindex,
+                authRequestUrl, authSignInUrl, pathRoutes, backupTargets, upstreamMaxFails, upstreamFailTimeout,
+                upstreamKeepalive, maintenance, maintenanceMessage, maintenanceAllowFrom, responseHeaders,
+                requestHeaders, redirectToPrimary, backendErrorPage, backendErrorMessage, note, value);
     }
 
     /** 사이트 유형에서 쓰지 않는 설정은 버린다(유형을 바꿨을 때 남은 값이 설정에 섞이지 않게). */
@@ -285,7 +353,7 @@ public record SiteOptions(
                 maintenance, maintenanceMessage, maintenanceAllowFrom, responseHeaders,
                 type == SiteType.PROXY ? requestHeaders : null, redirectToPrimary,
                 (type == SiteType.PROXY || type == SiteType.PHP) && backendErrorPage,
-                type == SiteType.PROXY || type == SiteType.PHP ? backendErrorMessage : null);
+                type == SiteType.PROXY || type == SiteType.PHP ? backendErrorMessage : null, note, serverDirectives);
     }
 
     @AssertTrue(message = "{msg.validation.addresses}")
@@ -415,6 +483,8 @@ public record SiteOptions(
         put(values, prefix + "redirectToPrimary", redirectToPrimary);
         put(values, prefix + "backendErrorPage", backendErrorPage);
         put(values, prefix + "backendErrorMessage", backendErrorMessage);
+        put(values, prefix + "note", note);
+        put(values, prefix + "serverDirectives", serverDirectives);
     }
 
     static SiteOptions load(Properties values, String prefix) {
@@ -434,7 +504,8 @@ public record SiteOptions(
                 values.getProperty(prefix + "maintenanceMessage"), values.getProperty(prefix + "maintenanceAllowFrom"),
                 values.getProperty(prefix + "responseHeaders"), values.getProperty(prefix + "requestHeaders"),
                 bool(values, prefix + "redirectToPrimary"), bool(values, prefix + "backendErrorPage"),
-                values.getProperty(prefix + "backendErrorMessage"));
+                values.getProperty(prefix + "backendErrorMessage"), values.getProperty(prefix + "note"),
+                values.getProperty(prefix + "serverDirectives"));
     }
 
     private static void put(Properties values, String key, Object value) {
