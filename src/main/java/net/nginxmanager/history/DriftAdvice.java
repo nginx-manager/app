@@ -1,5 +1,6 @@
 package net.nginxmanager.history;
 
+import net.nginxmanager.site.SiteAccess;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -18,7 +19,8 @@ public class DriftAdvice {
 
     @ModelAttribute("drift")
     public List<DriftItem> drift(Authentication authentication) {
-        if (authentication == null) {
+        // 외부 변경은 관리자가 버전 화면에서 확인한다
+        if (!SiteAccess.isAdmin(authentication)) {
             return List.of();
         }
         return driftDetector.current();

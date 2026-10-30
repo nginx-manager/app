@@ -49,7 +49,7 @@ class AcmeSettingsTest extends ConfigRootTest {
 
     @Test
     void onlyAdminsChangeTheAcmeServer() throws Exception {
-        mvc.perform(post("/settings/acme").with(csrf()).with(user("ed").roles("EDITOR"))
+        mvc.perform(post("/settings/acme").with(csrf()).with(user("ed").roles("MEMBER"))
                         .param("environment", "STAGING"))
                 .andExpect(status().isForbidden());
         assertThat(acmeSettingsRepository.findAll()).isEmpty();

@@ -6,7 +6,8 @@ public enum VersionSource {
     ROLLBACK("되돌리기"),
     DRIFT_IMPORT("외부 변경 가져오기"),
     CERT_ISSUE("인증서 발급"),
-    CERT_RENEW("인증서 갱신");
+    CERT_RENEW("인증서 갱신"),
+    ADMIN_DOMAIN("관리 화면 도메인");
 
     private final String label;
 

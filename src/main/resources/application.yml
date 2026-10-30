@@ -1,5 +1,7 @@
 server:
   port: 9000
+  # 설치 묶음에서는 nginx(관리 도메인 HTTPS 프록시)가 넘긴 X-Forwarded-*를 믿는다(native). 사설망 주소의 프록시만 믿는다
+  forward-headers-strategy: ${NGINX_MANAGER_FORWARD_HEADERS:none}
   servlet:
     session:
       cookie:

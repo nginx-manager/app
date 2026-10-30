@@ -1,6 +1,7 @@
 package net.nginxmanager.user;
 
 import jakarta.validation.Valid;
+import net.nginxmanager.site.SiteQueryRepository;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -18,10 +19,13 @@ public class UserController {
 
     private final UserRepository userRepository;
     private final UserService userService;
+    private final SiteQueryRepository siteQueryRepository;
 
-    public UserController(UserRepository userRepository, UserService userService) {
+    public UserController(UserRepository userRepository, UserService userService,
+                          SiteQueryRepository siteQueryRepository) {
         this.userRepository = userRepository;
         this.userService = userService;
+        this.siteQueryRepository = siteQueryRepository;
     }
 
     @GetMapping
@@ -31,6 +35,7 @@ public class UserController {
         }
         model.addAttribute("users", userRepository.findAllByOrderByUsernameAsc());
         model.addAttribute("roles", Role.values());
+        model.addAttribute("siteCounts", siteQueryRepository.countByOwner());
         return "users/list";
     }
 

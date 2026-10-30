@@ -10,15 +10,19 @@ import java.io.UncheckedIOException;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AccessDeniedException;
+import java.nio.file.FileVisitResult;
 import java.nio.file.FileSystems;
 import java.nio.file.FileVisitOption;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Stream;
 
 /**
  * 가져오기 패턴에 맞는 파일 찾기와 읽기. 설정 루트와 허용한 디렉터리({@link ImportProperties#roots}) 안의 파일만 다룬다
@@ -54,8 +58,17 @@ public class ImportFiles {
         }
     }
 
-    /** 패턴 검사 결과. error가 있으면 files는 비어 있다. */
-    public record Scan(String pattern, List<Found> files, String errorKey, String errorArg, boolean truncated) {
+    /**
+     * 패턴 검사 결과. error가 있으면 files는 비어 있다.
+     *
+     * @param denied 권한이 없어 열지 못한 디렉터리와 읽지 못한 파일(관리도구는 UID 10101로 돈다)
+     */
+    public record Scan(String pattern, List<Found> files, String errorKey, String errorArg, boolean truncated,
+                       List<String> denied) {
+
+        Scan(String pattern, List<Found> files, String errorKey, String errorArg, boolean truncated) {
+            this(pattern, files, errorKey, errorArg, truncated, List.of());
+        }
     }
 
     /** 화면에 보일 허용 디렉터리(설정 루트 포함). */
@@ -89,28 +102,71 @@ public class ImportFiles {
         }
         PathMatcher matcher = FileSystems.getDefault().getPathMatcher("glob:" + absolute);
         List<Found> found = new ArrayList<>();
-        boolean truncated = false;
+        List<String> denied = new ArrayList<>();
+        boolean[] truncated = {false};
         int depth = absolute.contains("**") ? MAX_DEPTH : depthOf(absolute) - depthOf(base.toString());
-        try (Stream<Path> paths = Files.walk(base, Math.max(depth, 0), FileVisitOption.FOLLOW_LINKS)) {
-            for (Path path : (Iterable<Path>) paths::iterator) {
-                if (!Files.isRegularFile(path) || !matcher.matches(path)) {
-                    continue;
+        try {
+            Files.walkFileTree(base, EnumSet.of(FileVisitOption.FOLLOW_LINKS), Math.max(depth, 0), new SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult visitFile(Path path, BasicFileAttributes attrs) {
+                    if (!attrs.isRegularFile() || !matcher.matches(path)) {
+                        return FileVisitResult.CONTINUE;
+                    }
+                    if (!Files.isReadable(path)) {
+                        addDenied(denied, path);
+                        return FileVisitResult.CONTINUE;
+                    }
+                    Optional<Found> file = resolve(path.toString());
+                    if (file.isEmpty() || isReserved(file.get())) {
+                        return FileVisitResult.CONTINUE;
+                    }
+                    if (found.size() >= MAX_MATCHES) {
+                        truncated[0] = true;
+                        return FileVisitResult.TERMINATE;
+                    }
+                    found.add(file.get());
+                    return FileVisitResult.CONTINUE;
                 }
-                Optional<Found> file = resolve(path.toString());
-                if (file.isEmpty() || isReserved(file.get())) {
-                    continue;
+
+                @Override
+                public FileVisitResult visitFileFailed(Path path, IOException e) {
+                    // 한 사용자의 디렉터리를 못 열어도 나머지는 계속 찾는다
+                    if (e instanceof AccessDeniedException && couldMatch(absolute, path)) {
+                        addDenied(denied, path);
+                    }
+                    return FileVisitResult.CONTINUE;
                 }
-                if (found.size() >= MAX_MATCHES) {
-                    truncated = true;
-                    break;
-                }
-                found.add(file.get());
-            }
+            });
         } catch (IOException | UncheckedIOException e) {
             return new Scan(pattern, List.of(), "import.error.notVisible", base.toString(), false);
         }
         found.sort(java.util.Comparator.comparing(Found::path));
-        return new Scan(pattern, found, null, null, truncated);
+        denied.sort(null);
+        return new Scan(pattern, found, null, null, truncated[0], denied);
+    }
+
+    private static void addDenied(List<String> denied, Path path) {
+        if (denied.size() < MAX_MATCHES) {
+            denied.add(path.toString());
+        }
+    }
+
+    /** 패턴에 맞는 파일이 이 디렉터리 아래에 있을 수 있는지. */
+    static boolean couldMatch(String absolutePattern, Path dir) {
+        String[] pattern = absolutePattern.substring(1).split("/");
+        String[] parts = dir.toString().substring(1).split("/");
+        for (int i = 0; i < parts.length; i++) {
+            if (i >= pattern.length - 1) {
+                return false;
+            }
+            if (pattern[i].contains("**")) {
+                return true;
+            }
+            if (!FileSystems.getDefault().getPathMatcher("glob:" + pattern[i]).matches(Path.of(parts[i]))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** 경로 하나를 확인한다. 허용한 디렉터리 밖이거나 파일이 아니면 비어 있다. */
@@ -148,6 +204,8 @@ public class ImportFiles {
                 throw new IllegalArgumentException("import.error.tooLarge");
             }
             return decode(Files.readAllBytes(path));
+        } catch (AccessDeniedException e) {
+            throw new IllegalArgumentException("import.error.denied");
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

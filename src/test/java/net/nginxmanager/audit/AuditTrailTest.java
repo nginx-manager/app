@@ -57,7 +57,7 @@ class AuditTrailTest extends ConfigRootTest {
     @BeforeEach
     void users() {
         userRepository.save(new User("admin", "{noop}unused-password", Role.ADMIN));
-        userRepository.save(new User("editor", "{noop}unused-password", Role.EDITOR));
+        userRepository.save(new User("editor", "{noop}unused-password", Role.MEMBER));
         setupState.reset();
     }
 
@@ -79,7 +79,7 @@ class AuditTrailTest extends ConfigRootTest {
 
         ApplyResult rollback = rollbackService.rollback(first.versionId(), "admin");
         User editor = userRepository.findByUsername("editor").orElseThrow();
-        userService.changeRole(editor.getId(), Role.VIEWER, editor.getVersion(), "admin");
+        userService.changeRole(editor.getId(), Role.ADMIN, editor.getVersion(), "admin");
 
         // 이력에 작성자가 남는다
         assertThat(List.of(first, second)).allSatisfy(r -> assertThat(version(r).getAuthorName()).isEqualTo("editor"));
@@ -142,7 +142,7 @@ class AuditTrailTest extends ConfigRootTest {
         mvc.perform(saveSite(site.getId(), "http://10.0.0.2:3000",
                         Long.toString(siteRepository.findById(site.getId()).orElseThrow().getVersion())))
                 .andExpect(status().is3xxRedirection());
-        mvc.perform(post("/files/" + file.getId()).with(csrf()).with(user("other").roles("EDITOR"))
+        mvc.perform(post("/files/" + file.getId()).with(csrf()).with(user("other").roles("ADMIN"))
                         .param("content", "server { listen 80; }\n").param("version", read))
                 .andExpect(status().isConflict());
 
@@ -152,7 +152,7 @@ class AuditTrailTest extends ConfigRootTest {
 
     private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder saveSite(long id, String target,
                                                                                                String version) {
-        return post("/sites/" + id).with(csrf()).with(user("editor").roles("EDITOR"))
+        return post("/sites/" + id).with(csrf()).with(user("editor").roles("ADMIN"))
                 .param("primaryDomain", "audit.local").param("type", "PROXY").param("listenHttpPort", "80")
                 .param("proxyTarget", target).param("version", version);
     }

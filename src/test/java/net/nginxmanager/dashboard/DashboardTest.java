@@ -78,7 +78,7 @@ class DashboardTest extends ConfigRootTest {
                 .satisfies(w -> assertThat(w.daysLeft()).isBetween(9L, 10L));
         assertThat(dashboard.databaseBytes()).isPositive();
 
-        mvc.perform(get("/").with(user("v").roles("VIEWER")))
+        mvc.perform(get("/").with(user("v").roles("ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("실행 중")))
                 .andExpect(content().string(containsString("2 활성 / 2 전체")))
@@ -103,7 +103,7 @@ class DashboardTest extends ConfigRootTest {
     void adminStartsStoppedNginxAfterValidation() throws Exception {
         nginx.running = false;
 
-        mvc.perform(get("/").with(user("v").roles("VIEWER")))
+        mvc.perform(get("/").with(user("v").roles("MEMBER")))
                 .andExpect(content().string(containsString("중지됨")))
                 .andExpect(content().string(not(containsString("nginx 시작"))));
         mvc.perform(get("/").with(user("admin").roles("ADMIN")))
@@ -137,16 +137,19 @@ class DashboardTest extends ConfigRootTest {
 
     @Test
     void footerShowsAppVersionOnlyAfterLogin() throws Exception {
-        mvc.perform(get("/").with(user("v").roles("VIEWER")))
+        mvc.perform(get("/").with(user("v").roles("MEMBER")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("<footer class=\"footer\">")))
-                .andExpect(content().string(containsString(">dev</span></a>")))
+                .andExpect(content().string(containsString(">manager dev</span></a>")))
+                .andExpect(content().string(containsString("class=\"brand-version\">dev</span>")))
                 .andExpect(content().string(containsString("class=\"icon icon-github\"")))
                 .andExpect(content().string(containsString("class=\"nav-manual\" href=\"/guide\"")))
                 .andExpect(content().string(containsString("<a href=\"/guide\"><svg")))
                 .andExpect(content().string(containsString(">사용 설명서</span></a>\n</footer>")));
         mvc.perform(get("/login"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(not(containsString("<footer"))));
+                .andExpect(content().string(not(containsString("<footer"))))
+                .andExpect(content().string(containsString("href=\"https://github.com/nginx-manager/app\"")))
+                .andExpect(content().string(containsString("<span>GitHub</span></a>")));
     }
 }

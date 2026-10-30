@@ -20,4 +20,10 @@ public interface SiteRepository extends JpaRepository<Site, Long> {
     List<Site> findByCertificateIdIsNotNull();
 
     Optional<Site> findByConfigFileId(Long configFileId);
+
+    List<Site> findByOwnerId(Long ownerId);
+
+    long countByOwnerId(Long ownerId);
+
+    long countByOwnerIdAndEnabledTrue(Long ownerId);
 }

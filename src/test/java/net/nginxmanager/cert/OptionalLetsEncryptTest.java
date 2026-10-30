@@ -92,7 +92,7 @@ class OptionalLetsEncryptTest extends ConfigRootTest {
     }
 
     private MockHttpServletRequestBuilder newSite(String mode) {
-        return post("/sites/new").with(csrf()).with(user("ed").roles("EDITOR"))
+        return post("/sites/new").with(csrf()).with(user("ed").roles("ADMIN"))
                 .param("primaryDomain", DOMAIN).param("type", "PROXY").param("listenHttpPort", "80")
                 .param("proxyTarget", "http://10.0.0.1:3000").param("certificateMode", mode)
                 // 화면에는 숨어 있어도 함께 보내지는 값들
@@ -101,7 +101,7 @@ class OptionalLetsEncryptTest extends ConfigRootTest {
 
     @Test
     void formOffersThreeChoicesAndNoneMeansNoCertificate() throws Exception {
-        mvc.perform(get("/sites/new").with(user("ed").roles("EDITOR")))
+        mvc.perform(get("/sites/new").with(user("ed").roles("ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("value=\"NONE\"")))
                 .andExpect(content().string(containsString("value=\"LETS_ENCRYPT\"")))
@@ -158,10 +158,10 @@ class OptionalLetsEncryptTest extends ConfigRootTest {
         assertThat(applyService.applyPending("ed", "http only").succeeded()).isTrue();
         Site site = siteRepository.findByPrimaryDomain(DOMAIN).orElseThrow();
 
-        mvc.perform(get("/sites/" + site.getId()).with(user("ed").roles("EDITOR")))
+        mvc.perform(get("/sites/" + site.getId()).with(user("ed").roles("ADMIN")))
                 .andExpect(content().string(containsString("Let&#39;s Encrypt 인증서 발급받기")));
 
-        mvc.perform(post("/certs/letsencrypt").with(csrf()).with(user("ed").roles("EDITOR"))
+        mvc.perform(post("/certs/letsencrypt").with(csrf()).with(user("ed").roles("ADMIN"))
                         .param("siteId", site.getId().toString()))
                 .andExpect(redirectedUrl("/sites/" + site.getId() + "#https"))
                 .andExpect(flash().attribute("notice", containsString("발급을 시작했습니다")));
@@ -172,7 +172,7 @@ class OptionalLetsEncryptTest extends ConfigRootTest {
         assertThat(readFile(PATH)).contains("listen 443 ssl;", "ssl_certificate " + cert.getCertPath() + ";");
         assertThat(siteRepository.findByPrimaryDomain(DOMAIN).orElseThrow().isHttpsEnabled()).isTrue();
 
-        mvc.perform(get("/sites/" + site.getId()).with(user("ed").roles("EDITOR")))
+        mvc.perform(get("/sites/" + site.getId()).with(user("ed").roles("ADMIN")))
                 .andExpect(content().string(containsString("발급됨")))
                 .andExpect(content().string(not(containsString("Let&#39;s Encrypt 인증서 발급받기"))));
     }
@@ -183,9 +183,9 @@ class OptionalLetsEncryptTest extends ConfigRootTest {
         Site site = siteRepository.findByPrimaryDomain(DOMAIN).orElseThrow();
 
         // 인증서 화면에서 고른다. 아직 nginx가 모르는 사이트라 바로 발급하지 않는다
-        mvc.perform(get("/certs").with(user("ed").roles("EDITOR")))
+        mvc.perform(get("/certs").with(user("ed").roles("ADMIN")))
                 .andExpect(content().string(containsString("<option value=\"" + site.getId() + "\">" + DOMAIN)));
-        mvc.perform(post("/certs/letsencrypt").with(csrf()).with(user("ed").roles("EDITOR"))
+        mvc.perform(post("/certs/letsencrypt").with(csrf()).with(user("ed").roles("ADMIN"))
                         .param("siteId", site.getId().toString()).param("from", "certs"))
                 .andExpect(redirectedUrl("/certs"))
                 .andExpect(flash().attribute("notice", containsString("적용하면")));
@@ -208,7 +208,7 @@ class OptionalLetsEncryptTest extends ConfigRootTest {
 
         assertThatThrownBy(() -> siteService.enableLetsEncrypt(site.getId(), "ed"))
                 .isInstanceOf(WildcardLetsEncryptException.class);
-        mvc.perform(post("/certs/letsencrypt").with(csrf()).with(user("ed").roles("EDITOR"))
+        mvc.perform(post("/certs/letsencrypt").with(csrf()).with(user("ed").roles("ADMIN"))
                         .param("siteId", site.getId().toString()))
                 .andExpect(flash().attribute("error", containsString("와일드카드")));
         assertThat(siteRepository.findById(site.getId()).orElseThrow().isHttpsEnabled()).isFalse();
@@ -224,7 +224,7 @@ class OptionalLetsEncryptTest extends ConfigRootTest {
         siteService.update(site.getId(), new SiteForm(DOMAIN, "", SiteType.PROXY, 80, null, "http://10.0.0.2:3000",
                 site.getVersion()), "ed");
 
-        mvc.perform(post("/certs/letsencrypt").with(csrf()).with(user("ed").roles("EDITOR"))
+        mvc.perform(post("/certs/letsencrypt").with(csrf()).with(user("ed").roles("ADMIN"))
                         .param("siteId", site.getId().toString()))
                 .andExpect(flash().attribute("notice", containsString("발급을 시작했습니다")));
 
@@ -247,18 +247,18 @@ class OptionalLetsEncryptTest extends ConfigRootTest {
         siteService.editRaw(file.getId(), "server { listen 80; server_name " + DOMAIN + "; }\n", file.getVersion(), "ed");
         Site site = siteRepository.findByPrimaryDomain(DOMAIN).orElseThrow();
 
-        mvc.perform(post("/certs/letsencrypt").with(csrf()).with(user("ed").roles("EDITOR"))
+        mvc.perform(post("/certs/letsencrypt").with(csrf()).with(user("ed").roles("ADMIN"))
                         .param("siteId", site.getId().toString()))
                 .andExpect(redirectedUrl("/sites/" + site.getId() + "#https"))
                 .andExpect(flash().attribute("error", containsString("원문 편집 사이트")));
         assertThat(certificateRepository.findAll()).isEmpty();
 
         // 폼을 열어 둔 사이 원문 편집 사이트가 되었으면 폼 값으로 덮어쓰지 않고 이유를 보여 준다
-        mvc.perform(post("/sites/" + site.getId()).with(csrf()).with(user("ed").roles("EDITOR"))
+        mvc.perform(post("/sites/" + site.getId()).with(csrf()).with(user("ed").roles("ADMIN"))
                         .param("primaryDomain", DOMAIN).param("type", "PROXY").param("listenHttpPort", "80")
                         .param("proxyTarget", "http://10.0.0.9:3000").param("version", Long.toString(site.getVersion())))
                 .andExpect(redirectedUrl("/sites/" + site.getId() + "?rawOnly"));
-        mvc.perform(get("/sites/" + site.getId() + "?rawOnly").with(user("ed").roles("EDITOR")))
+        mvc.perform(get("/sites/" + site.getId() + "?rawOnly").with(user("ed").roles("ADMIN")))
                 .andExpect(content().string(containsString("원문 편집기로 고친 사이트라")));
         assertThat(configFileRepository.findByPath(PATH).orElseThrow().getDraftContent()).doesNotContain("10.0.0.9");
     }

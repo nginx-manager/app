@@ -44,7 +44,7 @@ class FileCreateWebTest extends ConfigRootTest {
 
     @Test
     void createsADraftThatIsAppliedLikeAnyOtherFile() throws Exception {
-        mvc.perform(post("/files/new").with(csrf()).with(user("ed").roles("EDITOR"))
+        mvc.perform(post("/files/new").with(csrf()).with(user("ed").roles("ADMIN"))
                         .param("path", "njs/hello.js").param("content", "function hello(r) { r.return(200); }\r\n"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrlPattern("/files/*?saved"));
@@ -61,7 +61,7 @@ class FileCreateWebTest extends ConfigRootTest {
     @ValueSource(strings = {"../etc/passwd", "/etc/passwd", "certs/x.pem", "htpasswd/app.local", ".hidden",
             "a/../b.conf", "a b.conf", "a;b.conf", ""})
     void rejectsPathsOutsideWhatMayBeCreated(String path) throws Exception {
-        mvc.perform(post("/files/new").with(csrf()).with(user("ed").roles("EDITOR")).param("path", path))
+        mvc.perform(post("/files/new").with(csrf()).with(user("ed").roles("ADMIN")).param("path", path))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("files/new")));
 
@@ -72,7 +72,7 @@ class FileCreateWebTest extends ConfigRootTest {
     void rejectsExistingFiles() throws Exception {
         writeFile("stream.d/a.conf", "# a\n");
 
-        mvc.perform(post("/files/new").with(csrf()).with(user("ed").roles("EDITOR")).param("path", "stream.d/a.conf"))
+        mvc.perform(post("/files/new").with(csrf()).with(user("ed").roles("ADMIN")).param("path", "stream.d/a.conf"))
                 .andExpect(status().isOk());
 
         assertThat(configFileRepository.findByPath("stream.d/a.conf")).isEmpty();
@@ -84,9 +84,9 @@ class FileCreateWebTest extends ConfigRootTest {
         assertThat(applyService.applyPending("ed", "create").succeeded()).isTrue();
         ConfigFile file = configFileRepository.findByPath("stream.d/old.conf").orElseThrow();
 
-        mvc.perform(get("/files/" + created.getId()).with(user("ed").roles("EDITOR")))
+        mvc.perform(get("/files/" + created.getId()).with(user("ed").roles("ADMIN")))
                 .andExpect(content().string(containsString("/delete")));
-        mvc.perform(post("/files/" + file.getId() + "/delete").with(csrf()).with(user("ed").roles("EDITOR"))
+        mvc.perform(post("/files/" + file.getId() + "/delete").with(csrf()).with(user("ed").roles("ADMIN"))
                         .param("version", Long.toString(file.getVersion())))
                 .andExpect(status().is3xxRedirection());
 
@@ -100,7 +100,7 @@ class FileCreateWebTest extends ConfigRootTest {
     void deletingANeverAppliedFileDropsTheDraft() throws Exception {
         ConfigFile created = siteService.createFile("misc/note.conf", "# note\n", "ed");
 
-        mvc.perform(post("/files/" + created.getId() + "/delete").with(csrf()).with(user("ed").roles("EDITOR"))
+        mvc.perform(post("/files/" + created.getId() + "/delete").with(csrf()).with(user("ed").roles("ADMIN"))
                         .param("version", Long.toString(created.getVersion())))
                 .andExpect(status().is3xxRedirection());
 
@@ -113,14 +113,14 @@ class FileCreateWebTest extends ConfigRootTest {
         ConfigFile main = configFileRepository.save(new ConfigFile("nginx.conf", false));
         ConfigFile site = configFileRepository.save(new ConfigFile("conf.d/sites/a.local.conf", false));
 
-        mvc.perform(get("/files/" + main.getId()).with(user("ed").roles("EDITOR")))
+        mvc.perform(get("/files/" + main.getId()).with(user("ed").roles("ADMIN")))
                 .andExpect(content().string(not(containsString("/delete"))));
         assertThat(siteService.isDeletable(site)).isFalse();
     }
 
     @Test
     void viewersCannotCreate() throws Exception {
-        mvc.perform(post("/files/new").with(csrf()).with(user("v").roles("VIEWER")).param("path", "a.conf"))
+        mvc.perform(post("/files/new").with(csrf()).with(user("v").roles("MEMBER")).param("path", "a.conf"))
                 .andExpect(status().isForbidden());
     }
 }

@@ -1,6 +1,6 @@
 # 5. 설정 파일 가져오기
 
-이미 운영하던 nginx 설정 파일을 nginx manager의 사이트로 옮겨 옵니다(v1.1.0부터, 편집자부터). 사이트 목록의 **설정 파일 가져오기**에서 시작합니다.
+이미 운영하던 nginx 설정 파일을 nginx manager의 사이트로 옮겨 옵니다(v1.1.0부터, 관리자). 사이트 목록의 **설정 파일 가져오기**에서 시작합니다.
 
 가져온 파일은 이렇게 등록됩니다.
 
@@ -44,25 +44,40 @@
 
 ## 찾을 수 있는 디렉터리
 
-관리도구는 컨테이너 안에서 돌기 때문에, 컨테이너가 볼 수 있는 경로만 찾습니다.
+관리도구는 컨테이너 안에서 돌기 때문에, 컨테이너가 볼 수 있는 경로만 찾습니다. 설정 루트(`/etc/nginx`) 안의 파일은 따로 설정하지 않아도 됩니다. 화면의 **찾을 수 있는 디렉터리**에 지금 허용된 경로가 보입니다.
 
-- 설정 루트(`/etc/nginx`) 안의 파일은 따로 설정하지 않아도 됩니다.
-- 호스트의 다른 디렉터리(예: `/home`)는 compose 파일의 `manager` 서비스에 **같은 경로로 읽기 전용 마운트**하고 `NGINX_MANAGER_IMPORT_ROOTS`에 적은 뒤 다시 띄웁니다.
+### 호스트의 다른 디렉터리 붙이기
 
-```yaml
-  manager:
-    volumes:
-      # ...기존 볼륨...
-      - /home:/home:ro
-    environment:
-      NGINX_MANAGER_IMPORT_ROOTS: /home
-```
+`/home/*/nginx/*.conf`처럼 호스트의 다른 디렉터리에 있는 파일은 서버에서 그 디렉터리를 붙입니다(설치할 때 `--import-root /home`을 주어도 됩니다).
 
 ```bash
-docker compose up -d manager
+sudo /opt/nginx-manager/nm import-root add /home
 ```
 
-관리도구는 UID 10101로 돌므로 그 사용자가 파일을 읽을 수 있어야 합니다. 화면의 **찾을 수 있는 디렉터리**에 지금 허용된 경로가 보입니다.
+- 두 컨테이너(manager와 nginx)에 **호스트와 같은 경로**로 읽기 전용으로 붙입니다. 그래서 화면의 경로와 서버의 경로가 같고, 패턴을 바꿔 적을 필요가 없습니다.
+- nginx에도 붙이는 까닭: 가져온 설정의 `root /home/alice/www`, `ssl_certificate /home/...`, `include /home/...`를 nginx가 읽어야 적용할 때 `nginx -t`가 통과합니다.
+- 붙이는 동안 nginx가 몇 초 다시 시작합니다. 붙인 것은 `compose.import.yml`과 `.env`의 `NGINX_MANAGER_IMPORT_ROOTS`에 남아 업그레이드해도 그대로입니다.
+- 떼려면 `nm import-root remove /home`, 지금 붙인 것은 `nm import-root`로 봅니다.
+
+### 읽기 권한
+
+두 컨테이너는 UID 10101로 돕니다. 홈 디렉터리가 `700`이거나 파일이 `600`이면 붙여도 읽지 못합니다.
+
+- 화면에서 검사하면 읽은 파일은 그대로 보이고, 권한이 없어 열지 못한 디렉터리·파일은 따로 **권한이 없어 열지 못한 곳이 있습니다**로 알려 줍니다. 한 사용자의 디렉터리를 못 열어도 나머지는 계속 찾습니다.
+- 서버에서 미리 확인할 수 있습니다. 패턴에 맞는 파일과 그 안의 `root`·`alias`·`ssl_certificate`·`include` 경로까지 UID 10101로 읽어 보고, 못 읽는 것과 붙인 디렉터리 밖이라 보이지 않는 것을 알려 줍니다.
+
+```bash
+sudo /opt/nginx-manager/nm import-root check '/home/*/nginx/*.conf'
+```
+
+- 읽기 권한은 ACL로 UID 10101에게만 줍니다. 홈 디렉터리의 다른 권한(`700` 등)은 그대로이고, 위쪽 디렉터리에는 지나가기(`x`)만 줍니다. 디렉터리에 주면 나중에 생기는 파일도 읽을 수 있습니다.
+
+```bash
+sudo /opt/nginx-manager/nm import-root grant /home/alice/nginx /home/alice/www
+```
+
+- `setfacl`이 없으면 `acl` 패키지를 설치합니다(`apt install acl`). ACL을 지원하지 않는 파일시스템이면 `chmod o+rX`로 대신합니다.
+- 권한을 바꿀 수 없으면 **내 PC의 파일 올리기**로 내용만 가져옵니다. 이때는 원본이 바뀌어도 알 수 없고, 설정이 가리키는 파일(`root` 등)은 nginx가 읽을 수 있는 곳에 따로 두어야 합니다.
 
 ## 미리 보기
 

@@ -1,0 +1,54 @@
+# nginx manager 설치 묶음의 compose 파일. 이 파일은 `nm upgrade`가 새 버전으로 바꾼다.
+# 바꿀 값은 .env에, 더할 설정(스트림 포트, 마운트)은 compose.override.yml에 적는다. 두 파일은 업그레이드해도 그대로다.
+#
+# - manager와 nginx는 따로 올린다. manager만 올리면 nginx는 계속 트래픽을 받는다.
+# - 데이터는 이 디렉터리의 data/ 아래에 있다. 백업은 `nm backup`.
+name: nginx-manager
+
+services:
+  nginx:
+    image: ghcr.io/nginx-manager/nginx:${NGINX_IMAGE:?NGINX_IMAGE를 .env에 적으세요}
+    restart: unless-stopped
+    ports:
+      - "${NGINX_BIND_ADDRESS:-0.0.0.0}:${NGINX_HTTP_PORT:-80}:80"
+      - "${NGINX_BIND_ADDRESS:-0.0.0.0}:${NGINX_HTTPS_PORT:-443}:443"
+      - "${NGINX_BIND_ADDRESS:-0.0.0.0}:${NGINX_HTTPS_PORT:-443}:443/udp"   # HTTP/3(QUIC)
+    volumes:
+      - ./data/conf:/etc/nginx                # nginx 설정, 인증서(certs/)
+      - ./data/logs:/var/log/nginx            # 접근·오류 로그
+      - ./data/shared:/var/lib/nginx-manager  # ACME 챌린지 파일, 에이전트 토큰
+    environment:
+      TZ: ${TZ:-Asia/Seoul}
+    # nginx가 연결을 정리할 시간을 준다
+    stop_grace_period: 40s
+
+  manager:
+    image: ghcr.io/nginx-manager/app:${MANAGER_VERSION:?MANAGER_VERSION을 .env에 적으세요}
+    restart: unless-stopped
+    depends_on:
+      nginx:
+        condition: service_healthy
+    ports:
+      # 관리 화면. 기본은 이 서버에서만 열린다. 밖에서는 관리 도메인(HTTPS)으로 들어온다
+      - "${NGINX_MANAGER_BIND_ADDRESS:-127.0.0.1}:${NGINX_MANAGER_PORT:-9000}:9000"
+    volumes:
+      - ./data/conf:/etc/nginx
+      - ./data/logs:/var/log/nginx
+      - ./data/shared:/var/lib/nginx-manager
+      - ./data/manager:/data                  # 관리도구 DB, ACME 계정 키
+    environment:
+      NGINX_RUNTIME_AGENT_URL: http://nginx:7070
+      NGINX_MANAGER_ADMIN_DOMAIN: ${NGINX_MANAGER_ADMIN_DOMAIN:-}
+      NGINX_MANAGER_ADMIN_EMAIL: ${NGINX_MANAGER_ADMIN_EMAIL:-}
+      NGINX_MANAGER_ADMIN_ALLOW: ${NGINX_MANAGER_ADMIN_ALLOW:-}
+      NGINX_MANAGER_ADMIN_HTTPS_PORT: ${NGINX_HTTPS_PORT:-443}
+      # 관리 도메인으로 들어온 요청의 원래 주소(HTTPS)를 nginx가 넘긴다
+      NGINX_MANAGER_FORWARD_HEADERS: native
+      NGINX_MANAGER_IMPORT_ROOTS: ${NGINX_MANAGER_IMPORT_ROOTS:-}
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
+      TZ: ${TZ:-Asia/Seoul}
+    # 진행 중인 적용(검증·reload·상태 확인·복구)이 끝날 시간을 준다
+    stop_grace_period: 40s

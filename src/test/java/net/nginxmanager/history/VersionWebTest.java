@@ -52,28 +52,32 @@ class VersionWebTest extends ConfigRootTest {
     }
 
     @Test
-    void viewerSeesHistoryAndDiffButCannotRollBack() throws Exception {
-        mvc.perform(get("/versions").with(user("vi").roles("VIEWER")))
+    void memberCannotSeeHistoryOrRollBack() throws Exception {
+        mvc.perform(get("/versions").with(user("vi").roles("MEMBER")))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/versions/" + first + "/rollback").with(csrf()).with(user("vi").roles("MEMBER")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void adminSeesHistoryAndDiff() throws Exception {
+        mvc.perform(get("/versions").with(user("ad").roles("ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("첫 버전")))
                 .andExpect(content().string(containsString("둘째 버전")));
-        mvc.perform(get("/versions/" + first + "/diff/" + second).with(user("vi").roles("VIEWER")))
+        mvc.perform(get("/versions/" + first + "/diff/" + second).with(user("ad").roles("ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("-        proxy_pass http://first:1;")))
                 .andExpect(content().string(containsString("+        proxy_pass http://second:2;")));
-        mvc.perform(get("/versions/" + first).with(user("vi").roles("VIEWER")))
-                .andExpect(content().string(not(containsString("이 버전으로 되돌리기"))));
-        mvc.perform(post("/versions/" + first + "/rollback").with(csrf()).with(user("vi").roles("VIEWER")))
-                .andExpect(status().isForbidden());
     }
 
     @Test
     void editorRollsBackFromDetailPage() throws Exception {
         mvc.perform(get("/versions/compare").param("a", String.valueOf(second)).param("b", String.valueOf(first))
-                        .with(user("ed").roles("EDITOR")))
+                        .with(user("ed").roles("ADMIN")))
                 .andExpect(redirectedUrl("/versions/" + first + "/diff/" + second));
 
-        mvc.perform(post("/versions/" + first + "/rollback").with(csrf()).with(user("ed").roles("EDITOR")))
+        mvc.perform(post("/versions/" + first + "/rollback").with(csrf()).with(user("ed").roles("ADMIN")))
                 .andExpect(redirectedUrlPattern("/versions/*"));
 
         assertThat(readFile("conf.d/sites/app.local.conf")).contains("http://first:1");
@@ -84,11 +88,14 @@ class VersionWebTest extends ConfigRootTest {
         writeFile("conf.d/sites/app.local.conf", "server { listen 80; server_name app.local; }\n");
         driftDetector.invalidate();
 
-        mvc.perform(get("/sites").with(user("vi").roles("VIEWER")))
+        mvc.perform(get("/sites").with(user("ad").roles("ADMIN")))
                 .andExpect(content().string(containsString("서버에서 직접 바뀐 설정 파일이")));
-        mvc.perform(post("/drift/import").with(csrf()).with(user("ed").roles("EDITOR")))
+        // 외부 변경 확인은 관리자 일이라 멤버에게는 띄우지 않는다
+        mvc.perform(get("/sites").with(user("vi").roles("MEMBER")))
+                .andExpect(content().string(not(containsString("서버에서 직접 바뀐 설정 파일이"))));
+        mvc.perform(post("/drift/import").with(csrf()).with(user("ed").roles("ADMIN")))
                 .andExpect(redirectedUrlPattern("/versions/*"));
-        mvc.perform(get("/sites").with(user("vi").roles("VIEWER")))
+        mvc.perform(get("/sites").with(user("ad").roles("ADMIN")))
                 .andExpect(content().string(not(containsString("서버에서 직접 바뀐 설정 파일이"))));
     }
 }

@@ -41,13 +41,13 @@ class SiteOptionsWebTest extends ConfigRootTest {
     }
 
     private MockHttpServletRequestBuilder newProxy(String domain) {
-        return post("/sites/new").with(csrf()).with(user("ed").roles("EDITOR"))
+        return post("/sites/new").with(csrf()).with(user("ed").roles("ADMIN"))
                 .param("primaryDomain", domain).param("type", "PROXY").param("listenHttpPort", "80")
                 .param("proxyTarget", "http://10.0.0.1:3000");
     }
 
     private MockHttpServletRequestBuilder update(Site site) {
-        return post("/sites/" + site.getId()).with(csrf()).with(user("ed").roles("EDITOR"))
+        return post("/sites/" + site.getId()).with(csrf()).with(user("ed").roles("ADMIN"))
                 .param("primaryDomain", site.getPrimaryDomain()).param("version", Long.toString(site.getVersion()))
                 .param("type", "PROXY").param("listenHttpPort", "80").param("proxyTarget", "http://10.0.0.1:3000");
     }
@@ -67,7 +67,7 @@ class SiteOptionsWebTest extends ConfigRootTest {
         assertThat(configFileRepository.findByPath("conf.d/sites/in.local.conf").orElseThrow().getDraftContent())
                 .contains("satisfy any;", "allow 10.0.0.0/8;", "auth_basic_user_file htpasswd/in.local;", "gzip on;");
 
-        mvc.perform(get("/sites/" + site.getId()).with(user("ed").roles("EDITOR")))
+        mvc.perform(get("/sites/" + site.getId()).with(user("ed").roles("ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString(">kim</textarea>")))
                 .andExpect(content().string(not(containsString("first-password"))))
@@ -143,7 +143,7 @@ class SiteOptionsWebTest extends ConfigRootTest {
 
     @Test
     void redirectSiteFromTheForm() throws Exception {
-        mvc.perform(post("/sites/new").with(csrf()).with(user("ed").roles("EDITOR"))
+        mvc.perform(post("/sites/new").with(csrf()).with(user("ed").roles("ADMIN"))
                         .param("primaryDomain", "old.local").param("type", "REDIRECT").param("listenHttpPort", "80")
                         .param("redirectTarget", "https://new.example.com").param("redirectCode", "308")
                         .param("redirectKeepPath", "true"))
@@ -153,7 +153,7 @@ class SiteOptionsWebTest extends ConfigRootTest {
         assertThat(applyService.applyPending("ed", "redirect").succeeded()).isTrue();
         assertThat(siteRepository.findByPrimaryDomain("old.local").orElseThrow().getType()).isEqualTo(SiteType.REDIRECT);
 
-        mvc.perform(get("/sites").with(user("ed").roles("EDITOR")))
+        mvc.perform(get("/sites").with(user("ed").roles("ADMIN")))
                 .andExpect(content().string(containsString("리디렉션")));
     }
 

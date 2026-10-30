@@ -30,14 +30,14 @@ class UserAdminWebTest extends ConfigRootTest {
     @BeforeEach
     void users() {
         userRepository.save(new User("admin", passwordEncoder.encode("admin-password"), Role.ADMIN));
-        userRepository.save(new User("editor", passwordEncoder.encode("editor-password"), Role.EDITOR));
+        userRepository.save(new User("editor", passwordEncoder.encode("editor-password"), Role.MEMBER));
         setupState.reset();
     }
 
     @Test
     void adminInvitesUserAndSeesItInAuditLog() throws Exception {
         mvc.perform(post("/users").with(csrf()).with(user("admin").roles("ADMIN"))
-                        .param("username", "newbie").param("password", "newbie-password").param("role", "VIEWER"))
+                        .param("username", "newbie").param("password", "newbie-password").param("role", "MEMBER"))
                 .andExpect(redirectedUrl("/users?invited=newbie"));
 
         mvc.perform(get("/users").with(user("admin").roles("ADMIN")))
@@ -45,13 +45,13 @@ class UserAdminWebTest extends ConfigRootTest {
                 .andExpect(content().string(containsString("newbie")));
         mvc.perform(get("/audit").param("action", "USER_CREATE").with(user("admin").roles("ADMIN")))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("user:newbie role:VIEWER")));
+                .andExpect(content().string(containsString("user:newbie role:MEMBER")));
     }
 
     @Test
     void shortPasswordIsRejected() throws Exception {
         mvc.perform(post("/users").with(csrf()).with(user("admin").roles("ADMIN"))
-                        .param("username", "newbie").param("password", "short").param("role", "VIEWER"))
+                        .param("username", "newbie").param("password", "short").param("role", "MEMBER"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("10자 이상")));
     }

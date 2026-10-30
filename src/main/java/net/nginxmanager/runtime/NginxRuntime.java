@@ -42,6 +42,11 @@ public interface NginxRuntime {
         return Optional.empty();
     }
 
+    /** 마지막으로 확인한 nginx 버전(예: 1.31.8). 요청을 보내지 않는다. 아직 모르면 null. */
+    default String nginxVersion() {
+        return null;
+    }
+
     /** 에이전트에서 마지막으로 받은 응답으로 아는 것. 요청을 보내지 않는다. */
     default AgentInfo agent() {
         return AgentInfo.unknown();

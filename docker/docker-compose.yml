@@ -1,12 +1,13 @@
+# 개발·시험용 compose. 서버에는 릴리스의 설치 묶음(install.sh, deploy/)을 쓴다.
 # 실행 예시. docker compose -f docker/docker-compose.yml up -d
 #
 # nginx와 관리 화면이 컨테이너 두 개로 돈다. 관리 화면을 업데이트하거나 다시 띄워도 nginx는 계속 트래픽을 받는다.
-# - 두 이미지는 같은 버전으로 맞춘다. 아래 NGINX_MANAGER_VERSION 하나로 함께 바꾼다(예: 1.0.0).
+# - NGINX_MANAGER_VERSION 하나로 두 이미지를 함께 정한다(예: 1.0.0). 따로 정하려면 MANAGER_VERSION, NGINX_IMAGE.
 # - 관리 화면은 nginx 컨테이너 안의 에이전트(7070)에 nginx -t·reload를 요청한다. 에이전트는 호스트에 열지 않는다.
 # - 에이전트 토큰은 nginx 컨테이너가 처음 뜰 때 nm-shared 볼륨에 만들고 관리 화면이 읽는다. 따로 정할 것은 없다.
 services:
   nginx:
-    image: ghcr.io/nginx-manager/nginx:${NGINX_MANAGER_VERSION:-latest}
+    image: ghcr.io/nginx-manager/nginx:${NGINX_IMAGE:-${NGINX_MANAGER_VERSION:-latest}}
     restart: unless-stopped
     ports:
       - "80:80"
@@ -23,7 +24,7 @@ services:
     stop_grace_period: 40s
 
   manager:
-    image: ghcr.io/nginx-manager/app:${NGINX_MANAGER_VERSION:-latest}
+    image: ghcr.io/nginx-manager/app:${MANAGER_VERSION:-${NGINX_MANAGER_VERSION:-latest}}
     restart: unless-stopped
     depends_on:
       nginx:

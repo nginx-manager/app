@@ -31,6 +31,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 /**
@@ -88,8 +89,17 @@ public class ApplyService {
 
     /** @param actor 적용한 사용자. 시스템 작업이면 null */
     public ApplyResult applyPending(String actor, String message) {
+        return applyPending(actor, message, path -> true);
+    }
+
+    /**
+     * 경로가 맞는 초안만 반영한다. 멤버는 담당 사이트의 파일만 적용한다(007). 다른 초안은 DB에만 있고 디스크에
+     * 쓰이지 않으므로 검증(nginx -t)에 섞이지 않고 그대로 남는다.
+     */
+    public ApplyResult applyPending(String actor, String message, Predicate<String> paths) {
         return applyChanges(() -> tx.execute(status -> configFileRepository.findAll().stream()
                         .filter(ConfigFile::hasPendingChange)
+                        .filter(f -> paths.test(f.getPath()))
                         .map(f -> new FileChange(f.getPath(), f.isDraftDelete() ? null : f.getDraftContent()))
                         .toList()),
                 new Origin(actor, message, VersionSource.APPLY, null));

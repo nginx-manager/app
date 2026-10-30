@@ -21,7 +21,7 @@ class AuditListQueryCountTest extends ConfigRootTest {
 
     @Test
     void auditSearchQueryCountDoesNotGrowWithRows() {
-        User editor = userRepository.save(new User("editor", "{noop}x", Role.EDITOR));
+        User editor = userRepository.save(new User("editor", "{noop}x", Role.MEMBER));
         queryCounter.assertConstantQueries(
                 n -> {
                     for (int i = 0; i < n; i++) {
@@ -30,13 +30,13 @@ class AuditListQueryCountTest extends ConfigRootTest {
                     }
                 },
                 () -> assertThat(auditQueryRepository.search(AuditQueryRepository.Filter.none(), ZoneId.of("UTC"), 0, 100))
-                        .allSatisfy(row -> assertThat(row.userRole()).isEqualTo("EDITOR")),
+                        .allSatisfy(row -> assertThat(row.userRole()).isEqualTo("MEMBER")),
                 1, 50);
     }
 
     @Test
     void filtersCombine() {
-        User editor = userRepository.save(new User("editor", "{noop}x", Role.EDITOR));
+        User editor = userRepository.save(new User("editor", "{noop}x", Role.MEMBER));
         auditLogRepository.save(new AuditLog(editor, "editor", AuditAction.APPLY, "version:1", AuditResult.SUCCESS, null));
         auditLogRepository.save(new AuditLog(editor, "editor", AuditAction.APPLY, "version:2", AuditResult.FAILURE, "x"));
         auditLogRepository.save(new AuditLog(null, "ghost", AuditAction.LOGIN, null, AuditResult.FAILURE, null));

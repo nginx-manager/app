@@ -9,9 +9,17 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 public class RuntimeAdvice {
 
     private final RuntimeCompatibility compatibility;
+    private final NginxRuntime runtime;
 
-    public RuntimeAdvice(RuntimeCompatibility compatibility) {
+    public RuntimeAdvice(RuntimeCompatibility compatibility, NginxRuntime runtime) {
         this.compatibility = compatibility;
+        this.runtime = runtime;
+    }
+
+    /** footer에 manager 버전과 함께 보이는 nginx 버전. 로그인 전에는 보이지 않는다. */
+    @ModelAttribute("nginxVersion")
+    public String nginxVersion(Authentication authentication) {
+        return authentication == null ? null : runtime.nginxVersion();
     }
 
     @ModelAttribute("runtimeWarning")

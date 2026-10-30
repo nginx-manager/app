@@ -1,8 +1,10 @@
 package net.nginxmanager.config;
 
+import net.nginxmanager.admin.AdminDomainService;
 import net.nginxmanager.common.NotFoundException;
 import net.nginxmanager.site.SiteRepository;
 import net.nginxmanager.site.SiteService;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -11,6 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.server.ResponseStatusException;
 
 @Controller
 @RequestMapping("/files")
@@ -71,11 +74,13 @@ public class FileEditorController {
         model.addAttribute("content", file.getDraftContent() != null ? file.getDraftContent() : store.read(file.getPath()));
         model.addAttribute("site", siteRepository.findByConfigFileId(id).orElse(null));
         model.addAttribute("deletable", siteService.isDeletable(file) && !file.isDraftDelete());
+        model.addAttribute("managed", AdminDomainService.isManagedPath(file.getPath()));
         return "files/edit";
     }
 
     @PostMapping("/{id}/delete")
     public String delete(@PathVariable long id, @RequestParam long version, Authentication authentication) {
+        requireNotManaged(id);
         ConfigFile file = siteService.deleteFile(id, version, authentication.getName());
         return file.isDraftDelete() ? "redirect:/files/" + id + "?deleted" : "redirect:/files?deleted";
     }
@@ -83,7 +88,17 @@ public class FileEditorController {
     @PostMapping("/{id}")
     public String save(@PathVariable long id, @RequestParam String content, @RequestParam long version,
                        Authentication authentication) {
+        requireNotManaged(id);
         siteService.editRaw(id, content, version, authentication.getName());
         return "redirect:/files/" + id + "?saved";
+    }
+
+    /** 관리 화면 도메인 설정은 관리도구가 .env로 유지하므로 원문 편집기에서 바꾸지 못한다. */
+    private void requireNotManaged(long id) {
+        configFileRepository.findById(id)
+                .filter(file -> AdminDomainService.isManagedPath(file.getPath()))
+                .ifPresent(file -> {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "managed by nginx manager");
+                });
     }
 }
