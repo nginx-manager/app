@@ -2,7 +2,7 @@
 
 브라우저에서 nginx를 관리하는 도구입니다. nginx(오픈소스, 전체 모듈 빌드)와 관리 화면(Spring Boot)이 서로 다른 컨테이너에서 돌기 때문에, 관리 화면을 업데이트하거나 다시 띄워도 nginx는 트래픽을 계속 받습니다.
 
-**사용법은 [사용 설명서](docs/manual/README.md)에 있습니다.** 관리 화면 아래(footer)의 사용 설명서 링크도 이 문서를 엽니다.
+**사용법은 [사용 설명서](docs/manual/README.md)에 있습니다.** 관리 화면 왼쪽 메뉴와 아래(footer)의 사용 설명서 링크도 이 문서를 엽니다.
 
 명세와 설계는 [nginx-manager/docs](https://github.com/nginx-manager/docs)의 `specs/001-nginx-web-manager/`에 있습니다(Spec Kit).
 
