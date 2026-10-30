@@ -20,6 +20,9 @@ on:
         description: '같은 태그가 이미 있어도 다시 게시'
         type: boolean
         default: false
+      release:
+        description: '이 버전(v1.2.3)으로 태그를 달고 릴리스. 실행한 브랜치의 마지막 커밋에 단다'
+        required: false
 
 permissions:
   # 설치 묶음을 GitHub Release에 첨부한다
@@ -49,8 +52,26 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           INPUT_NGINX: ${{ inputs.nginx_version }}
+          INPUT_RELEASE: ${{ inputs.release }}
         run: |
           set -euo pipefail
+          release="${INPUT_RELEASE:-}"
+          if [ -n "$release" ]; then
+            # 태그를 직접 밀 수 없는 곳에서도 릴리스할 수 있게 여기서 태그를 단다
+            if ! echo "$release" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "unexpected release tag: $release" >&2
+              exit 1
+            fi
+            if git rev-parse -q --verify "refs/tags/$release" > /dev/null; then
+              echo "$release already exists" >&2
+              exit 1
+            fi
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git tag -a "$release" -m "$release"
+            git push origin "$release"
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
           nginx="${INPUT_NGINX:-}"
           if [ -z "$nginx" ]; then
             # latest는 stable 패치가 나중에 나오면 stable을 가리킨다. 가장 높은 정식 버전(mainline)을 고른다
@@ -61,7 +82,9 @@ jobs:
             echo "unexpected nginx version: $nginx" >&2
             exit 1
           fi
-          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+          if [ -n "$release" ]; then
+            ref="$release"
+          elif [ "${GITHUB_REF_TYPE}" = "tag" ]; then
             ref="${GITHUB_REF_NAME}"
           else
             # v1.2.0-rc1 같은 시험 태그는 건너뛴다
@@ -83,7 +106,8 @@ jobs:
         if: steps.versions.outputs.skip != 'true'
         run: |
           # 릴리스 태그를 밀었거나 force로 돌리면 다시 게시하고, 그 밖에는 이미 있는 nginx 태그를 건너뛴다
-          if [ "${{ github.event_name }}" != "push" ] && [ "${{ inputs.force }}" != "true" ]; then
+          if [ "${{ github.event_name }}" != "push" ] && [ "${{ inputs.force }}" != "true" ] \
+              && [ "${{ steps.versions.outputs.release }}" != "true" ]; then
             if docker manifest inspect "$NGINX_IMAGE:${{ steps.versions.outputs.tag }}" > /dev/null 2>&1; then
               echo "$NGINX_IMAGE:${{ steps.versions.outputs.tag }} already exists"
               echo "skip=true" >> "$GITHUB_OUTPUT"
@@ -91,6 +115,7 @@ jobs:
           fi
           # 관리도구 이미지는 릴리스할 때(또는 아직 없을 때)만 게시한다. nginx만 바뀐 예약 실행은 그대로 둔다
           if [ "${{ github.event_name }}" = "push" ] || [ "${{ inputs.force }}" = "true" ] \
+              || [ "${{ steps.versions.outputs.release }}" = "true" ] \
               || ! docker manifest inspect "$APP_IMAGE:${{ steps.versions.outputs.app }}" > /dev/null 2>&1; then
             echo "publish_app=true" >> "$GITHUB_OUTPUT"
           fi
