@@ -2,7 +2,7 @@
 
 브라우저에서 nginx를 관리하는 도구입니다. nginx(오픈소스, 전체 모듈 빌드)와 관리 화면(Spring Boot)이 서로 다른 컨테이너에서 돌기 때문에, 관리 화면을 업데이트하거나 다시 띄워도 nginx는 트래픽을 계속 받습니다.
 
-**사용법은 [사용 설명서](docs/manual/README.md)에 있습니다.** 관리 화면 왼쪽 메뉴와 아래(footer)의 사용 설명서 링크도 이 문서를 엽니다.
+**사용법은 관리 화면 안의 사용 설명서(`/guide`)에 있습니다.** 왼쪽 메뉴와 아래(footer)의 **사용 설명서**를 누르면 열립니다. 원문은 [src/main/resources/guide/ko](src/main/resources/guide/ko/README.md)에 있어 저장소에서도 읽을 수 있습니다.
 
 명세와 설계는 [nginx-manager/docs](https://github.com/nginx-manager/docs)의 `specs/001-nginx-web-manager/`에 있습니다(Spec Kit).
 
@@ -126,6 +126,6 @@ cd frontend && npm ci && npm run build
 - 연관관계는 모두 `fetch = LAZY`, `open-in-view=false`입니다.
 - 목록 조회마다 `QueryCounter.assertConstantQueries`로 데이터 건수와 상관없이 쿼리 수가 같은지 확인합니다.
 
-사용 설명서: 사용자가 보는 기능·화면·설정을 바꾸는 PR은 같은 PR에서 [사용 설명서](docs/manual/README.md)의 해당 장도 고칩니다. 방법과 그림 다시 찍기는 [설명서 관리](docs/manual/MAINTAINING.md)에 있습니다.
+사용 설명서: 사용자가 보는 기능·화면·설정을 바꾸는 PR은 같은 PR에서 [사용 설명서](src/main/resources/guide/ko/README.md)의 해당 장도 고칩니다. 방법과 그림 다시 찍기는 [설명서 관리](docs/guide.md)에 있습니다.
 
 릴리스: [릴리스 노트](docs/releases/README.md)를 쓰고 `v<버전>` 태그를 밀면 그 버전과 최신 nginx로 두 이미지를 게시합니다. 이후 nginx 릴리스는 매일 확인해 nginx 이미지만 자동으로 게시합니다. 에이전트 API를 바꾸면 `agent/server.go`의 `Protocol`과 `AgentNginxRuntime.PROTOCOL`을 함께 올립니다.

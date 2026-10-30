@@ -9,7 +9,7 @@
 
 ## 사용 설명서
 
-사용자가 보는 기능·화면·설정이 바뀌면 같은 PR에서 [사용 설명서](https://github.com/nginx-manager/app/blob/main/docs/manual/README.md)도 고칩니다([설명서 관리](https://github.com/nginx-manager/app/blob/main/docs/manual/MAINTAINING.md)). 하나를 고릅니다.
+사용자가 보는 기능·화면·설정이 바뀌면 같은 PR에서 [사용 설명서](https://github.com/nginx-manager/app/blob/main/src/main/resources/guide/ko/README.md)도 고칩니다([설명서 관리](https://github.com/nginx-manager/app/blob/main/docs/guide.md)). 하나를 고릅니다.
 
 - [ ] 설명서의 해당 장을 고쳤다 (화면이 바뀌었으면 그림도 다시 찍었다)
 - [ ] 사용자가 보는 변화가 없어 설명서를 고치지 않았다

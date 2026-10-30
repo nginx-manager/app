@@ -1,12 +1,12 @@
-// 사용 설명서(docs/manual)에 넣을 화면을 실제 이미지로 찍는다.
+// 사용 설명서(src/main/resources/guide)에 넣을 화면을 실제 이미지로 찍는다.
 //
 //   NGINX_MANAGER_VERSION=<버전> docker compose -f docker/docker-compose.yml -p nm-manual up -d --wait
-//   TRAFFIC_URL=http://localhost IMPORT_PATTERN='/home/*/nginx/*.conf' node scripts/manual-screenshots.mjs http://localhost:9000 docs/manual/images
+//   TRAFFIC_URL=http://localhost IMPORT_PATTERN='/home/*/nginx/*.conf' node scripts/manual-screenshots.mjs http://localhost:9000 src/main/resources/static/guide/images
 //
 // 빈 볼륨으로 띄운 컨테이너에 관리자 계정을 만들고, 예시 사이트·스트림·인증서·사용자를 만들며 설명서의 장 순서대로 찍는다.
 // 그림은 2배(deviceScaleFactor 2)로 찍고, 설명서에서는 width로 1배 크기에 맞춰 보여 준다.
 // playwright 패키지가 필요하다(npm i -g playwright 또는 NODE_PATH로 지정). 인증서 업로드에 openssl을 쓴다.
-// 설정 파일 가져오기 화면은 IMPORT_PATTERN을 줄 때만 찍는다. 예시 파일 준비는 docs/manual/MAINTAINING.md.
+// 설정 파일 가져오기 화면은 IMPORT_PATTERN을 줄 때만 찍는다. 예시 파일 준비는 docs/guide.md.
 import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync } from 'node:fs';
@@ -16,7 +16,7 @@ import { join } from 'node:path';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 
-const [base = 'http://localhost:9000', outDir = 'docs/manual/images'] = process.argv.slice(2);
+const [base = 'http://localhost:9000', outDir = 'src/main/resources/static/guide/images'] = process.argv.slice(2);
 const USER = 'admin';
 const PASSWORD = 'manual-shots-2026!';
 mkdirSync(outDir, { recursive: true });
@@ -225,6 +225,10 @@ await shot('modules', { selector: '#modules' });
 await page.locator('footer.footer').scrollIntoViewIfNeeded();
 const footerBox = await page.locator('footer.footer').boundingBox();
 await page.screenshot({ path: join(outDir, 'footer.png'), clip: { x: footerBox.x - 12, y: footerBox.y, width: 300, height: footerBox.height } });
+
+// 2장: 관리도구 안의 사용 설명서
+await go('/guide/04-sites');
+await shot('guide');
 
 // 휴대폰 폭(390px): 메뉴 버튼으로 연 메뉴
 await page.setViewportSize({ width: 390, height: 844 });
