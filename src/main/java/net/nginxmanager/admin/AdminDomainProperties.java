@@ -12,10 +12,11 @@ import java.util.List;
  * @param allow     관리 도메인에 들어올 수 있는 주소(CIDR). 비우면 모두
  * @param httpsPort nginx가 서버에 여는 HTTPS 포트. 443이 아니면 리다이렉트 주소에 붙인다
  * @param upstream  nginx가 관리 화면으로 넘길 주소
+ * @param syncOnStart 시작할 때 설정과 인증서를 맞출지(기본 true)
  */
 @ConfigurationProperties("nginx-manager.admin")
 public record AdminDomainProperties(String domain, String email, List<String> allow, Integer httpsPort,
-                                    String upstream) {
+                                    String upstream, Boolean syncOnStart) {
 
     public AdminDomainProperties {
         domain = domain == null || domain.isBlank() ? null : domain.trim().toLowerCase();
@@ -26,6 +27,9 @@ public record AdminDomainProperties(String domain, String email, List<String> al
         }
         if (upstream == null || upstream.isBlank()) {
             upstream = "http://manager:9000";
+        }
+        if (syncOnStart == null) {
+            syncOnStart = true;
         }
     }
 

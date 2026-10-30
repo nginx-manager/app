@@ -57,6 +57,6 @@ class AdminConfigRendererTest {
     }
 
     static AdminDomainProperties props(List<String> allow, int httpsPort) {
-        return new AdminDomainProperties("NM.example.com ", "ops@example.com", allow, httpsPort, null);
+        return new AdminDomainProperties("NM.example.com ", "ops@example.com", allow, httpsPort, null, null);
     }
 }

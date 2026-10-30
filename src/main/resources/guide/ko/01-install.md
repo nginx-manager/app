@@ -43,6 +43,27 @@ ssh -L 9000:127.0.0.1:9000 <서버>
 
 처음 시작할 때 `/etc/nginx`에 이미 있는 설정을 가져와 첫 버전(**처음 가져오기**)으로 남깁니다.
 
+### .env 설정
+
+설치하면 설치 디렉터리에 `.env`가 생기고, 위 옵션으로 준 값이 들어갑니다. 대부분은 기본값 그대로 두면 되고, 바꾼 뒤에는 `nm restart`(nginx 포트를 바꿨으면 `nm restart nginx`)로 다시 띄웁니다.
+
+| 변수 | 기본 | 언제 바꾸나 |
+| --- | --- | --- |
+| `MANAGER_VERSION`, `NGINX_IMAGE` | 설치한 버전 | 직접 고치지 않습니다. `nm upgrade`가 바꿉니다 |
+| `NGINX_MANAGER_ADMIN_DOMAIN` | (비움) | 관리 화면을 인터넷에서 `https://도메인`으로 열 때. DNS가 이 서버를 가리키고 80으로 들어올 수 있어야 합니다 |
+| `NGINX_MANAGER_ADMIN_EMAIL` | (비움) | 관리 도메인을 쓸 때 Let's Encrypt 연락 이메일(만료 안내) |
+| `NGINX_MANAGER_ADMIN_ALLOW` | (비움, 모두 허용) | 관리 도메인에 들어올 주소를 막을 때(CIDR, 쉼표로 여럿) |
+| `NGINX_MANAGER_PORT` | `9000` | 9000을 다른 프로그램이 쓸 때 |
+| `NGINX_MANAGER_BIND_ADDRESS` | `127.0.0.1` | 관리 도메인 없이 사내망에서 바로 열 때 `0.0.0.0`이나 사내 IP |
+| `NGINX_HTTP_PORT`, `NGINX_HTTPS_PORT` | `80`, `443` | 앞단에 다른 프록시가 있어 80/443을 못 쓸 때 |
+| `NGINX_BIND_ADDRESS` | `0.0.0.0` | nginx를 특정 IP에만 열 때 |
+| `NGINX_MANAGER_BACKUP_KEEP` | `14` | `nm backup`이 남길 백업 수 |
+| `TZ` | `Asia/Seoul` | 서버 시간대가 다를 때 |
+| `NGINX_MANAGER_IMPORT_ROOTS` | (비움) | `/etc/nginx` 밖의 설정 파일을 가져올 때 |
+| `SPRING_MAIL_*` | (비움) | 메일 알림을 보낼 때 SMTP 서버 |
+
+자세한 내용은 [관리 도메인](#관리-도메인으로-https-열기), [포트](#포트), [환경 변수](#환경-변수)에 있습니다.
+
 ### 설치 디렉터리
 
 | 파일 | 내용 | 업그레이드할 때 |

@@ -101,7 +101,9 @@ public class AdminDomainService {
 
     @EventListener(ApplicationReadyEvent.class)
     public void onReady() {
-        sync();
+        if (properties.syncOnStart()) {
+            sync();
+        }
     }
 
     @Scheduled(initialDelayString = "${nginx-manager.admin.check-interval:PT1M}",

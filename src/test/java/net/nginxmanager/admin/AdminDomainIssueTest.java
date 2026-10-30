@@ -11,6 +11,11 @@ import net.nginxmanager.site.SiteForm;
 import net.nginxmanager.site.SiteService;
 import net.nginxmanager.site.SiteType;
 import net.nginxmanager.support.ConfigRootTest;
+import net.nginxmanager.user.Role;
+import net.nginxmanager.user.SetupState;
+import net.nginxmanager.user.User;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -59,6 +64,7 @@ class AdminDomainIssueTest extends ConfigRootTest {
         registry.add("nginx-manager.admin.email", () -> "ops@example.com");
         // 테스트가 직접 sync()를 부른다
         registry.add("nginx-manager.admin.check-interval", () -> "PT1H");
+        registry.add("nginx-manager.admin.sync-on-start", () -> "false");
     }
 
     @Autowired
@@ -69,6 +75,21 @@ class AdminDomainIssueTest extends ConfigRootTest {
     SiteService siteService;
     @Autowired
     MockMvc mvc;
+    @Autowired
+    SetupState setupState;
+
+    @BeforeEach
+    void setUp() {
+        userRepository.save(new User("admin", "{noop}unused-password", Role.ADMIN));
+        setupState.reset();
+    }
+
+    /** 맡긴 발급이 다음 테스트의 초기화와 겹치지 않게 끝날 때까지 기다린다. */
+    @AfterEach
+    void waitForIssuance() {
+        certificateRepository.findByName(DOMAIN).ifPresent(cert -> await().atMost(Duration.ofSeconds(60))
+                .pollInterval(Duration.ofMillis(200)).until(() -> !certificateService.isRunning(cert.getId())));
+    }
 
     @Test
     void certificateIsIssuedAndTheAdminUiIsServedOverHttpsOnly() throws Exception {
