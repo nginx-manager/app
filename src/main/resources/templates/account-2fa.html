@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ko" th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(#{account.2fa.title})}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<main class="page">
+    <h1 th:text="#{account.2fa.title}">2단계 인증 켜기</h1>
+    <section class="card narrow">
+        <ol class="steps">
+            <li th:text="#{account.2fa.step1}">휴대폰의 인증 앱(Google Authenticator, Microsoft Authenticator, 1Password 등)에서 QR 코드를 찍습니다.</li>
+            <li th:text="#{account.2fa.step2}">앱에 나온 6자리 코드를 아래에 넣습니다.</li>
+        </ol>
+        <div class="qr-box" th:utext="${setup.qrSvg}"></div>
+        <p class="hint"><span th:text="#{account.2fa.secret}">QR 코드를 찍을 수 없으면 이 키를 앱에 직접 넣으세요:</span>
+            <code id="totp-secret" th:text="${setup.secret}">JBSWY3DPEHPK3PXP</code></p>
+        <p class="error" role="alert" th:if="${param.error}" th:text="#{account.2fa.error}">코드가 맞지 않습니다. 휴대폰 시간이 맞는지 확인하세요.</p>
+        <form th:action="@{/account/2fa}" method="post">
+            <label><span th:text="#{account.2fa.code}">인증 코드</span>
+                <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9 ]{6,7}" required></label>
+            <button type="submit" th:text="#{account.2fa.enable}">켜기</button>
+            <a th:href="@{/account}" class="button secondary" th:text="#{account.2fa.cancel}">취소</a>
+        </form>
+    </section>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

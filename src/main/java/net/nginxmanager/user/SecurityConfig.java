@@ -13,6 +13,7 @@ import org.springframework.security.core.session.SessionRegistryImpl;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.session.HttpSessionEventPublisher;
 import org.springframework.context.ApplicationEventPublisher;
@@ -22,9 +23,12 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, SetupState setupState,
-                                                   SessionRegistry sessionRegistry) throws Exception {
+                                                   SessionRegistry sessionRegistry, TwoFactorService twoFactor)
+            throws Exception {
         http
                 .addFilterBefore(new SetupRedirectFilter(setupState), UsernamePasswordAuthenticationFilter.class)
+                // 2단계 인증 코드를 넣기 전에는 권한 검사 전에 코드 화면으로 돌려보낸다(017)
+                .addFilterBefore(new TwoFactorLogin.PendingFilter(), AuthorizationFilter.class)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/setup", "/login", "/css/**", "/js/**", "/webjars/**", "/favicon.ico", "/favicon.svg", "/favicon-32.png", "/apple-touch-icon.png", "/actuator/health", "/actuator/health/liveness", "/actuator/health/readiness", "/error").permitAll()
                         // 여러 사이트에 걸치거나 서버 전체에 영향을 주는 기능은 관리자만 쓴다(007)
@@ -39,7 +43,7 @@ public class SecurityConfig {
                         .anyRequest().hasRole("MEMBER"))
                 .formLogin(form -> form
                         .loginPage("/login")
-                        .defaultSuccessUrl("/", true)
+                        .successHandler(new TwoFactorLogin.SuccessHandler(twoFactor))
                         .permitAll())
                 .sessionManagement(session -> session
                         .maximumSessions(-1)

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="ko" th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(#{login.code.title})}"></head>
+<body class="auth">
+<div th:replace="~{fragments/layout :: authTop}"></div>
+<main class="auth-shell">
+    <aside th:replace="~{fragments/layout :: authBrand}"></aside>
+    <section class="auth-form">
+        <h1 th:text="#{login.code.title}">2단계 인증</h1>
+        <p class="auth-sub" th:text="#{login.code.subtitle}">인증 앱에 보이는 6자리 코드를 넣어 주세요.</p>
+        <p class="error" role="alert" th:if="${param.error}" th:text="#{login.code.error}">코드가 맞지 않습니다.</p>
+        <form th:action="@{/login/code}" method="post">
+            <label><span th:text="#{login.code.label}">인증 코드</span>
+                <span class="field"><input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" autocapitalize="none" spellcheck="false" maxlength="12" required autofocus></span>
+                <span class="hint" th:text="#{login.code.hint}">휴대폰을 잃었다면 복구 코드(예: abcde-12345)를 넣어도 됩니다.</span>
+            </label>
+            <button type="submit" th:text="#{login.code.submit}">확인</button>
+        </form>
+        <form th:action="@{/logout}" method="post">
+            <button type="submit" class="link" th:text="#{login.code.cancel}">다른 계정으로 로그인</button>
+        </form>
+    </section>
+</main>
+</body>
+</html>

@@ -157,6 +157,7 @@ services:
 | `nm restart [manager\|nginx]` | 다시 띄우기(기본 manager). `.env`를 바꾼 뒤 |
 | `nm upgrade [버전] [--nginx]` | [업그레이드](#업그레이드) |
 | `nm backup`, `nm restore <파일>` | [백업과 복원](#백업과-복원) |
+| `nm reset-2fa 아이디` | 인증 앱과 복구 코드를 모두 잃은 사용자의 [2단계 인증](02-getting-started.md#2단계-인증)을 끈다(manager를 다시 띄움) |
 | `nm migrate` | [v1.1 이전 설치 옮기기](#v11-이전-설치-옮기기) |
 | `nm import-root add\|remove\|check\|grant` | [가져올 호스트 디렉터리](05-import.md#호스트의-다른-디렉터리-붙이기) 붙이기·떼기, UID 10101 읽기 권한 확인·부여 |
 

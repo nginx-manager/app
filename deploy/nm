@@ -207,6 +207,19 @@ version_ge() { # a b: a >= b (x.y.z)
     [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -n1)" = "$1" ]
 }
 
+# 인증 앱과 복구 코드를 모두 잃은 사용자의 2단계 인증을 끈다(017). 관리 화면이 시작할 때 data/manager/reset-2fa를 읽는다
+cmd_reset_2fa() {
+    user="${1:-}"
+    case "$user" in
+        ''|*[!A-Za-z0-9._-]*) die "아이디를 주세요: nm reset-2fa 아이디" ;;
+    esac
+    as_root "printf '%s\\n' '$user' >> data/manager/reset-2fa && chmod 644 data/manager/reset-2fa" \
+        || die "data/manager/reset-2fa를 쓰지 못했습니다"
+    dc restart manager >/dev/null
+    wait_healthy manager
+    say "$user의 2단계 인증을 껐습니다. 비밀번호만으로 로그인한 뒤 내 계정에서 다시 켜세요."
+}
+
 cmd_restore() {
     yes=0
     file=""
@@ -669,6 +682,7 @@ nginx manager 운영 명령
   nm backup [--with-logs] [--keep N]   설정·인증서·DB를 backups/에 묶는다(nginx는 계속 돈다)
   nm backup-schedule              매일 자동 백업을 깐다(시각은 .env의 NGINX_MANAGER_BACKUP_AT, off면 끔)
   nm restore <파일> [-y]          백업으로 되돌린다
+  nm reset-2fa 아이디             인증 앱과 복구 코드를 모두 잃은 사용자의 2단계 인증을 끈다(manager를 다시 띄움)
   nm migrate [--from 프로젝트]     v1.0·v1.1(이름 붙은 볼륨)에서 옮겨 온다
   nm import-root add 디렉터리      설정 파일 가져오기에서 찾을 호스트 디렉터리(/home 등)를 두 컨테이너에 같은 경로로 붙인다
   nm import-root check [패턴]      컨테이너 사용자(UID 10101)가 그 파일들을 읽을 수 있는지 본다
@@ -707,6 +721,7 @@ case "$cmd" in
     backup) cmd_backup "$@" ;;
     backup-schedule) cmd_backup_schedule ;;
     restore) cmd_restore "$@" ;;
+    reset-2fa) cmd_reset_2fa "$@" ;;
     migrate) cmd_migrate "$@" ;;
     import-root) cmd_import_root "$@" ;;
     help|-h|--help) usage ;;

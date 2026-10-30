@@ -14,15 +14,25 @@ import org.springframework.web.bind.annotation.PostMapping;
 public class AccountController {
 
     private final UserService userService;
+    private final UserRepository userRepository;
 
-    public AccountController(UserService userService) {
+    public AccountController(UserService userService, UserRepository userRepository) {
         this.userService = userService;
+        this.userRepository = userRepository;
     }
 
     @GetMapping("/account")
     public String form(Model model) {
         model.addAttribute("form", UserForms.PasswordChange.empty());
         return "account";
+    }
+
+    /** 2단계 인증 상태(017). */
+    @ModelAttribute
+    void addAccount(Model model, Authentication authentication) {
+        if (authentication != null) {
+            userRepository.findByUsername(authentication.getName()).ifPresent(user -> model.addAttribute("me", user));
+        }
     }
 
     @PostMapping("/account")

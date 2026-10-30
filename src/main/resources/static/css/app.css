@@ -614,3 +614,9 @@ body > footer, .footer { padding: 1.25rem 2rem 2rem; text-align: center; color: 
     .markdown h1 { font-size: 1.4rem; }
     .guide-pager { flex-direction: column; }
 }
+
+/* 2단계 인증(017) */
+.qr-box { width: 220px; max-width: 100%; margin: 12px 0; }
+.qr-box svg { display: block; width: 100%; height: auto; border-radius: 6px; }
+.recovery-codes { columns: 2; list-style: none; padding: 0; margin: 12px 0 16px; }
+.recovery-codes li { padding: 4px 0; font-size: 1.05em; }

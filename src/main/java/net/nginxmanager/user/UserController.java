@@ -20,12 +20,14 @@ public class UserController {
     private final UserRepository userRepository;
     private final UserService userService;
     private final SiteQueryRepository siteQueryRepository;
+    private final TwoFactorService twoFactor;
 
     public UserController(UserRepository userRepository, UserService userService,
-                          SiteQueryRepository siteQueryRepository) {
+                          SiteQueryRepository siteQueryRepository, TwoFactorService twoFactor) {
         this.userRepository = userRepository;
         this.userService = userService;
         this.siteQueryRepository = siteQueryRepository;
+        this.twoFactor = twoFactor;
     }
 
     @GetMapping
@@ -72,6 +74,13 @@ public class UserController {
             return "redirect:/users?error=password";
         }
         userService.resetPassword(id, password, version, authentication.getName());
+        return "redirect:/users?saved";
+    }
+
+    /** 휴대폰을 잃은 사용자의 2단계 인증을 해제한다(017). */
+    @PostMapping("/{id}/2fa/reset")
+    public String resetTwoFactor(@PathVariable long id, @RequestParam long version, Authentication authentication) {
+        twoFactor.reset(id, version, authentication.getName());
         return "redirect:/users?saved";
     }
 
