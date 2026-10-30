@@ -30,6 +30,27 @@
 - **같은 도메인의 사이트가 있어 만들지 않았습니다**: 그 사이트를 지우거나 `.env`의 관리 도메인을 바꾸고 `nm restart`.
 - **403**: `NGINX_MANAGER_ADMIN_ALLOW`에 지금 주소가 들어 있는지 확인합니다.
 
+## 관리 화면이 뜨지 않을 때(manager가 unhealthy)
+
+nginx는 따로 돌기 때문에 사이트는 계속 열립니다. 먼저 이유를 봅니다.
+
+```bash
+cd /opt/nginx-manager && sudo docker compose logs manager 2>&1 | grep -m5 -A3 -E 'Exception|Caused by'
+```
+
+`AccessDeniedException: /etc/nginx/...`가 보이면 서버에서 `sudo`로 만든 파일이나 디렉터리(root 소유)에 관리도구가 쓰지 못한 것입니다. v1.2.2부터는 manager가 시작할 때 소유자를 맞추므로 `sudo /opt/nginx-manager/nm restart`면 됩니다. 그 전 버전은 소유자를 직접 맞추고 다시 띄웁니다.
+
+```bash
+sudo chown -R 10101:10101 /opt/nginx-manager/data/conf
+sudo /opt/nginx-manager/nm restart
+```
+
+적용이 끝나기 전에 끊겼다면 다시 뜰 때 적용 전 파일로 되돌립니다. 초안은 남아 있어 다시 적용할 수 있습니다.
+
+## 적용이 "쓸 수 없어 적용하지 못했습니다"로 실패할 때
+
+위와 같은 이유입니다. 서버에서 `data/conf` 아래에 파일을 직접 복사하거나 디렉터리를 만들었다면 `sudo /opt/nginx-manager/nm restart`로 소유자를 맞춘 뒤 다시 적용합니다. 직접 복사하기보다 [5장](05-import.md)의 가져오기를 쓰면 이런 일이 없습니다.
+
 ## nm upgrade가 "되돌렸습니다"로 끝날 때
 
 새 관리 화면이 정해진 시간 안에 뜨지 않아 이전 버전과 업그레이드 전 DB로 되돌린 것입니다. nginx는 그대로 돌고 있습니다. 출력에 보인 로그 끝부분으로 이유를 확인하고, 느린 서버라면 `NM_WAIT_TIMEOUT=600 nm upgrade`처럼 기다리는 시간을 늘려 다시 합니다.

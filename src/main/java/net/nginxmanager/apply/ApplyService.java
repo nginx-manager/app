@@ -151,7 +151,15 @@ public class ApplyService {
         } catch (RuntimeException e) {
             // nginx -t 시간 초과, pid 파일 오류, DB 오류 등 예상하지 못한 실패: 검증되지 않은 파일을 남기지 않는다
             log.error("apply failed unexpectedly, restoring previous configuration", e);
-            restore(backup);
+            try {
+                restore(backup);
+            } catch (RuntimeException restoreFailure) {
+                // 되돌리지 못한 파일이 있다. 기록을 남겨 두면 다음 시작 때 다시 되돌린다
+                log.error("restore after failed apply failed; will retry on next start", restoreFailure);
+                e.addSuppressed(restoreFailure);
+                events.publishEvent(AuditEvent.failure(origin.actor(), auditAction(origin), "apply", e.getMessage()));
+                throw e;
+            }
             if (reloaded[0]) {
                 try {
                     runtime.reload();
@@ -184,7 +192,16 @@ public class ApplyService {
             ApplyJournal.Entry entry = pending.get();
             log.warn("previous apply by {} started at {} did not finish; restoring {} files",
                     entry.actor(), entry.startedAt(), entry.files().size());
-            restore(entry.files());
+            try {
+                restore(entry.files());
+            } catch (RuntimeException e) {
+                // 되돌리지 못해도 관리 화면은 띄운다. 기록은 남겨 두고 다음 시작 때 다시 되돌린다
+                log.error("could not restore interrupted apply; will retry on next start. "
+                        + "Check that the manager (UID 10101) can write the nginx configuration directory", e);
+                events.publishEvent(AuditEvent.failure(entry.actor(), AuditAction.APPLY, "apply",
+                        "INTERRUPTED; restore failed: " + e.getMessage()));
+                return true;
+            }
             journal.clear();
             String detail = "INTERRUPTED";
             try {
