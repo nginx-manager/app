@@ -4,6 +4,9 @@
     const panel = document.getElementById('live');
     const lines = document.getElementById('live-lines');
     const state = document.getElementById('live-state');
+    // 지난 로그 파일을 고르면 바로 그 파일을 보인다(검색 단추를 눌러도 된다)
+    const file = document.getElementById('log-file');
+    if (file) file.addEventListener('change', function () { file.form.submit(); });
     if (!toggle) return;
     const MAX_LINES = 2000;
     // 화면 문구는 템플릿이 data-* 속성으로 넣는다(다국어). 없으면 한국어 기본값을 쓴다

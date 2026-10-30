@@ -229,7 +229,7 @@ public final class RawHttps {
         return blocks;
     }
 
-    private static String indent(String block) {
+    static String indent(String block) {
         Matcher m = Pattern.compile("\\{\\s*\\n([ \\t]+)\\S").matcher(block);
         return m.find() ? m.group(1) : "    ";
     }

@@ -18,7 +18,7 @@ Specs and design documents are in `specs/001-nginx-web-manager/` of [nginx-manag
 - **Safe apply**: Review saved drafts as a diff on the apply screen before applying them. Applying runs `nginx -t` validation → reload → health check, and rolls back to the previous config if any step fails. Problems that `nginx -t` misses and only show up on reload, such as port conflicts, are also treated as failures and rolled back.
 - **History and rollback**: Every apply creates a version. Compare two versions or roll back to an earlier one (rollbacks go through the same validation). Files changed directly on the server are detected and reported.
 - **HTTPS**: Turn on HTTPS for a site and it gets a Let's Encrypt certificate, applies the config automatically, and renews it before it expires. If renewal fails, it keeps serving with the current certificate and alerts you by email and webhook. Upload wildcard and internal certificates. Imported raw-config sites can get a certificate too, and add a 443 server block and an 80→443 redirect as a draft.
-- **Dashboard and logs**: See nginx status, version and modules, recent applies and certificate warnings, and search or tail per-site access/error logs.
+- **Dashboard and logs**: See nginx status, version and modules, recent applies and certificate warnings, and search or tail per-site access/error logs (including imported raw sites and rotated older logs).
 - **Users and audit log**: Admin and member roles. Members can only view, edit and apply the sites assigned to them; admins assign members to each site. Every change is recorded in the audit log.
 
 ## Running
