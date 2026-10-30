@@ -129,7 +129,8 @@ await page.waitForLoadState('networkidle');
 await shot('site-detail');
 await page.locator('details.proxy-options summary').click().catch(() => {});
 await page.fill('input[name=proxyReadTimeout]', '120');
-await submit('form button[type=submit]:has-text("저장")');
+// 사이트 화면 위쪽의 담당자 폼에도 "담당자 저장" 단추가 있어, 설정 폼의 저장을 고른다
+await submit('form:not([action$="/owner"]) button[type=submit]:has-text("저장")');
 await applyPending('app 응답 타임아웃 120초');
 
 // 8장: 이력, 비교, 버전 화면
@@ -232,7 +233,7 @@ await page.waitForTimeout(300);
 await shot('modules', { selector: '#modules' });
 await page.locator('footer.footer').scrollIntoViewIfNeeded();
 const footerBox = await page.locator('footer.footer').boundingBox();
-await page.screenshot({ path: join(outDir, 'footer.png'), clip: { x: footerBox.x - 12, y: footerBox.y, width: 300, height: footerBox.height } });
+await page.screenshot({ path: join(outDir, 'footer.png'), clip: { x: footerBox.x - 12, y: footerBox.y, width: 420, height: footerBox.height } });
 
 // 2장: 관리도구 안의 사용 설명서
 await go('/guide/04-sites');

@@ -144,7 +144,7 @@ await page.locator('a', { hasText: 'app.example.com' }).first().click();
 await page.waitForLoadState('networkidle');
 await page.locator('details.proxy-options summary').click().catch(() => {});
 await page.fill('input[name=proxyReadTimeout]', '120');
-await Promise.all([page.waitForNavigation(), page.locator('form button[type=submit]', { hasText: '저장' }).first().click()]);
+await Promise.all([page.waitForNavigation(), page.locator('form:not([action$="/owner"]) button[type=submit]', { hasText: '저장' }).first().click()]);
 await go('/apply');
 await applyPending('읽기 타임아웃 120초');
 
