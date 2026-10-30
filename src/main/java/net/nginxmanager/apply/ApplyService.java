@@ -93,7 +93,7 @@ public class ApplyService {
     }
 
     /**
-     * 경로가 맞는 초안만 반영한다. 멤버는 담당 사이트의 파일만 적용한다(006). 다른 초안은 DB에만 있고 디스크에
+     * 경로가 맞는 초안만 반영한다. 멤버는 담당 사이트의 파일만 적용한다(007). 다른 초안은 DB에만 있고 디스크에
      * 쓰이지 않으므로 검증(nginx -t)에 섞이지 않고 그대로 남는다.
      */
     public ApplyResult applyPending(String actor, String message, Predicate<String> paths) {

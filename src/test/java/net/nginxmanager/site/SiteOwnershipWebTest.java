@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrlPattern;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** 006 US1·US3: 멤버는 담당 사이트만 보고 고치고, 관리자는 담당자를 정한다. */
+/** 007 US1·US3: 멤버는 담당 사이트만 보고 고치고, 관리자는 담당자를 정한다. */
 class SiteOwnershipWebTest extends ConfigRootTest {
 
     @Autowired

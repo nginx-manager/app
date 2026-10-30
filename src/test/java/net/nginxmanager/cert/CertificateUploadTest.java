@@ -168,7 +168,7 @@ class CertificateUploadTest extends ConfigRootTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("web.example.com")))
                 .andExpect(content().string(containsString("업로드")));
-        // 인증서 화면은 관리자만 본다(006)
+        // 인증서 화면은 관리자만 본다(007)
         mvc.perform(get("/certs").with(user("v").roles("MEMBER")))
                 .andExpect(status().isForbidden());
 

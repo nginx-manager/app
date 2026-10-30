@@ -73,7 +73,7 @@ public class DashboardService {
 
     /**
      * @param memberId 멤버면 그 사용자 id. 사이트 수와 인증서 경고를 담당 사이트로 거르고, 관리자에게만 보이는 값
-     *                 (최근 적용, DB 크기)은 비운다(006). null이면 관리자
+     *                 (최근 적용, DB 크기)은 비운다(007). null이면 관리자
      */
     @Transactional(readOnly = true)
     public Dashboard load(Long memberId) {

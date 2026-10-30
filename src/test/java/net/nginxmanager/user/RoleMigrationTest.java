@@ -14,7 +14,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** 006 FR-601: v1.1의 편집자·조회자는 v1.2에서 멤버가 되고, 기존 사이트에는 담당자가 없다. */
+/** 007 FR-701: v1.1의 편집자·조회자는 v1.2에서 멤버가 되고, 기존 사이트에는 담당자가 없다. */
 class RoleMigrationTest {
 
     @Test

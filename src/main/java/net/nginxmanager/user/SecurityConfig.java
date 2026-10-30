@@ -27,7 +27,7 @@ public class SecurityConfig {
                 .addFilterBefore(new SetupRedirectFilter(setupState), UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/setup", "/login", "/css/**", "/js/**", "/webjars/**", "/favicon.ico", "/favicon.svg", "/favicon-32.png", "/apple-touch-icon.png", "/actuator/health", "/actuator/health/liveness", "/actuator/health/readiness", "/error").permitAll()
-                        // 여러 사이트에 걸치거나 서버 전체에 영향을 주는 기능은 관리자만 쓴다(006)
+                        // 여러 사이트에 걸치거나 서버 전체에 영향을 주는 기능은 관리자만 쓴다(007)
                         .requestMatchers("/users/**", "/audit/**", "/settings/**", "/runtime/**", "/files/**",
                                 "/streams/**", "/versions/**", "/drift/**", "/sites/import", "/sites/import/**",
                                 "/sites/*/owner", "/sites/*/reimport").hasRole("ADMIN")

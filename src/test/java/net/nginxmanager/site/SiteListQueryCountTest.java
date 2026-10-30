@@ -34,7 +34,7 @@ class SiteListQueryCountTest extends ConfigRootTest {
                 1, 50);
     }
 
-    /** 담당자 이름(006)과 사용자별 담당 수도 사이트 수와 관계없이 한 쿼리다. */
+    /** 담당자 이름(007)과 사용자별 담당 수도 사이트 수와 관계없이 한 쿼리다. */
     @Test
     void ownerColumnsAndCountsDoNotGrowWithSites() {
         User owner = userRepository.save(new User("owner", "{noop}x", Role.MEMBER));

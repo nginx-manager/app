@@ -55,7 +55,7 @@ class LogWebTest extends ConfigRootTest {
         setupState.reset();
         ConfigFile file = configFileRepository.save(new ConfigFile("conf.d/sites/app.local.conf", true));
         site = siteRepository.save(new Site("app.local", SiteType.STATIC, file));
-        // 멤버 v가 담당하는 사이트다(006)
+        // 멤버 v가 담당하는 사이트다(007)
         User v = userRepository.save(new User("v", "{noop}unused-password", Role.MEMBER));
         site = siteService.assignOwner(site.getId(), v.getId(), site.getVersion(), "admin");
         Files.createDirectories(LOG_DIR.resolve("sites"));

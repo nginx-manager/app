@@ -23,7 +23,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** 006 US2: 멤버의 적용은 본인 사이트의 초안만 반영하고, 다른 사람의 초안은 그대로 둔다. */
+/** 007 US2: 멤버의 적용은 본인 사이트의 초안만 반영하고, 다른 사람의 초안은 그대로 둔다. */
 class MemberApplyTest extends ConfigRootTest {
 
     static final String ALICE = "conf.d/sites/alice.local.conf";
