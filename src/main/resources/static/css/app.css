@@ -54,11 +54,6 @@
 *, *::before, *::after { box-sizing: border-box; }
 [hidden] { display: none !important; }
 body { margin: 0; padding-left: var(--sidebar); min-height: 100vh; }
-body.centered {
-    padding-left: 0; display: grid; place-items: center;
-    background: radial-gradient(1200px 600px at 10% -10%, var(--glow-1) 0, transparent 60%),
-                radial-gradient(900px 500px at 110% 110%, var(--glow-2) 0, transparent 60%), var(--bg);
-}
 
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; text-underline-offset: 2px; }
@@ -98,13 +93,9 @@ li { margin: .25rem 0; }
 .nav-label { margin: 1rem .7rem .35rem; color: var(--side-muted); font-size: .72rem; font-weight: 600; letter-spacing: .06em; }
 .nav .spacer { flex: 1; }
 .langs { display: grid; grid-template-columns: 1fr 1fr; gap: .2rem; padding: .5rem .35rem .75rem; }
-body.centered .langs { display: flex; gap: .25rem; }
 .nav .langs a { width: auto; justify-content: center; padding: .2rem .5rem; border-radius: 6px; font-size: .75rem; color: var(--side-muted); }
 .nav .langs a.active { background: rgba(148, 163, 184, .16); color: #fff; }
 .nav .langs a.active .icon { color: inherit; }
-body.centered .langs { position: fixed; top: 1rem; right: 1rem; padding: 0; }
-body.centered .langs a { padding: .25rem .6rem; border-radius: 6px; font-size: .8rem; color: var(--muted); }
-body.centered .langs a.active { background: var(--card); color: var(--fg); box-shadow: var(--shadow); }
 .nav-user { border-top: 1px solid rgba(148, 163, 184, .15); padding-top: .75rem; display: flex; flex-direction: column; gap: .15rem; }
 .nav-user form.inline { display: block; }
 .nav button.link { justify-content: flex-start; background: none; font: inherit; cursor: pointer; text-align: left; color: var(--side-muted); }
@@ -117,12 +108,6 @@ body.centered .langs a.active { background: var(--card); color: var(--fg); box-s
 .page { max-width: 1200px; margin: 0 auto; padding: 2rem 2rem 3rem; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1.25rem 1.5rem; margin-bottom: 1.25rem; }
 .card.narrow { width: min(400px, 92vw); }
-body.centered > .card.narrow { padding: 2rem; box-shadow: 0 10px 30px rgba(16, 24, 40, .08); }
-body.centered > .card.narrow h1::before {
-    content: "N"; display: grid; place-items: center; width: 40px; height: 40px; margin-bottom: 1rem; border-radius: 10px;
-    background: linear-gradient(135deg, #14b8a6, #0f766e); color: #fff; font-size: 1.1rem; font-weight: 800;
-}
-body.centered button[type=submit] { width: 100%; margin-top: .5rem; padding: .65rem 1rem; }
 .columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 1.25rem; align-items: start; }
 .columns > .card { margin-bottom: 0; }
 /* 긴 설정 줄(pre)이 칸을 넓히지 않고 칸 안에서 가로로 스크롤되게 한다. 좁은 화면에서 페이지가 옆으로 밀리지 않는다 */
@@ -307,6 +292,88 @@ summary code { background: none; padding: 0; }
 .pager { display: flex; gap: 1rem; margin: .9rem 0 0; font-size: .9rem; }
 .pager:empty { display: none; }
 .actions { display: flex; align-items: center; gap: .75rem; margin-top: 1rem; }
+
+/* 로그인·최초 설정 화면: 왼쪽 소개 패널과 오른쪽 입력 칸. 좁은 화면에서는 위아래로 쌓는다 */
+body.auth {
+    padding: 4.5rem 1.5rem 2rem; display: grid; place-items: center;
+    background: radial-gradient(1200px 600px at 10% -10%, var(--glow-1) 0, transparent 60%),
+                radial-gradient(900px 500px at 110% 110%, var(--glow-2) 0, transparent 60%), var(--bg);
+}
+.auth-top { position: fixed; top: 1rem; right: 1rem; z-index: 1; display: flex; align-items: center; gap: .5rem; }
+.auth-top .langs { display: flex; gap: .25rem; padding: 0; }
+.auth-top .langs a { padding: .25rem .6rem; border-radius: 6px; font-size: .8rem; color: var(--muted); }
+.auth-top .langs a.active { background: var(--card); color: var(--fg); box-shadow: var(--shadow); }
+.auth-top .theme-toggle { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; color: var(--muted); }
+.auth-top .theme-toggle:hover { background: var(--card); color: var(--fg); box-shadow: var(--shadow); }
+.auth-shell {
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); width: min(940px, 100%);
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px; overflow: hidden;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 24px 48px -12px rgba(16, 24, 40, .18);
+}
+.auth-brand {
+    position: relative; display: flex; flex-direction: column; gap: 1.25rem; padding: 2.5rem;
+    background: radial-gradient(520px 320px at 0% 0%, rgba(45, 212, 191, .22), transparent 70%),
+                radial-gradient(420px 300px at 100% 100%, rgba(99, 102, 241, .18), transparent 70%), #0b1220;
+    color: #cbd5e1;
+}
+.auth-logo { display: flex; align-items: center; gap: .65rem; color: #fff; font-weight: 700; font-size: 1.05rem; letter-spacing: -.01em; }
+.auth-logo .logo { width: 36px; height: 36px; border-radius: 10px; font-size: 1.05rem; }
+.auth-tagline { margin: .5rem 0 0; color: #fff; font-size: 1.35rem; font-weight: 700; line-height: 1.4; letter-spacing: -.015em; }
+.auth-features { display: flex; flex-direction: column; gap: .7rem; margin: 0; padding: 0; list-style: none; font-size: .9rem; }
+.auth-features li { display: flex; gap: .65rem; align-items: flex-start; margin: 0; }
+.auth-features .icon {
+    width: 26px; height: 26px; padding: 5px; border-radius: 7px; margin-top: -.1rem;
+    background: rgba(45, 212, 191, .14); color: #2dd4bf; stroke-width: 2.2;
+}
+.auth-snippet {
+    margin: auto 0 0; padding: .9rem 1rem; border: 1px solid rgba(148, 163, 184, .16); border-radius: 10px;
+    background: rgba(2, 6, 23, .55); color: #94a3b8; font-family: var(--mono); font-size: .76rem; line-height: 1.6;
+    white-space: pre; overflow: hidden;
+}
+.auth-snippet .k { color: #5eead4; }
+.auth-snippet .n { color: #fbbf24; }
+.auth-snippet .s { color: #c4b5fd; }
+.auth-snippet .ok { color: #4ade80; }
+.auth-version { align-self: flex-start; color: #64748b; font-size: .75rem; }
+.auth-version:hover { color: #cbd5e1; }
+.auth-form { display: flex; flex-direction: column; justify-content: center; padding: 2.75rem 2.5rem; }
+.auth-form h1 { margin: 0 0 .35rem; font-size: 1.6rem; }
+.auth-sub { margin: 0 0 1.5rem; color: var(--muted); font-size: .92rem; }
+.auth-form p.error, .auth-form p.notice { margin: -.4rem 0 1.1rem; }
+.auth-form form { margin: 0; }
+.auth-form label { margin-bottom: 1.1rem; }
+.auth-form label > span:first-child { display: block; margin-bottom: .1rem; }
+.auth-form input:where(:not([type=checkbox]):not([type=radio])) { padding-top: .65rem; padding-bottom: .65rem; }
+.auth-form button[type=submit] { width: 100%; margin-top: .4rem; padding: .75rem 1rem; font-size: .95rem; }
+.auth .field { position: relative; display: block; }
+.auth .field > .icon { position: absolute; left: .8rem; top: 50%; transform: translateY(-50%); width: 17px; height: 17px; color: var(--placeholder); pointer-events: none; }
+.auth .field input:where(:not([type=checkbox]):not([type=radio])) { padding-left: 2.4rem; }
+.auth .field:focus-within > .icon { color: var(--accent); }
+.auth .field .reveal {
+    display: none; position: absolute; right: .35rem; top: 50%; transform: translateY(-50%);
+    width: 34px; height: 34px; place-items: center; border-radius: 6px; color: var(--muted);
+}
+.js .auth .field .reveal { display: grid; }
+.js .auth .field:has(.reveal) input { padding-right: 2.75rem; }
+.auth .field .reveal:hover { color: var(--fg); background: var(--subtle); }
+.auth .field .reveal .icon-eye-off, .auth .field .reveal[aria-pressed=true] .icon-eye { display: none; }
+.auth .field .reveal[aria-pressed=true] .icon-eye-off { display: block; }
+.caps-warning { display: block; margin-top: .35rem; color: var(--warn); font-size: .8rem; font-weight: 500; }
+.caps-warning[hidden] { display: none; }
+.auth-hint { display: flex; gap: .5rem; align-items: flex-start; margin: 1.25rem 0 0; padding-top: 1rem; border-top: 1px solid var(--line); }
+.auth-hint .icon { width: 16px; height: 16px; margin-top: .1rem; color: var(--placeholder); }
+@media (max-width: 760px) {
+    body.auth { padding: 4rem 1rem 1.5rem; place-items: start center; }
+    .auth-shell { grid-template-columns: 1fr; }
+    .auth-brand { gap: .6rem; padding: 1.5rem 1.5rem 1.35rem; }
+    .auth-tagline { margin: 0; font-size: 1rem; font-weight: 600; }
+    .auth-features, .auth-snippet, .auth-version { display: none; }
+    .auth-form { padding: 1.75rem 1.5rem 1.5rem; }
+}
+@media (max-width: 420px) {
+    .auth-top { left: 1rem; justify-content: space-between; }
+    .auth-top .langs a { padding: .25rem .45rem; }
+}
 
 /* 다크 모드: 시스템 설정을 따르고, 사이드바의 테마 버튼으로 고른 값(data-theme)이 있으면 그것을 따른다 */
 @media (prefers-color-scheme: dark) {
