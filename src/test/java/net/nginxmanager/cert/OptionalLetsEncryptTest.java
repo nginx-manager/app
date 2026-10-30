@@ -159,7 +159,7 @@ class OptionalLetsEncryptTest extends ConfigRootTest {
         Site site = siteRepository.findByPrimaryDomain(DOMAIN).orElseThrow();
 
         mvc.perform(get("/sites/" + site.getId()).with(user("ed").roles("ADMIN")))
-                .andExpect(content().string(containsString("Let&#39;s Encrypt 인증서 발급받기")));
+                .andExpect(content().string(containsString("Let&#39;s Encrypt 인증서 발급</button>")));
 
         mvc.perform(post("/certs/letsencrypt").with(csrf()).with(user("ed").roles("ADMIN"))
                         .param("siteId", site.getId().toString()))
@@ -174,7 +174,7 @@ class OptionalLetsEncryptTest extends ConfigRootTest {
 
         mvc.perform(get("/sites/" + site.getId()).with(user("ed").roles("ADMIN")))
                 .andExpect(content().string(containsString("발급됨")))
-                .andExpect(content().string(not(containsString("Let&#39;s Encrypt 인증서 발급받기"))));
+                .andExpect(content().string(not(containsString("Let&#39;s Encrypt 인증서 발급</button>"))));
     }
 
     @Test
@@ -276,7 +276,7 @@ class OptionalLetsEncryptTest extends ConfigRootTest {
 
         mvc.perform(get("/sites/" + site.getId()).with(user("ed").roles("ADMIN")))
                 .andExpect(content().string(containsString(cert.getCertPath())))
-                .andExpect(content().string(containsString("443 server 블록 초안에 더하기")));
+                .andExpect(content().string(containsString("443 server 블록 추가</button>")));
         mvc.perform(post("/certs/letsencrypt/raw-https").with(csrf()).with(user("ed").roles("ADMIN"))
                         .param("siteId", site.getId().toString()).param("redirectHttp", "true"))
                 .andExpect(flash().attribute("notice", containsString("443 server 블록")));
@@ -286,7 +286,7 @@ class OptionalLetsEncryptTest extends ConfigRootTest {
         // 80은 넘기되 인증 경로는 남아 갱신할 수 있다
         assertThat(readFile(PATH).indexOf("acme-challenge")).isLessThan(readFile(PATH).indexOf("return 301"));
         mvc.perform(get("/sites/" + site.getId()).with(user("ed").roles("ADMIN")))
-                .andExpect(content().string(not(containsString("443 server 블록 초안에 더하기"))));
+                .andExpect(content().string(not(containsString("443 server 블록 추가</button>"))));
 
         // 갱신하면 원문의 인증서 경로도 새 경로로 바뀐다
         assertThat(certificateService.issueOrRenew(cert.getId())).isEmpty();

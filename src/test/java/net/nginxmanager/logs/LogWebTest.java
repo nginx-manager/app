@@ -142,7 +142,7 @@ class LogWebTest extends ConfigRootTest {
 
         mvc.perform(get("/logs/" + raw.getId()).with(user("admin").roles("ADMIN")))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("공통 로그(/var/log/nginx/access.log)")))
+                .andExpect(content().string(containsString("공통 로그 파일(/var/log/nginx/access.log)")))
                 .andExpect(content().string(containsString("사이트별 로그로 남기기")))
                 .andExpect(content().string(not(containsString("live-toggle"))));
         mvc.perform(get("/logs/" + raw.getId() + "/stream").with(user("admin").roles("ADMIN")))
@@ -190,7 +190,7 @@ class LogWebTest extends ConfigRootTest {
         Files.writeString(LOG_DIR.resolve("sites/app.local.access.log.1"), "old-request /archived\n");
 
         mvc.perform(get("/logs/" + site.getId()).with(user("v").roles("MEMBER")))
-                .andExpect(content().string(containsString("지난 로그 1")))
+                .andExpect(content().string(containsString("로테이트된 로그 1")))
                 .andExpect(content().string(not(containsString("/archived"))));
         mvc.perform(get("/logs/" + site.getId()).param("file", "1").with(user("v").roles("MEMBER")))
                 .andExpect(content().string(containsString("/archived")))

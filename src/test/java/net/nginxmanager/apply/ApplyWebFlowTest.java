@@ -66,16 +66,16 @@ class ApplyWebFlowTest extends ConfigRootTest {
         nginx.validation = () -> FakeNginxRuntime.invalid(CONFIG_ROOT.resolve("conf.d/sites/other.local.conf").toString(),
                 4, "unknown directive \"proxy_pas\"");
         mvc.perform(post("/apply").with(csrf()).with(user("ed").roles("ADMIN")).header("HX-Request", "true"))
-                .andExpect(content().string(containsString("문법 검증에 실패해 반영하지 않았습니다")))
+                .andExpect(content().string(containsString("nginx -t에 실패해 반영하지 않았습니다")))
                 .andExpect(content().string(containsString("other.local.conf:4")))
-                .andExpect(content().string(containsString("이번 초안이 바꾸지 않은 파일")));
+                .andExpect(content().string(containsString("이번 변경에 없는 파일")));
         assertThat(CONFIG_ROOT.resolve("conf.d/sites/mine.local.conf")).doesNotExist();
 
         nginx.validation = () -> FakeNginxRuntime.invalid(CONFIG_ROOT.resolve("conf.d/sites/mine.local.conf").toString(),
                 7, "unknown directive \"rooot\"");
         mvc.perform(post("/apply").with(csrf()).with(user("ed").roles("ADMIN")).header("HX-Request", "true"))
                 .andExpect(content().string(containsString("mine.local.conf:7")))
-                .andExpect(content().string(not(containsString("이번 초안이 바꾸지 않은 파일"))));
+                .andExpect(content().string(not(containsString("이번 변경에 없는 파일"))));
     }
 
     private void createStaticSite(String domain) throws Exception {

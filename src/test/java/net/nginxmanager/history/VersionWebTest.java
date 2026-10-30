@@ -66,9 +66,9 @@ class VersionWebTest extends ConfigRootTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("첫 버전")))
                 .andExpect(content().string(containsString("둘째 버전")))
-                .andExpect(content().string(containsString(">변경 전</th>")))
-                .andExpect(content().string(containsString(">변경 후</th>")))
-                .andExpect(content().string(containsString("aria-label=\"변경 전 버전으로 #" + first + " 고르기\"")));
+                .andExpect(content().string(containsString(">base</th>")))
+                .andExpect(content().string(containsString(">compare</th>")))
+                .andExpect(content().string(containsString("aria-label=\"버전 #" + first + "을(를) base로 선택\"")));
         mvc.perform(get("/versions/" + first + "/diff/" + second).with(user("ad").roles("ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("-        proxy_pass http://first:1;")))

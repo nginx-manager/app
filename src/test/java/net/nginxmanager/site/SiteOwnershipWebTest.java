@@ -98,7 +98,7 @@ class SiteOwnershipWebTest extends ConfigRootTest {
         mvc.perform(get("/sites/" + aliceSite.getId()).with(user("alice").roles("MEMBER")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(not(containsString("담당자 저장"))))
-                .andExpect(content().string(not(containsString("원문 편집</a>"))));
+                .andExpect(content().string(not(containsString("Raw 편집</a>"))));
     }
 
     @Test
