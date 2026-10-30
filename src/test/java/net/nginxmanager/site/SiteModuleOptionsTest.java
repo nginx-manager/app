@@ -31,7 +31,8 @@ class SiteModuleOptionsTest {
                 (Boolean) values.get("satisfyAny"), (Integer) values.get("rateLimit"),
                 (Integer) values.get("rateBurst"), (Integer) values.get("connLimit"),
                 (String) values.get("realIpFrom"), (SiteOptions.RealIpHeader) values.get("realIpHeader"),
-                (Integer) values.get("cacheMinutes"), (Boolean) values.get("autoindex"));
+                (Integer) values.get("cacheMinutes"), (Boolean) values.get("autoindex"),
+                (String) values.get("authRequestUrl"), (String) values.get("authSignInUrl"));
     }
 
     static SiteOptions options(Object... keyValues) {

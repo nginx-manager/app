@@ -19,7 +19,7 @@ record ProxyBackend(String scheme, String host, int port, String path) {
         String path = slash < 0 ? "" : rest.substring(slash);
         int colon = authority.indexOf(':');
         String host = colon < 0 ? authority : authority.substring(0, colon);
-        int port = colon < 0 ? ("https".equals(scheme) ? 443 : 80) : Integer.parseInt(authority.substring(colon + 1));
+        int port = colon < 0 ? ("https".equals(scheme) || "grpcs".equals(scheme) ? 443 : 80) : Integer.parseInt(authority.substring(colon + 1));
         return new ProxyBackend(scheme, host, port, path);
     }
 
@@ -32,6 +32,11 @@ record ProxyBackend(String scheme, String host, int port, String path) {
         boolean agent = local || host.equals("nginx");
         return (agent && (port == 7070 || port == 8081)) || (local && port == 9000)
                 || (host.equals("manager") && port == 9000);
+    }
+
+    /** gRPC 백엔드(grpc://, grpcs://)인지(018). */
+    boolean isGrpc() {
+        return scheme.startsWith("grpc");
     }
 
     /** upstream의 server 항목. 포트는 늘 적는다(https의 기본 포트는 80이 아니라서). */

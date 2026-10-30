@@ -28,6 +28,9 @@ import java.util.regex.Pattern;
  * @param realIpFrom 실제 클라이언트 IP를 헤더에서 읽을 때 믿을 프록시 주소(로드 밸런서, CDN)
  * @param cacheMinutes 프록시 응답을 캐시할 시간(분). null이면 캐시하지 않는다. 리버스 프록시에서만 쓴다
  * @param autoindex 정적 사이트에서 index.html이 없는 폴더의 파일 목록을 보여 준다
+ * @param authRequestUrl 요청마다 먼저 물어볼 인증 서버 주소(auth_request, 018). 2xx면 통과, 401·403이면 거절.
+ *                       oauth2-proxy, Authelia, Authentik 같은 SSO 앞단에 쓴다
+ * @param authSignInUrl 인증 서버가 401을 주면 보낼 로그인 주소. 원래 주소를 rd 파라미터로 붙인다. 비우면 401을 그대로 준다
  */
 public record SiteOptions(
         Boolean gzip,
@@ -50,10 +53,16 @@ public record SiteOptions(
         RealIpHeader realIpHeader,
         @Min(value = 1, message = "{msg.validation.cacheMinutes}") @Max(value = 525600, message = "{msg.validation.cacheMinutes}")
         Integer cacheMinutes,
-        Boolean autoindex) {
+        Boolean autoindex,
+        String authRequestUrl,
+        String authSignInUrl) {
 
     public static final SiteOptions DEFAULTS = new SiteOptions(false, false, false, false, null, null, null, null,
-            false, null, null, null, null, null, null, false);
+            false, null, null, null, null, null, null, false, null, null);
+
+    /** 인증 서버 주소. nginx 변수($)·따옴표·공백이 들어가지 않게 쓸 수 있는 문자를 좁힌다. */
+    private static final Pattern AUTH_REQUEST_URL = Pattern.compile(
+            "https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?(/[A-Za-z0-9._~/%!&*+,=:@-]*)?(\\?[A-Za-z0-9._~/%!&*+,=:@?-]*)?");
 
     /** 비밀번호 보호 사용자 이름. htpasswd 형식(이름:해시)이라 콜론과 공백은 쓸 수 없다. */
     static final Pattern AUTH_USER = Pattern.compile("[A-Za-z0-9._@-]{1,64}");
@@ -77,6 +86,26 @@ public record SiteOptions(
         satisfyAny = satisfyAny != null && satisfyAny;
         autoindex = autoindex != null && autoindex;
         realIpHeader = realIpHeader == null ? RealIpHeader.X_FORWARDED_FOR : realIpHeader;
+        authRequestUrl = authRequestUrl == null || authRequestUrl.isBlank() ? null : authRequestUrl.strip();
+        authSignInUrl = authRequestUrl == null || authSignInUrl == null || authSignInUrl.isBlank()
+                ? null : authSignInUrl.strip();
+    }
+
+    /** 외부 인증 서버(auth_request)를 쓰는지(018). */
+    public boolean authRequestEnabled() {
+        return authRequestUrl != null;
+    }
+
+    @AssertTrue(message = "{msg.validation.authRequestUrl}")
+    public boolean isAuthRequestUrlValid() {
+        return authRequestUrl == null
+                || (authRequestUrl.length() <= 2048 && AUTH_REQUEST_URL.matcher(authRequestUrl).matches());
+    }
+
+    @AssertTrue(message = "{msg.validation.authSignInUrl}")
+    public boolean isAuthSignInUrlValid() {
+        return authSignInUrl == null
+                || (authSignInUrl.length() <= 2048 && AUTH_REQUEST_URL.matcher(authSignInUrl).matches());
     }
 
     public List<String> allowList() {
@@ -124,14 +153,15 @@ public record SiteOptions(
         return new SiteOptions(gzip, securityHeaders, hsts, http3, maxBodySizeMb, normalized(allowFrom),
                 normalized(denyFrom), names.isEmpty() ? null : String.join("\n", names), satisfyAny, rateLimit,
                 rateLimit == null ? null : rateBurst, connLimit, normalized(realIpFrom), realIpHeader, cacheMinutes,
-                autoindex);
+                autoindex, authRequestUrl, authSignInUrl);
     }
 
     /** 사이트 유형에서 쓰지 않는 설정은 버린다(유형을 바꿨을 때 남은 값이 설정에 섞이지 않게). */
     SiteOptions forType(SiteType type) {
         return new SiteOptions(gzip, securityHeaders, hsts, http3, maxBodySizeMb, allowFrom, denyFrom, authUsers,
                 satisfyAny, rateLimit, rateBurst, connLimit, realIpFrom, realIpHeader,
-                type == SiteType.PROXY ? cacheMinutes : null, type == SiteType.STATIC && autoindex);
+                type == SiteType.PROXY ? cacheMinutes : null, type == SiteType.STATIC && autoindex, authRequestUrl,
+                authSignInUrl);
     }
 
     @AssertTrue(message = "{msg.validation.addresses}")
@@ -246,6 +276,8 @@ public record SiteOptions(
         put(values, prefix + "realIpHeader", realIpHeader.name());
         put(values, prefix + "cacheMinutes", cacheMinutes);
         put(values, prefix + "autoindex", autoindex);
+        put(values, prefix + "authRequestUrl", authRequestUrl);
+        put(values, prefix + "authSignInUrl", authSignInUrl);
     }
 
     static SiteOptions load(Properties values, String prefix) {
@@ -257,7 +289,8 @@ public record SiteOptions(
                 bool(values, prefix + "satisfyAny"), integer(values, prefix + "rateLimit"),
                 integer(values, prefix + "rateBurst"), integer(values, prefix + "connLimit"),
                 values.getProperty(prefix + "realIpFrom"), header == null ? null : RealIpHeader.valueOf(header),
-                integer(values, prefix + "cacheMinutes"), bool(values, prefix + "autoindex"));
+                integer(values, prefix + "cacheMinutes"), bool(values, prefix + "autoindex"),
+                values.getProperty(prefix + "authRequestUrl"), values.getProperty(prefix + "authSignInUrl"));
     }
 
     private static void put(Properties values, String key, Object value) {
