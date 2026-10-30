@@ -30,7 +30,8 @@ public class SiteConfigRenderer {
             proxyPrelude(out, primaryDomain, form);
         }
         optionPrelude(out, primaryDomain, form);
-        String serverNames = form.extraDomainsNormalized() == null
+        boolean redirectExtras = form.extraDomainsNormalized() != null && form.options().redirectToPrimary();
+        String serverNames = form.extraDomainsNormalized() == null || redirectExtras
                 ? primaryDomain
                 : primaryDomain + " " + form.extraDomainsNormalized();
         out.append("server {\n")
@@ -72,7 +73,45 @@ public class SiteConfigRenderer {
             content(out, primaryDomain, form, true);
             out.append("}\n");
         }
+        if (redirectExtras) {
+            extraDomainRedirects(out, primaryDomain, form, https ? tls : null);
+        }
         return out.toString();
+    }
+
+    /**
+     * 추가 도메인을 대표 도메인으로 보내는 server 블록(023). 인증서 발급 경로는 그대로 받아
+     * 같은 인증서에 추가 도메인을 넣어 발급·갱신할 수 있게 한다.
+     */
+    private static void extraDomainRedirects(StringBuilder out, String primaryDomain, SiteForm form,
+                                             CertificatePaths tls) {
+        String target = tls != null ? "https://" + primaryDomain
+                : "http://" + primaryDomain + (form.listenHttpPort() == 80 ? "" : ":" + form.listenHttpPort());
+        out.append("\n# 추가 도메인은 대표 도메인으로 보낸다\n")
+                .append("server {\n")
+                .append("    listen ").append(form.listenHttpPort()).append(";\n")
+                .append("    server_name ").append(form.extraDomainsNormalized()).append(";\n\n");
+        logs(out, primaryDomain);
+        out.append("    location ^~ /.well-known/acme-challenge/ {\n")
+                .append("        root /var/lib/nginx-manager/acme-webroot;\n")
+                .append("        default_type text/plain;\n")
+                .append("    }\n\n")
+                .append("    location / {\n")
+                .append("        return 301 ").append(target).append("$request_uri;\n")
+                .append("    }\n")
+                .append("}\n");
+        if (tls != null) {
+            out.append("\nserver {\n")
+                    .append("    listen 443 ssl;\n")
+                    .append("    http2 on;\n")
+                    .append("    server_name ").append(form.extraDomainsNormalized()).append(";\n\n")
+                    .append("    ssl_certificate ").append(tls.certPath()).append(";\n")
+                    .append("    ssl_certificate_key ").append(tls.keyPath()).append(";\n")
+                    .append("    ssl_protocols TLSv1.2 TLSv1.3;\n\n");
+            logs(out, primaryDomain);
+            out.append("    return 301 ").append(target).append("$request_uri;\n")
+                    .append("}\n");
+        }
     }
 
     private static void logs(StringBuilder out, String primaryDomain) {
@@ -163,10 +202,11 @@ public class SiteConfigRenderer {
             }
             out.append("        proxy_pass ").append(route.target()).append(";\n")
                     .append("        proxy_http_version 1.1;\n")
-                    .append("        proxy_set_header Host $host;\n")
+                    .append("        proxy_set_header Host ").append(hostHeader(form)).append(";\n")
                     .append("        proxy_set_header X-Real-IP $remote_addr;\n")
                     .append("        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n")
                     .append("        proxy_set_header X-Forwarded-Proto $scheme;\n");
+            customRequestHeaders(out, form);
             if (route.target().startsWith("https://")) {
                 out.append("        proxy_ssl_server_name on;\n");
             }
@@ -393,6 +433,30 @@ public class SiteConfigRenderer {
                     .append("        proxy_cache_lock on;\n")
                     .append("        add_header X-Cache-Status $upstream_cache_status always;\n");
         }
+        for (CustomHeader header : options.responseHeaderList()) {
+            out.append("        add_header ").append(header.name()).append(' ').append(header.quotedValue())
+                    .append(" always;\n");
+        }
+    }
+
+    /** 백엔드에 보낼 Host(022). 사용자 지정 헤더에 Host가 있으면 그 값을 쓴다. */
+    private static String hostHeader(SiteForm form) {
+        return proxyRequestHeaders(form).stream().filter(CustomHeader::isHost).findFirst()
+                .map(CustomHeader::quotedValue).orElse("$host");
+    }
+
+    private static List<CustomHeader> proxyRequestHeaders(SiteForm form) {
+        return form.type() == SiteType.PROXY ? form.options().requestHeaderList() : List.of();
+    }
+
+    /** 사용자 지정 백엔드 헤더(022). Host는 기본 Host 줄을 바꿔 쓰므로 여기서는 뺀다. */
+    private static void customRequestHeaders(StringBuilder out, SiteForm form) {
+        for (CustomHeader header : proxyRequestHeaders(form)) {
+            if (!header.isHost()) {
+                out.append("        proxy_set_header ").append(header.name()).append(' ')
+                        .append(header.quotedValue()).append(";\n");
+            }
+        }
     }
 
     /**
@@ -450,10 +514,11 @@ public class SiteConfigRenderer {
         locationOptions(out, primaryDomain, form, https);
         out.append("        proxy_pass ").append(pass).append(";\n")
                 .append("        proxy_http_version 1.1;\n")
-                .append("        proxy_set_header Host $host;\n")
+                .append("        proxy_set_header Host ").append(hostHeader(form)).append(";\n")
                 .append("        proxy_set_header X-Real-IP $remote_addr;\n")
                 .append("        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n")
                 .append("        proxy_set_header X-Forwarded-Proto $scheme;\n");
+        customRequestHeaders(out, form);
         if (pass.startsWith("https://")) {
             // https 백엔드에 SNI를 보낸다(가상 호스트·CDN 백엔드는 SNI가 없으면 핸드셰이크를 거절한다).
             // upstream으로 묶으면 보낼 이름이 upstream 이름이 되므로 첫 백엔드의 호스트 이름을 쓴다
@@ -489,6 +554,10 @@ public class SiteConfigRenderer {
                 .append("        grpc_set_header X-Real-IP $remote_addr;\n")
                 .append("        grpc_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n")
                 .append("        grpc_set_header X-Forwarded-Proto $scheme;\n");
+        for (CustomHeader header : proxyRequestHeaders(form)) {
+            out.append("        grpc_set_header ").append(header.name()).append(' ').append(header.quotedValue())
+                    .append(";\n");
+        }
         if (pass.startsWith("grpcs://")) {
             out.append("        grpc_ssl_server_name on;\n");
             if (form.usesUpstream()) {

@@ -48,6 +48,20 @@
         </label>
     </details>
 
+    <details class="site-options" th:open="${form?.options?.responseHeaders != null or form?.options?.requestHeaders != null}">
+        <summary th:text="#{sites.opt.headers.title}">사용자 지정 헤더</summary>
+        <label><th:block th:text="#{sites.opt.responseHeaders}">응답 헤더</th:block>
+            <span class="hint" th:text="#{sites.opt.responseHeaders.hint}">설명</span>
+            <textarea th:field="*{options.responseHeaders}" rows="3" placeholder="Access-Control-Allow-Origin: *&#10;X-Robots-Tag: noindex" spellcheck="false" th:disabled="${!editable}"></textarea>
+            <span class="error" th:errors="*{options.responseHeadersValid}"></span>
+        </label>
+        <label class="type-fields type-proxy"><th:block th:text="#{sites.opt.requestHeaders}">백엔드로 보낼 헤더</th:block>
+            <span class="hint" th:text="#{sites.opt.requestHeaders.hint}">설명</span>
+            <textarea th:field="*{options.requestHeaders}" rows="2" placeholder="Host: api.internal&#10;X-Forwarded-Host: $host" spellcheck="false" th:disabled="${!editable}"></textarea>
+            <span class="error" th:errors="*{options.requestHeadersValid}"></span>
+        </label>
+    </details>
+
     <details class="site-options" th:open="${form?.options?.accessRestricted() == true or form?.options?.authEnabled() == true or form?.options?.authRequestEnabled() == true}">
         <summary th:text="#{sites.opt.access.title}">접근 제한 (IP, 비밀번호)</summary>
         <p class="hint" th:text="#{sites.opt.access.intro}">설명</p>

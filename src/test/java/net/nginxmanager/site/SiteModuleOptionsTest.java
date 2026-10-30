@@ -36,7 +36,9 @@ class SiteModuleOptionsTest {
                 (String) values.get("pathRoutes"), (String) values.get("backupTargets"),
                 (Integer) values.get("upstreamMaxFails"), (Integer) values.get("upstreamFailTimeout"),
                 (Integer) values.get("upstreamKeepalive"), (Boolean) values.get("maintenance"),
-                (String) values.get("maintenanceMessage"), (String) values.get("maintenanceAllowFrom"));
+                (String) values.get("maintenanceMessage"), (String) values.get("maintenanceAllowFrom"),
+                (String) values.get("responseHeaders"), (String) values.get("requestHeaders"),
+                (Boolean) values.get("redirectToPrimary"));
     }
 
     static SiteOptions options(Object... keyValues) {
