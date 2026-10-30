@@ -92,6 +92,13 @@ li { margin: .25rem 0; }
 .nav-links { display: flex; flex-direction: column; gap: .15rem; }
 .nav-label { margin: 1rem .7rem .35rem; color: var(--side-muted); font-size: .72rem; font-weight: 600; letter-spacing: .06em; }
 .nav .spacer { flex: 1; }
+.nav a.nav-manual {
+    margin: 0 0 .75rem; border: 1px solid rgba(45, 212, 191, .35); background: rgba(45, 212, 191, .08);
+    color: #fff; font-weight: 600;
+}
+.nav a.nav-manual:hover { background: rgba(45, 212, 191, .16); border-color: rgba(45, 212, 191, .6); }
+.nav a.nav-manual .icon { color: #2dd4bf; }
+.nav a.nav-manual .icon-external { width: 14px; height: 14px; margin-left: auto; color: var(--side-muted); }
 .langs { display: grid; grid-template-columns: 1fr 1fr; gap: .2rem; padding: .5rem .35rem .75rem; }
 .nav .langs a { width: auto; justify-content: center; padding: .2rem .5rem; border-radius: 6px; font-size: .75rem; color: var(--side-muted); }
 .nav .langs a.active { background: rgba(148, 163, 184, .16); color: #fff; }
@@ -502,6 +509,7 @@ body > footer, .footer { padding: 1.25rem 2rem 2rem; text-align: center; color: 
     .nav-user { border-top: 0; padding-top: 0; margin-left: auto; }
     .nav a, .nav button.link { width: auto; white-space: nowrap; padding: .45rem .6rem; }
     .nav-user span { display: none; }
+    .nav a.nav-manual { margin: 0; }
     .nav .langs { display: flex; padding: 0; }
     .page { padding: 1.25rem 1rem 2rem; }
     .columns { grid-template-columns: 1fr; }
@@ -526,9 +534,11 @@ body > footer, .footer { padding: 1.25rem 2rem 2rem; text-align: center; color: 
     .js .nav.open .nav-user { border-top: 1px solid rgba(148, 163, 184, .15); padding-top: .5rem; }
     .js .nav.open .nav-user span { display: inline; }
     .js .nav.open .nav-links a, .js .nav.open .nav-user a, .js .nav.open button.link { width: 100%; padding: .6rem .7rem; }
+    .js .nav.open a.nav-manual { width: 100%; margin: .5rem 0 0; padding: .6rem .7rem; }
     .js .nav.open .langs { width: 100%; padding: .5rem 0 0; flex-wrap: wrap; }
     .js .nav.open .langs a { width: auto; }
 }
 .footer { box-sizing: border-box; width: calc(100% - 4rem); max-width: calc(1200px - 4rem); margin: 0 auto; padding: .75rem 0 1.5rem; display: flex; gap: .5rem; color: var(--muted); font-size: .8rem; border-top: 1px solid var(--line); }
 .footer a { color: var(--muted); display: inline-flex; align-items: center; gap: .3rem; }
-.footer .icon-github { width: 14px; height: 14px; fill: currentColor; stroke: none; }
+.footer .icon { width: 14px; height: 14px; }
+.footer .icon-github { fill: currentColor; stroke: none; }

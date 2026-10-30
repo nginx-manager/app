@@ -144,7 +144,7 @@ class DashboardTest extends ConfigRootTest {
                 .andExpect(content().string(containsString(">dev</span></a>")))
                 .andExpect(content().string(containsString("class=\"icon icon-github\"")))
                 .andExpect(content().string(containsString("class=\"nav-manual\" href=\"" + AppVersion.MANUAL_URL + "\"")))
-                .andExpect(content().string(containsString("href=\"" + AppVersion.MANUAL_URL + "\" target=\"_blank\" rel=\"noopener\">사용 설명서</a>\n</footer>")));
+                .andExpect(content().string(containsString(">사용 설명서</span></a>\n</footer>")));
         mvc.perform(get("/login"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(not(containsString("<footer"))));
