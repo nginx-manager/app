@@ -23,6 +23,11 @@
 
 <!-- 유형과 관계없이 켜는 모듈 설정(접근 제한, 속도 제한, 성능·보안) -->
 <th:block th:fragment="options(editable)">
+    <label><th:block th:text="#{sites.opt.note}">메모</th:block>
+        <span class="hint" th:text="#{sites.opt.note.hint}">설명</span>
+        <textarea th:field="*{options.note}" rows="2" maxlength="500" th:placeholder="#{sites.opt.note.placeholder}" th:disabled="${!editable}"></textarea>
+        <span class="error" th:errors="*{options.noteValid}"></span>
+    </label>
     <details class="site-options" th:open="${form?.options?.maintenance == true}">
         <summary th:text="#{sites.opt.maintenance.title}">점검 모드</summary>
         <label class="inline"><input type="checkbox" th:field="*{options.maintenance}" value="true" th:disabled="${!editable}"> <th:block th:text="#{sites.opt.maintenance}">점검 모드 켜기</th:block></label>
@@ -159,6 +164,17 @@
         </label>
         <label class="inline"><input type="checkbox" th:field="*{options.autoindex}" value="true" th:disabled="${!editable}"> <th:block th:text="#{sites.opt.autoindex}">디렉터리 목록 보이기</th:block></label>
         <p class="hint" th:text="#{sites.opt.autoindex.hint}">설명</p>
+    </details>
+    <details class="site-options" th:open="${form?.options?.serverDirectives != null}">
+        <summary th:text="#{sites.opt.directives.title}">추가 지시어 (관리자)</summary>
+        <label><th:block th:text="#{sites.opt.directives}">server 블록에 덧붙일 지시어</th:block>
+            <span class="hint" th:text="#{sites.opt.directives.hint}">설명</span>
+            <textarea th:field="*{options.serverDirectives}" rows="5" maxlength="4000" spellcheck="false"
+                      placeholder="client_body_timeout 30s;&#10;location = /healthz { return 200; }"
+                      th:readonly="${!currentUser.isAdmin()}" th:disabled="${!editable}"></textarea>
+            <span class="hint" th:unless="${currentUser.isAdmin()}" th:text="#{sites.opt.directives.adminOnly}">관리자만 바꿀 수 있습니다.</span>
+            <span class="error" th:errors="*{options.serverDirectivesValid}"></span>
+        </label>
     </details>
 </th:block>
 </body>

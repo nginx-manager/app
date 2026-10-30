@@ -19,5 +19,6 @@ public enum AuditAction {
     CERT_DELETE,
     RUNTIME_START,
     UPGRADE,
-    NGINX_RESTART
+    NGINX_RESTART,
+    API_TOKEN
 }

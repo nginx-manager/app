@@ -29,7 +29,7 @@
 
 ## 감사 로그
 
-누가 언제 무엇을 했는지 기록합니다. 로그인, 계정 잠김, 2단계 인증 켜기·끄기·해제, 사용자 추가·변경, 사이트 저장, 사이트 담당자 변경, 설정 파일 가져오기, 설정 적용·롤백, 드리프트 가져오기, 인증서 발급·갱신·업로드, nginx 시작·재시작·업그레이드가 남습니다. 비밀번호와 키는 남기지 않습니다.
+누가 언제 무엇을 했는지 기록합니다. 로그인, 계정 잠김, 2단계 인증 켜기·끄기·해제, 사용자 추가·변경, 사이트 저장, 사이트 담당자 변경, 설정 파일 가져오기, 설정 적용·롤백, 드리프트 가져오기, 인증서 발급·갱신·업로드, nginx 시작·재시작·업그레이드, API 토큰 만들기·지우기가 남습니다. [API 토큰](#api-토큰)으로 한 일은 사용자가 `token:이름`으로 보입니다. 비밀번호와 키는 남기지 않습니다.
 
 <p align="center"><img src="images/audit.png" alt="감사 로그" width="860"></p>
 
@@ -74,3 +74,43 @@
 - **삭제**: 채널을 지웁니다.
 
 웹훅은 서버가 관리자가 정한 URL로 요청을 보내는 기능이므로, 관리자 역할은 믿을 수 있는 사람에게만 줍니다.
+
+## API 토큰
+
+v1.9.0부터 배포 스크립트나 CI에서 관리도구를 부를 수 있습니다. 배포하는 동안 점검 모드를 켜고, 끝나면 끄는 일을 사람이 화면을 누르지 않고 합니다. **설정** 메뉴의 **API 토큰** 탭에서 토큰을 만듭니다(관리자).
+
+1. **이름**에 어디서 쓰는 토큰인지 적고(예: `github-deploy`) **만들기**를 누릅니다.
+2. 화면 위에 `nmt_`로 시작하는 토큰 값이 나옵니다. **이 값은 지금 한 번만 보입니다.** 바로 복사해 CI의 비밀 값(GitHub Actions secret 등)에 넣습니다. 관리도구에는 해시만 남아 다시 볼 수 없으니, 잃어버리면 지우고 새로 만듭니다.
+3. 목록에서 토큰의 앞 몇 글자, 만든 사람, 마지막으로 쓴 때를 봅니다. **삭제**하면 그 토큰으로 오는 요청은 바로 거절됩니다.
+
+토큰은 관리자 권한으로 동작합니다. 꼭 필요한 곳에만 두고, 쓰지 않는 토큰은 지웁니다. 토큰으로 한 일은 감사 로그에 `token:이름`으로 남고, 적용이 실패하면 [알림](#알림-설정)도 갑니다.
+
+### API
+
+요청마다 `Authorization: Bearer <토큰>` 헤더를 붙입니다. 답은 JSON입니다. 토큰이 없거나 틀리면 `401`입니다.
+
+| 요청 | 하는 일 |
+| --- | --- |
+| `GET /api/v1/sites` | 사이트 목록. 사이트마다 `domain`, `type`, `enabled`, `maintenance`, `pending`, `https` |
+| `POST /api/v1/sites/{도메인}/maintenance` | 본문 `{"enabled": true, "apply": true}`. 점검 모드를 켜거나(`true`) 끕니다(`false`). `apply`가 `true`면 바꾼 뒤 적용 대기 중인 변경을 모두 적용합니다. 이미 그 상태면 초안을 만들지 않습니다(`changed: false`) |
+| `POST /api/v1/apply` | 적용 대기 중인 변경을 모두 적용합니다. 결과 `result`는 `SUCCESS`, `NOTHING_TO_APPLY`, `VALIDATION_FAILED`, `AUTO_RECOVERED` 중 하나입니다 |
+
+- 적용이 검증에 실패하거나 자동으로 되돌렸으면 `422`와 함께 `errors`에 `nginx -t` 오류가 담깁니다. 스크립트는 HTTP 상태로 성공을 판단하면 됩니다(`curl --fail`).
+- 없는 도메인은 `404`, Raw 설정 사이트의 점검 모드나 다른 적용과 겹친 요청, nginx 컨테이너 업그레이드가 필요해 적용이 막힌 때는 `409`입니다.
+
+배포 스크립트 예:
+
+```bash
+NM=https://manager.example.com
+AUTH="Authorization: Bearer $NM_TOKEN"
+
+# 점검 모드 켜고 바로 적용
+curl --fail -X POST -H "$AUTH" -H "Content-Type: application/json" \
+     -d '{"enabled": true, "apply": true}' "$NM/api/v1/sites/app.example.com/maintenance"
+
+./deploy.sh
+
+# 점검 모드 끄고 적용
+curl --fail -X POST -H "$AUTH" -H "Content-Type: application/json" \
+     -d '{"enabled": false, "apply": true}' "$NM/api/v1/sites/app.example.com/maintenance"
+```

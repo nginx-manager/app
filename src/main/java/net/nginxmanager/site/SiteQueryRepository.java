@@ -5,9 +5,12 @@ import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import org.springframework.stereotype.Repository;
 
+import java.io.IOException;
+import java.io.StringReader;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.stream.Collectors;
 
 import static net.nginxmanager.config.QConfigFile.configFile;
@@ -26,6 +29,21 @@ public class SiteQueryRepository {
         /** 점검 모드를 켠 사이트인지(021). 옵션은 Properties 형식으로 저장된다. */
         public boolean maintenance() {
             return options != null && options.lines().anyMatch("maintenance=true"::equals);
+        }
+
+        /** 운영 메모(031). 메모가 없으면 null */
+        public String note() {
+            if (options == null || !options.contains("note=")) {
+                return null;
+            }
+            Properties values = new Properties();
+            try {
+                values.load(new StringReader(options));
+            } catch (IOException e) {
+                return null;
+            }
+            String note = values.getProperty("note");
+            return note == null || note.isBlank() ? null : note;
         }
 
         /** 목록의 대상 칸. 프록시는 백엔드 주소들, 정적은 문서 루트, 리디렉션은 보낼 주소, PHP는 PHP-FPM 주소. 원문 편집 사이트는 비운다 */

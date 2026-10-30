@@ -6,7 +6,7 @@ import java.util.Locale;
 /**
  * 사이트 목록 검색(027). 담당자로 거른 행을 검색어와 상태로 한 번 더 거른다.
  *
- * @param q      대표·추가 도메인과 대상(백엔드 주소, 문서 루트, 보낼 주소)에서 찾을 말. 대소문자를 가리지 않는다
+ * @param q      대표·추가 도메인, 대상(백엔드 주소, 문서 루트, 보낼 주소), 메모에서 찾을 말. 대소문자를 가리지 않는다
  * @param status enabled, disabled, pending, maintenance 중 하나. 비우면 전체
  */
 public record SiteSearch(String q, String status) {
@@ -33,7 +33,7 @@ public record SiteSearch(String q, String status) {
             return true;
         }
         String needle = q.toLowerCase(Locale.ROOT);
-        return contains(row.primaryDomain(), needle) || contains(row.extraDomains(), needle)
+        return contains(row.primaryDomain(), needle) || contains(row.extraDomains(), needle) || contains(row.note(), needle)
                 || row.targets().stream().anyMatch(target -> contains(target, needle));
     }
 

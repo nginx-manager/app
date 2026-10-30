@@ -122,6 +122,26 @@ public class SiteService {
         return site;
     }
 
+    /**
+     * 점검 모드만 켜고 끈다(033, API). 이미 그 상태면 초안을 만들지 않는다.
+     *
+     * @return 초안을 만들었는지
+     */
+    public boolean setMaintenance(long siteId, boolean on, String actor) {
+        return locked(() -> {
+            Site site = load(siteId);
+            if (site.getType() == SiteType.RAW) {
+                throw new RawSiteFormException();
+            }
+            SiteOptions options = site.getOptions();
+            if (Boolean.TRUE.equals(options.maintenance()) == on) {
+                return false;
+            }
+            doUpdate(siteId, rendering.formOf(site).withOptions(options.withMaintenance(on)), actor);
+            return true;
+        });
+    }
+
     /** 담당자를 바꾼다. 설정 파일과 초안은 그대로이고, 초안은 사이트를 따라 새 담당자에게 넘어간다. */
     public Site assignOwner(long siteId, Long ownerId, long expectedVersion, String actor) {
         return locked(() -> doAssignOwner(siteId, ownerId, expectedVersion, actor));
