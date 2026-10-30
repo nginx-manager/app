@@ -258,13 +258,18 @@ class ImageModuleOptionsTest {
     @Test
     @DisplayName("gRPC 프록시(018): 실제 nginx가 grpc_pass와 h2c를 받아들인다")
     void grpcProxyIsAcceptedByNginx() throws Exception {
-        create("grpc.local", "PROXY", Map.of("proxyTarget", "grpc://127.0.0.1:50051"));
+        // 평문 gRPC(h2c)는 nginx가 그 포트의 기본 서버 설정으로 HTTP/2를 고르므로 전용 포트에 둔다
+        create("grpc.local", "PROXY", Map.of("proxyTarget", "grpc://127.0.0.1:50051", "listenHttpPort", "8086"));
         apply("grpc");
 
         // 백엔드가 없어 502. HTTP/2(사전 지식)로 받는지 본다
-        awaitStatus("grpc.local", "502");
-        assertThat(status("grpc.local", "--http2-prior-knowledge", "-w", "%{http_code} %{http_version}",
-                "http://127.0.0.1/helloworld.Greeter/SayHello")).isEqualTo("502 2");
+        String url = "http://127.0.0.1:8086/helloworld.Greeter/SayHello";
+        String result = "";
+        for (int i = 0; i < 30 && !result.equals("502 2"); i++) {
+            Thread.sleep(1000);
+            result = status("grpc.local", "--http2-prior-knowledge", "-w", "%{http_code} %{http_version}", url);
+        }
+        assertThat(result).isEqualTo("502 2");
     }
 
     private static void createStatic(String domain, String root, Map<String, String> fields) throws Exception {

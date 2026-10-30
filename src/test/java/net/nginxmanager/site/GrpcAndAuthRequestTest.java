@@ -80,7 +80,7 @@ class GrpcAndAuthRequestTest {
 
         String plain = renderer.render("api.local", proxy("http://10.0.0.1:8080",
                 authRequest("http://auth:9091/api/verify", "")));
-        assertThat(plain).contains("auth_request /_nginx_manager_auth;").doesNotContain("error_page 401", "@nginx");
+        assertThat(plain).contains("auth_request /_nginx_manager_auth;").doesNotContain("error_page 401", "@nginx", "auth_basic");
     }
 
     @Test

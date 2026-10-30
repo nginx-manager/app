@@ -254,7 +254,7 @@ public class SiteConfigRenderer {
         if (!options.allowList().isEmpty()) {
             out.append("        deny all;\n");
         }
-        if (auth) {
+        if (options.authEnabled()) {
             out.append("        auth_basic \"").append(primaryDomain).append("\";\n")
                     .append("        auth_basic_user_file ").append(Htpasswd.path(primaryDomain)).append(";\n");
         }
