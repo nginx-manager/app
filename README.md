@@ -30,6 +30,7 @@ curl -fsSL https://github.com/nginx-manager/app/releases/latest/download/install
 
 - 관리 화면은 기본으로 서버 안(`http://127.0.0.1:9000`)에서만 열립니다. `--admin-domain`(또는 `.env`의 `NGINX_MANAGER_ADMIN_DOMAIN`)을 주면 함께 든 nginx가 그 도메인으로 Let's Encrypt 인증서를 받아 HTTPS로만 관리 화면을 엽니다(80은 443으로 넘김).
 - 포트·도메인·버전은 설치 디렉터리의 `.env`에서 바꿉니다. 데이터는 `data/` 아래에 있습니다.
+- 이미 깐 서버에서 설치 명령을 다시 실행하면 `.env`와 `data/`를 건드리지 않고 끝납니다. 새 버전은 `nm upgrade`로 올리며, `.env`는 그대로 두고 새로 생긴 키만 기본값으로 더합니다.
 - 운영은 `nm` 명령으로 합니다: `nm status`, `nm upgrade`(manager만 올려 nginx는 끊기지 않음), `nm upgrade --nginx`, `nm backup`, `nm restore`, `nm migrate`(v1.1 이전 설치 옮기기).
 - 자세한 내용은 사용 설명서 [1. 설치와 실행](src/main/resources/guide/ko/01-install.md)에 있습니다. 묶음의 원본은 [deploy/](deploy/)입니다.
 

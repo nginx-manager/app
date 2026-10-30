@@ -24,6 +24,8 @@ curl -fsSL https://github.com/nginx-manager/app/releases/latest/download/install
 
 - 설치 스크립트는 Docker·Compose v2, 포트 사용 여부, 남은 공간을 먼저 확인합니다. 빠진 것이 있으면 아무것도 만들지 않고 이유를 보여 줍니다.
 - 릴리스에 첨부된 설치 묶음(`compose.yml`, `.env`, `nm` 명령)만 받습니다. 소스(git clone)는 필요 없습니다.
+- 이미 설치된 디렉터리(`.env`가 있음)에서 다시 실행하면 아무것도 바꾸지 않고 끝납니다. 새 버전으로 올릴 때는 `nm upgrade`를 씁니다([업그레이드](#업그레이드)).
+- v1.0·v1.1로 깐 서버(이름 붙은 볼륨)에서는 설치를 멈추고 [옮기는 방법](#v11-이전-설치-옮기기)을 알려 줍니다.
 - `--admin-domain`, `--email`을 빼면 관리 화면은 서버 안(`http://127.0.0.1:9000`)에서만 열립니다. 나중에 `.env`에 적어도 됩니다([관리 도메인](#관리-도메인으로-https-열기)).
 
 | 옵션 | 뜻 |
@@ -161,7 +163,7 @@ sudo /opt/nginx-manager/nm upgrade          # 최신 릴리스로
 sudo /opt/nginx-manager/nm upgrade 1.2.1    # 버전을 정해서
 ```
 
-1. 그 버전의 설치 묶음을 받아 `compose.yml`·`nm`을 바꿉니다. `.env`와 `compose.override.yml`은 그대로입니다.
+1. 그 버전의 설치 묶음을 받아 `compose.yml`·`nm`을 바꿉니다. `.env`와 `compose.override.yml`은 그대로이고, `.env`에서는 `MANAGER_VERSION`만 바뀝니다. 새 버전에 새 설정 키가 생겼으면 기본값으로 `.env` 끝에 더하고 무엇을 더했는지 보여 줍니다(이미 있는 값은 건드리지 않습니다). 새 버전의 설명이 붙은 `.env`는 `.env.example`에 있습니다.
 2. 올리기 전에 백업합니다(`backups/…-before-v1.2.1.tar.gz`).
 3. manager만 새 이미지로 다시 띄우고 healthy를 기다립니다. DB 변경은 관리 화면이 시작할 때 자동으로 적용됩니다.
 4. 정해진 시간(기본 180초) 안에 healthy가 되지 않으면 이전 버전과 업그레이드 전 DB로 되돌리고 이유를 보여 줍니다.

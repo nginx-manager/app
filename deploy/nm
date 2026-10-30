@@ -219,6 +219,7 @@ cmd_upgrade() {
     cp "$BUNDLE_DIR/env.example" .env.example
     cp "$BUNDLE_DIR/bundle.env" bundle.env
     cp "$BUNDLE_DIR/README.md" README.md 2>/dev/null || true
+    add_missing_env "$BUNDLE_VERSION"
 
     if [ "$old_manager" != "$BUNDLE_VERSION" ]; then
         say "manager v$old_manager → v$BUNDLE_VERSION (nginx는 그대로 트래픽을 받습니다)"
@@ -248,6 +249,16 @@ cmd_upgrade() {
         say "nginx 이미지 업데이트가 있습니다: $old_nginx → $BUNDLE_NGINX_IMAGE"
         say "nginx가 몇 초 다시 시작하므로 한가한 시간에: nm upgrade --nginx"
     fi
+}
+
+# 새 묶음의 env.example에만 있는 키를 기본값으로 .env 끝에 더한다. 이미 있는 값은 건드리지 않는다
+add_missing_env() { # version
+    added="$(awk -F= 'NR == FNR { if ($0 ~ /^[A-Z_]+=/) have[$1] = 1; next }
+        /^[A-Z_]+=/ && !($1 in have) { print }' .env .env.example)"
+    [ -n "$added" ] || return 0
+    (umask 077 && printf '\n# v%s에서 더한 설정(기본값)\n%s\n' "$1" "$added" >> .env)
+    say ".env에 새 설정을 기본값으로 더했습니다:"
+    printf '%s\n' "$added" | sed 's/^/  /'
 }
 
 upgrade_nginx() { # image tag

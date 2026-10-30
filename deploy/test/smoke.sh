@@ -51,6 +51,7 @@ sh "$work/b-$OLD/install.sh" --dir "$dir" --bundle "$work/b-$OLD/nginx-manager.t
 check ".env 유지" grep -q '^# keep$' "$dir/.env"
 
 step "manager만 업그레이드: nginx는 끊기지 않는다"
+sed -i '/^NGINX_MANAGER_BACKUP_KEEP=/d' "$dir/.env"   # 새 버전에서 생긴 키인 셈
 nginx_before="$(started_at nginx)"
 : > "$work/codes"
 ( while [ ! -f "$work/stop" ]; do curl -s -o /dev/null -m 2 -w '%{http_code}\n' "http://127.0.0.1:$HTTP/" >> "$work/codes"; done ) &
@@ -61,6 +62,8 @@ check "MANAGER_VERSION=$NEW" [ "$(env_of MANAGER_VERSION)" = "$NEW" ]
 check "nginx 이미지는 그대로" [ "$(env_of NGINX_IMAGE)" = "$OLD_NGINX" ]
 check "nginx 컨테이너가 다시 시작하지 않음" [ "$(started_at nginx)" = "$nginx_before" ]
 check "업그레이드 중 요청 실패 0 ($(wc -l < "$work/codes")개 요청)" sh -c "! grep -q '^000\$' '$work/codes'"
+check "빠진 .env 키를 기본값으로 더함" grep -q '^NGINX_MANAGER_BACKUP_KEEP=14$' "$dir/.env"
+check "이미 있던 .env 값은 그대로" grep -q '^# keep$' "$dir/.env"
 check "업그레이드 전 백업" sh -c "ls '$dir'/backups/*before-v$NEW* >/dev/null"
 
 step "새 manager가 뜨지 않으면 되돌린다"

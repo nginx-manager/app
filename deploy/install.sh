@@ -80,6 +80,11 @@ port_in_use() {
         return 1
     fi
 }
+# v1.0·v1.1(compose 파일 하나와 이름 붙은 볼륨)으로 깐 서버
+if [ "$START" = 1 ] && docker volume ls -q --filter name=nm-conf 2>/dev/null | grep -q '_nm-conf$'; then
+    die "v1.0·v1.1로 깐 nginx manager 볼륨이 있습니다. --no-start로 깐 뒤 $DIR/nm migrate 로 데이터를 옮기세요(사용 설명서 1장 'v1.1 이전 설치 옮기기')"
+fi
+
 for port in "$HTTP_PORT" "$HTTPS_PORT" "$MANAGER_PORT"; do
     if [ "$START" = 1 ] && port_in_use "$port"; then
         who="$( (ss -Hltnp "sport = :$port" 2>/dev/null || true) | sed -n 's/.*users:((\("[^"]*"\).*/\1/p' | head -n1)"
