@@ -9,6 +9,8 @@ import net.nginxmanager.runtime.RuntimeCompatibility;
 import net.nginxmanager.common.NotFoundException;
 import net.nginxmanager.site.SiteAccess;
 import net.nginxmanager.site.SiteService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -38,6 +40,8 @@ public class ApplyController {
             return diff.lines().filter(line -> line.startsWith("-") && !line.startsWith("---")).count();
         }
     }
+
+    private static final Logger log = LoggerFactory.getLogger(ApplyController.class);
 
     private final ApplyService applyService;
     private final ConfigFileRepository configFileRepository;
@@ -74,6 +78,12 @@ public class ApplyController {
         } catch (NginxCommandException e) {
             // 에이전트에 연결할 수 없거나 명령이 실패했다. 파일은 되돌렸고 초안은 그대로다
             model.addAttribute("failure", e.getMessage());
+        } catch (ApplyInProgressException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            // 예상하지 못한 오류도 화면에 이유를 보인다(아무 반응 없이 500으로 끝나지 않게)
+            log.error("apply failed", e);
+            model.addAttribute("failure", e.getClass().getSimpleName() + ": " + e.getMessage());
         }
         model.addAttribute("pending", pendingFiles(authentication));
         model.addAttribute("applyBlocked", applyBlocked());

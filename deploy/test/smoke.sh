@@ -115,6 +115,15 @@ else
     printf 'skip: setfacl이나 sudo가 없어 grant는 건너뜀\n'
 fi
 
+step "관리 도메인 점검: DNS에 없는 도메인을 알린다"
+cp "$dir/.env" "$work/env.bak"
+sed -i 's/^NGINX_MANAGER_ADMIN_DOMAIN=.*/NGINX_MANAGER_ADMIN_DOMAIN=nm-typo.example.invalid/' "$dir/.env"
+if "$dir/nm" check-domain > "$work/domain.out" 2>&1; then
+    fail "없는 도메인을 통과시킴"
+fi
+check "DNS에서 찾지 못했다고 알림" grep -q "DNS에서 찾지 못했습니다" "$work/domain.out"
+cat "$work/env.bak" > "$dir/.env"
+
 step "백업과 복원"
 docker run --rm -v "$dir/data/conf:/c" alpine:3.20 sh -c 'mkdir -p /c/conf.d/sites && echo "# marker" > /c/conf.d/sites/zz-marker.conf'
 "$dir/nm" backup --keep 3

@@ -11,6 +11,12 @@
     <p><code th:text="${sourcePath}">/home/a/nginx/app.conf</code></p>
     <p class="error" th:if="${errorKey}" th:text="#{${errorKey}(${errorArg})}">오류</p>
     <p class="error" th:unless="${analysis.importable()}" th:text="#{${analysis.errorKey}(${analysis.errorArg})}">등록할 수 없습니다.</p>
+    <div class="warning" th:unless="${#lists.isEmpty(missingPaths)}" id="import-missing-paths">
+        <p th:text="#{import.preview.missingPaths}">이 설정이 가리키는 파일이 nginx 컨테이너에 없습니다.</p>
+        <ul><li th:each="m : ${missingPaths}"><code th:text="${m}">/etc/letsencrypt/live/a/fullchain.pem</code></li></ul>
+        <p th:if="${certbot}" th:text="#{import.preview.certbot}">Certbot이 만든 설정입니다.</p>
+        <p th:unless="${certbot}" th:text="#{import.preview.missingPaths.fix}">그 디렉터리를 붙이세요.</p>
+    </div>
     <p class="notice" th:if="${existing}">
         <th:block th:text="#{import.preview.existing}">이 파일에서 가져온 사이트가 있습니다:</th:block>
         <a th:href="@{/sites/{id}(id=${existing.id})}" th:text="${existing.primaryDomain}">app</a>

@@ -147,7 +147,8 @@ services:
 
 | 명령 | 하는 일 |
 | --- | --- |
-| `nm status` | 컨테이너 상태와 버전, 관리 화면 주소 |
+| `nm status` | 컨테이너 상태와 버전, 관리 화면 주소, 관리 도메인 점검 |
+| `nm check-domain` | 관리 도메인이 DNS에 있고 이 서버의 nginx로 들어오는지 확인([13장](13-troubleshooting.md#관리-도메인이-열리지-않을-때)) |
 | `nm version` | 설치된 버전과 최신 릴리스 |
 | `nm logs [manager\|nginx]` | 로그 보기 |
 | `nm restart [manager\|nginx]` | 다시 띄우기(기본 manager). `.env`를 바꾼 뒤 |

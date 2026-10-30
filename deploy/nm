@@ -508,6 +508,38 @@ import_grant() {
     say "관리 화면에서 다시 검사하세요"
 }
 
+# ---------------------------------------------------------------- 관리 도메인 점검
+
+# 관리 도메인이 DNS에 있고 이 서버의 nginx로 들어오는지 본다. 챌린지 디렉터리에 표식 파일을 두고
+# http://도메인/.well-known/acme-challenge/표식 으로 받아 본다(Let's Encrypt가 확인하는 길과 같다)
+check_admin_domain() {
+    domain="$(env_get NGINX_MANAGER_ADMIN_DOMAIN)"
+    [ -n "$domain" ] || return 0
+    case "$domain" in
+        *[!A-Za-z0-9.-]*|.*|*.|*..*) warn "주의: 관리 도메인 '$domain' 의 형식이 이상합니다. .env를 확인하세요"; return 1 ;;
+    esac
+    addrs="$(getent ahostsv4 "$domain" 2>/dev/null | awk '{ print $1 }' | sort -u | paste -sd' ' -)"
+    if [ -z "$addrs" ]; then
+        warn "주의: 관리 도메인 $domain 을 DNS에서 찾지 못했습니다. 오타가 없는지, DNS에 A 레코드를 만들었는지 확인하세요"
+        warn "      고친 뒤: .env의 NGINX_MANAGER_ADMIN_DOMAIN을 바꾸고 nm restart"
+        return 1
+    fi
+    command -v curl >/dev/null 2>&1 || return 0
+    token="nm-check-$(date +%s)-$$"
+    rel="data/shared/acme-webroot/.well-known/acme-challenge"
+    as_root "mkdir -p '$rel' && printf '%s' '$token' > '$rel/$token' && chmod 644 '$rel/$token'" 2>/dev/null || return 0
+    got="$(curl -fsS -m 5 --noproxy '*' "http://$domain/.well-known/acme-challenge/$token" 2>/dev/null || true)"
+    as_root "rm -f '$rel/$token'" 2>/dev/null || true
+    if [ "$got" = "$token" ]; then
+        say "관리 도메인 $domain → $addrs: 이 서버의 nginx로 들어옵니다"
+        return 0
+    fi
+    warn "주의: http://$domain 이($addrs) 이 서버의 nginx로 들어오지 않습니다. 인증서를 받을 수 없습니다"
+    warn "      DNS가 이 서버를 가리키는지, 방화벽·앞단 프록시가 80 포트를 이 서버로 넘기는지 확인하세요"
+    warn "      (서버 안에서 자기 공인 주소로 접속이 안 되는 망이면 이 점검만 틀릴 수 있습니다)"
+    return 1
+}
+
 # ---------------------------------------------------------------- 그 밖
 
 cmd_status() {
@@ -517,6 +549,7 @@ cmd_status() {
     domain="$(env_get NGINX_MANAGER_ADMIN_DOMAIN)"
     if [ -n "$domain" ]; then
         say "관리 화면: https://$domain (그리고 $(local_url))"
+        check_admin_domain || true
     else
         say "관리 화면: $(local_url) (관리 도메인 없음)"
     fi
@@ -547,6 +580,7 @@ nginx manager 운영 명령
   nm version                      설치된 버전과 최신 릴리스
   nm logs [manager|nginx]         로그 보기(따라가기)
   nm restart [manager|nginx]      다시 띄우기(기본 manager. .env를 바꾼 뒤)
+  nm check-domain                 관리 도메인이 DNS에 있고 이 서버로 들어오는지 본다
   nm upgrade [버전] [--nginx]      manager를 올린다(nginx는 끊기지 않음). --nginx면 nginx 이미지도
              [--bundle 파일]       인터넷이 막힌 서버에서 미리 받은 묶음으로
   nm backup [--with-logs] [--keep N]   설정·인증서·DB를 backups/에 묶는다(nginx는 계속 돈다)
@@ -571,8 +605,13 @@ case "$cmd" in
     restart)
         svc="${1:-manager}"
         wait_healthy "$svc"
+        check_admin_domain || true
         ;;
-    up) dc up -d --wait --wait-timeout "$WAIT_TIMEOUT" ;;
+    up)
+        dc up -d --wait --wait-timeout "$WAIT_TIMEOUT"
+        check_admin_domain || true
+        ;;
+    check-domain) check_admin_domain ;;
     upgrade) cmd_upgrade "$@" ;;
     backup) cmd_backup "$@" ;;
     restore) cmd_restore "$@" ;;

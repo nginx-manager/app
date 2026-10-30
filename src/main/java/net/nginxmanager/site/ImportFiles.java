@@ -224,6 +224,33 @@ public class ImportFiles {
         }
     }
 
+    private static final java.util.regex.Pattern PATH_DIRECTIVE = java.util.regex.Pattern.compile(
+            "(?m)(?:^|[;{\\s])(?:ssl_certificate|ssl_certificate_key|ssl_trusted_certificate|ssl_dhparam|include|root|alias)"
+                    + "\\s+\"?(/[^;\\s\"]+)");
+
+    /**
+     * 설정이 가리키지만 컨테이너에서 보이지 않는 파일·디렉터리(예: Certbot의 /etc/letsencrypt/...). 그대로 적용하면
+     * nginx -t가 실패한다. 변수나 와일드카드가 든 경로는 확인하지 않는다.
+     */
+    public static List<String> missingReferences(String content) {
+        java.util.LinkedHashSet<String> missing = new java.util.LinkedHashSet<>();
+        java.util.regex.Matcher m = PATH_DIRECTIVE.matcher(content);
+        while (m.find()) {
+            String path = m.group(1);
+            if (path.contains("$") || path.contains("*") || path.contains("?")) {
+                continue;
+            }
+            try {
+                if (!Files.exists(Path.of(path))) {
+                    missing.add(path);
+                }
+            } catch (java.nio.file.InvalidPathException ignored) {
+                // 경로가 아니면 넘어간다
+            }
+        }
+        return List.copyOf(missing);
+    }
+
     /** 설정 루트 안에서 관리도구가 이미 다루는 곳: 사이트·스트림 파일, nginx.conf, 인증서·비밀번호 디렉터리. */
     static boolean isReserved(Found file) {
         String relative = file.relativePath();

@@ -211,6 +211,8 @@ public class SiteImportController {
         model.addAttribute("content", content);
         model.addAttribute("contentHash", ConfigFileStore.hash(content));
         model.addAttribute("analysis", analysis);
+        model.addAttribute("missingPaths", ImportFiles.missingReferences(content));
+        model.addAttribute("certbot", content.contains("managed by Certbot") || content.contains("/etc/letsencrypt/"));
         model.addAttribute("primaryDomain", analysis.primaryDomain());
         model.addAttribute("existing", siteRepository.findByImportPath(sourcePath).stream().findFirst()
                 .filter(s -> !uploaded).orElse(null));

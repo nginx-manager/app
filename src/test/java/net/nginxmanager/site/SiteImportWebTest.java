@@ -251,6 +251,32 @@ class SiteImportWebTest extends ConfigRootTest {
     }
 
     @Test
+    void previewWarnsAboutCertbotFilesTheContainerCannotSee() throws Exception {
+        writeHome("alice/nginx/storage.conf", """
+                server {
+                    server_name storage.example.com;
+                    location / { proxy_pass http://127.0.0.1:9001; }
+                    listen 443 ssl; # managed by Certbot
+                    ssl_certificate /etc/letsencrypt/live/storage.example.com/fullchain.pem; # managed by Certbot
+                    ssl_certificate_key /etc/letsencrypt/live/storage.example.com/privkey.pem; # managed by Certbot
+                    include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+                }
+                """);
+
+        mvc.perform(get("/sites/import/file").param("path", HOME + "/alice/nginx/storage.conf")
+                        .with(user("ed").roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("id=\"import-missing-paths\"")))
+                .andExpect(content().string(containsString("/etc/letsencrypt/live/storage.example.com/fullchain.pem")))
+                .andExpect(content().string(containsString("/etc/letsencrypt/options-ssl-nginx.conf")))
+                .andExpect(content().string(containsString("Certbot이 만든 설정입니다")));
+        writeHome("alice/nginx/app.conf", PROXY);
+        mvc.perform(get("/sites/import/file").param("path", HOME + "/alice/nginx/app.conf")
+                        .with(user("ed").roles("ADMIN")))
+                .andExpect(content().string(not(containsString("id=\"import-missing-paths\""))));
+    }
+
+    @Test
     void aDirectoryWithoutPermissionDoesNotStopTheScanAndIsListed() throws Exception {
         // 루트는 권한과 상관없이 읽으므로 일반 사용자로 돌 때(CI)만 확인한다
         Assumptions.assumeFalse("root".equals(System.getProperty("user.name")));
