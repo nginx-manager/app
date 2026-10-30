@@ -17,7 +17,7 @@
 | 폼으로 만든 사이트 | `/var/log/nginx/sites/<도메인>.access.log`, `<도메인>.error.log` |
 | Raw 사이트(가져오기·Raw 설정) | Raw 설정의 `server` 블록에 적힌 `access_log`, `error_log` 경로 |
 
-Raw 사이트는 서버에 반영된 설정에서 경로를 읽습니다(v1.2.4부터). 다음 경우에는 파일을 읽지 않고 로그 화면에 이유를 보여 줍니다.
+Raw 사이트는 서버에 반영된 설정에서 경로를 읽습니다(v1.3.0부터). 다음 경우에는 파일을 읽지 않고 로그 화면에 이유를 보여 줍니다.
 
 - `access_log`/`error_log`가 없음: 다른 사이트와 함께 공통 로그(`/var/log/nginx/access.log`, `error.log`)에 쌓입니다.
 - `access_log off;`: 이 사이트는 접근 로그를 남기지 않습니다.

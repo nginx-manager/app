@@ -21,6 +21,8 @@ public final class RawHttps {
     private static final Pattern LISTEN = Pattern.compile("(?m)^(\\s*)listen\\s+([^;]*);");
     private static final Pattern SERVER_NAME = Pattern.compile("(?<![\\w$])server_name\\s+([^;]+);");
     private static final Pattern PORT_80 = Pattern.compile("^(?:(.*):)?80$");
+    private static final Pattern SSL_CERTIFICATE = Pattern.compile("(?<![\\w$])ssl_certificate\\s+([^;\\s]+);");
+    private static final Pattern SSL_CERTIFICATE_KEY = Pattern.compile("(?<![\\w$])ssl_certificate_key\\s+([^;\\s]+);");
 
     /** 맨 바깥 server 블록 하나. start는 "server", end는 닫는 "}" 다음 글자. open은 여는 "{" 다음 글자. */
     record Block(int start, int open, int end, String text) {
@@ -86,6 +88,26 @@ public final class RawHttps {
                     + indent(block.text()) + "}\n");
         }
         return out.toString();
+    }
+
+    /**
+     * 원본을 다시 가져올 때, 관리도구가 이전 원문에 더한 인증 경로와 443 server 블록을 새 원문에도 다시 더한다.
+     * 이전 원문에 넘기기 블록(return 301 https://)이 있었으면 새 원문도 넘기게 한다. 새 원문에 이미 있으면 그대로 둔다.
+     */
+    public static String reapply(String previous, String content) {
+        String out = content;
+        if (ACME_SNIPPET.matcher(previous).find()) {
+            out = withAcmeChallenge(out);
+        }
+        if (hasHttps(previous) && !hasHttps(out)) {
+            String plain = withoutComments(previous);
+            Matcher cert = SSL_CERTIFICATE.matcher(plain);
+            Matcher key = SSL_CERTIFICATE_KEY.matcher(plain);
+            if (cert.find() && key.find()) {
+                out = withHttps(out, cert.group(1), key.group(1), plain.contains("return 301 https://"));
+            }
+        }
+        return out;
     }
 
     /** 이미 HTTPS server 블록이 있는지. */

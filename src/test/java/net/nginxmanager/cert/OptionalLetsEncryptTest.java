@@ -293,5 +293,10 @@ class OptionalLetsEncryptTest extends ConfigRootTest {
         TlsCertificate renewed = certificateRepository.findById(cert.getId()).orElseThrow();
         assertThat(renewed.getCertPath()).isNotEqualTo(cert.getCertPath());
         assertThat(readFile(PATH)).contains("ssl_certificate " + renewed.getCertPath() + ";");
+
+        // 원문에서 443 server 블록을 지우면 HTTPS 켬도 꺼져 더 갱신하지 않는다
+        ConfigFile applied = configFileRepository.findByPath(PATH).orElseThrow();
+        siteService.editRaw(applied.getId(), raw, applied.getVersion(), "ed");
+        assertThat(siteRepository.findById(site.getId()).orElseThrow().isHttpsEnabled()).isFalse();
     }
 }
