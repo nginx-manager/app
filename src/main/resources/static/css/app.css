@@ -290,6 +290,15 @@ summary code { background: none; padding: 0; }
 .log-lines { max-height: 60vh; overflow: auto; white-space: pre; font-size: .8rem; }
 .log-lines mark { background: #fde68a; color: #111827; border-radius: 2px; }
 .title-row a.current { font-weight: 700; color: var(--fg); }
+/* 한 카드 안의 목록을 나누는 탭. 링크라 스크립트 없이도 동작한다 */
+.tabs { display: flex; flex-wrap: wrap; gap: .25rem; margin: -.25rem 0 1rem; border-bottom: 1px solid var(--line); }
+.tabs a { display: inline-flex; align-items: center; gap: .4rem; padding: .5rem .8rem; margin-bottom: -1px; border-bottom: 2px solid transparent; color: var(--muted); font-weight: 500; }
+.tabs a:hover { color: var(--fg); text-decoration: none; }
+.tabs a.current { color: var(--accent); border-bottom-color: var(--accent); }
+.tabs .tab-count { min-width: 1.4rem; padding: 0 .4rem; border-radius: 999px; background: var(--chip); color: var(--fg-soft); font-size: .75rem; line-height: 1.4rem; text-align: center; }
+.tabs .tab-count.bad { background: var(--bad-soft); color: var(--bad); }
+.row-actions { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; }
+button.link.danger { color: var(--bad); }
 .cm-editor { font-size: .85rem; background: var(--field); color: var(--fg); }
 .cm-editor .cm-gutters { background: var(--subtle); border-right-color: var(--line); color: var(--muted); }
 .cm-editor .cm-activeLine, .cm-editor .cm-activeLineGutter { background: var(--row-hover); }

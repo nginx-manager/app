@@ -13,10 +13,23 @@
     <p class="error" th:if="${error}" th:text="${error}">오류</p>
 
     <section class="card">
-        <p class="muted" th:if="${#lists.isEmpty(certificates)}" th:text="#{certs.list.empty}">
+        <p class="muted" th:unless="${hasAny}" th:text="#{certs.list.empty}">
             아직 인증서가 없습니다. 사이트 화면에서 HTTPS를 켜면 Let's Encrypt 인증서를 자동으로 받습니다.
         </p>
-        <table th:unless="${#lists.isEmpty(certificates)}" id="certificates">
+        <nav class="tabs" th:if="${hasAny}" th:attr="aria-label=#{certs.list.title}">
+            <a th:href="@{/certs(tab='issued')}" th:classappend="${tab == 'issued'} ? 'current'"
+               th:attr="aria-current=${tab == 'issued'} ? 'page' : null">
+                <span th:text="#{certs.tab.issued}">발급된 인증서</span>
+                <span class="tab-count" th:text="${issuedCount}">1</span></a>
+            <a th:href="@{/certs(tab='pending')}" th:classappend="${tab == 'pending'} ? 'current'"
+               th:attr="aria-current=${tab == 'pending'} ? 'page' : null" id="tab-pending">
+                <span th:text="#{certs.tab.pending}">발급 대기·실패</span>
+                <span class="tab-count" th:classappend="${pendingCount > 0} ? 'bad'" th:text="${pendingCount}">1</span></a>
+        </nav>
+        <p class="muted small" th:if="${hasAny and #lists.isEmpty(certificates)}"
+           th:text="${tab == 'pending'} ? #{certs.list.pendingEmpty} : #{certs.list.issuedEmpty}">없습니다.</p>
+
+        <table th:if="${tab == 'issued' and !#lists.isEmpty(certificates)}" id="certificates">
             <thead>
             <tr><th th:text="#{certs.list.col.name}">이름</th><th th:text="#{certs.list.col.domains}">도메인</th><th th:text="#{certs.list.col.source}">출처</th><th th:text="#{certs.list.col.status}">상태</th><th th:text="#{certs.list.col.expires}">만료</th><th th:text="#{certs.list.col.nextRenewal}">다음 갱신</th><th th:text="#{certs.list.col.sites}">사용 사이트</th><th></th></tr>
             </thead>
@@ -27,9 +40,8 @@
                 <td><span th:if="${c.source.name() == 'LETS_ENCRYPT'}">Let's Encrypt</span><span th:unless="${c.source.name() == 'LETS_ENCRYPT'}" th:text="#{certs.list.source.upload}">업로드</span></td>
                 <td>
                     <span th:if="${#lists.contains(running, c.id)}" class="badge warn" th:text="#{certs.list.status.issuing}">발급 중</span>
-                    <span th:if="${c.status.name() == 'PENDING' and !#lists.contains(running, c.id)}" class="badge" th:text="#{certs.list.status.pending}">대기</span>
-                    <span th:if="${c.status.name() == 'ACTIVE' and !c.isExpiringSoon(now)}" class="badge ok" th:text="#{certs.list.status.ok}">정상</span>
-                    <span th:if="${c.status.name() == 'ACTIVE' and c.isExpiringSoon(now)}" class="badge warn"
+                    <span th:if="${!c.isExpiringSoon(now)}" class="badge ok" th:text="#{certs.list.status.ok}">정상</span>
+                    <span th:if="${c.isExpiringSoon(now)}" class="badge warn"
                           th:text="#{certs.list.status.daysLeft(${c.daysLeft(now)})}">10일 남음</span>
                     <span th:if="${c.isFailing()}" class="badge bad" th:title="${c.lastError}"
                           th:text="#{certs.list.status.failed(${c.failureCount})}">실패</span>
@@ -45,13 +57,54 @@
                 <td>
                     <form th:if="${currentUser.canEdit() and c.source.name() == 'LETS_ENCRYPT'}"
                           th:action="@{/certs/{id}/renew(id=${c.id})}" method="post" class="inline">
-                        <button type="submit" class="link" th:text="${c.status.name() == 'ACTIVE'} ? #{certs.list.renewNow} : #{certs.list.retry}">지금 갱신</button>
+                        <button type="submit" class="link" th:text="#{certs.list.renewNow}">지금 갱신</button>
                     </form>
                 </td>
             </tr>
             </tbody>
         </table>
-        <p class="hint" th:unless="${#lists.isEmpty(certificates)}" th:text="#{certs.list.renewHint}">Let's Encrypt 인증서는 다음 갱신 시각에 자동으로 갱신됩니다.</p>
+        <p class="hint" th:if="${tab == 'issued' and !#lists.isEmpty(certificates)}" th:text="#{certs.list.renewHint}">Let's Encrypt 인증서는 다음 갱신 시각에 자동으로 갱신됩니다.</p>
+
+        <table th:if="${tab == 'pending' and !#lists.isEmpty(certificates)}" id="pending-certificates">
+            <thead>
+            <tr><th th:text="#{certs.list.col.name}">이름</th><th th:text="#{certs.list.col.domains}">도메인</th><th th:text="#{certs.list.col.source}">출처</th><th th:text="#{certs.list.col.status}">상태</th><th th:text="#{certs.list.col.sites}">사용 사이트</th><th></th></tr>
+            </thead>
+            <tbody>
+            <tr th:each="c : ${certificates}" th:id="'cert-' + ${c.id}">
+                <td th:text="${c.name}">app.local</td>
+                <td class="small" th:text="${c.domains}">app.local</td>
+                <td><span th:if="${c.source.name() == 'LETS_ENCRYPT'}">Let's Encrypt</span><span th:unless="${c.source.name() == 'LETS_ENCRYPT'}" th:text="#{certs.list.source.upload}">업로드</span></td>
+                <td>
+                    <span th:if="${#lists.contains(running, c.id)}" class="badge warn" th:text="#{certs.list.status.issuing}">발급 중</span>
+                    <span th:unless="${#lists.contains(running, c.id)}" class="badge" th:text="#{certs.list.status.pending}">대기</span>
+                    <span th:if="${c.isFailing()}" class="badge bad" th:title="${c.lastError}"
+                          th:text="#{certs.list.status.failed(${c.failureCount})}">실패</span>
+                    <div class="small error" th:if="${c.isFailing()}" th:text="${c.lastError}"></div>
+                    <div class="small muted" th:if="${c.isFailing() and c.retryAfter != null and c.retryAfter.isAfter(now)}"
+                         th:text="#{certs.list.retryAfter(${#temporals.format(c.retryAfter, 'yyyy-MM-dd HH:mm')})}">2026-10-14 12:00 이후 다시 시도합니다</div>
+                </td>
+                <td class="small">
+                    <span th:each="d, s : ${sitesByCert.get(c.id)}" th:text="${d} + (${s.last} ? '' : ', ')">app.local</span>
+                </td>
+                <td>
+                    <div class="row-actions">
+                        <form th:if="${currentUser.canEdit() and c.source.name() == 'LETS_ENCRYPT'}"
+                              th:action="@{/certs/{id}/renew(id=${c.id})}" method="post" class="inline">
+                            <input type="hidden" name="tab" value="pending">
+                            <button type="submit" class="link" th:text="#{certs.list.retry}">다시 시도</button>
+                        </form>
+                        <form th:if="${currentUser.isAdmin() and !deleteBlocked.containsKey(c.id) and !#lists.contains(running, c.id)}"
+                              th:action="@{/certs/{id}/delete(id=${c.id})}" method="post" class="inline"
+                              th:attr="data-confirm=#{certs.list.deleteConfirm(${c.name})}">
+                            <button type="submit" class="link danger" th:text="#{certs.list.delete}">삭제</button>
+                        </form>
+                    </div>
+                    <div class="small muted" th:if="${deleteBlocked.containsKey(c.id)}" th:text="${deleteBlocked.get(c.id)}">사이트가 쓰고 있어 지울 수 없습니다.</div>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+        <p class="hint" th:if="${tab == 'pending' and !#lists.isEmpty(certificates)}" th:text="#{certs.list.pendingHint}">발급하지 못한 인증서는 자동으로 다시 시도합니다.</p>
     </section>
 
     <section class="card" id="issue" th:if="${currentUser.canEdit()}">

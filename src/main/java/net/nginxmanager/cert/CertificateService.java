@@ -157,11 +157,21 @@ public class CertificateService {
         return running.contains(certificateId);
     }
 
+    /** 발급·갱신과 겹치지 않게 인증서를 잡는다. 이미 진행 중이면 false. 지울 때 쓴다. */
+    boolean hold(long certificateId) {
+        return running.add(certificateId);
+    }
+
+    void release(long certificateId) {
+        running.remove(certificateId);
+    }
+
     private Optional<String> run(long id) {
-        Target target = tx.execute(status -> {
-            TlsCertificate cert = load(id);
-            return new Target(cert.getName(), cert.domainList(), cert.getSource(), cert.paths());
-        });
+        Target target = tx.execute(status -> certificateRepository.findById(id).map(this::targetOf).orElse(null));
+        if (target == null) {
+            // 기다리는 동안 지운 인증서
+            return Optional.of("지운 인증서입니다.");
+        }
         if (target.source() != CertificateSource.LETS_ENCRYPT) {
             return Optional.of("업로드한 인증서는 자동으로 갱신하지 않습니다.");
         }
@@ -284,7 +294,7 @@ public class CertificateService {
     }
 
     /** 인증서 디렉터리를 지금 디스크의 설정, 초안, 되돌릴 수 있는 버전 중 어디서든 쓰는지. */
-    private boolean referenced(String directory) {
+    boolean referenced(String directory) {
         return Boolean.TRUE.equals(tx.execute(status -> {
             for (ConfigFile file : configFileRepository.findAllByOrderByPathAsc()) {
                 String disk = store.read(file.getPath());
