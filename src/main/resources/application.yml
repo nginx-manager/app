@@ -18,6 +18,9 @@ nginx-manager:
   cert:
     # 갱신이 필요한 인증서를 찾는 주기
     check-interval: PT6H
+  backup:
+    # 호스트의 nm이 매일 이 시각에 백업한다(015). 대시보드가 켜졌는지만 안다
+    at: ${NGINX_MANAGER_BACKUP_AT:off}
   logs:
     # 이 크기를 넘은 nginx 로그를 .1, .2 …로 밀어내고 keep 개만 남긴다
     max-size-mb: 100

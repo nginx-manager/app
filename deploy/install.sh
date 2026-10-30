@@ -140,6 +140,7 @@ set_env NGINX_MANAGER_IMPORT_ROOTS "$IMPORT_ROOTS"
 umask 022
 mkdir -p data/conf data/logs data/shared data/manager backups
 [ -z "$IMPORT_ROOTS" ] || ./nm import-root sync
+./nm backup-schedule || say "자동 백업 스케줄을 깔지 못했습니다: sudo $DIR/nm backup-schedule"
 
 say "nginx manager v$BUNDLE_VERSION (nginx 이미지 $BUNDLE_NGINX_IMAGE) 를 $DIR 에 깔았습니다"
 if [ "$HTTP_PORT" != 80 ]; then

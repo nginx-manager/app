@@ -50,6 +50,7 @@ curl -fsSL https://github.com/nginx-manager/app/releases/latest/download/install
 | `NGINX_HTTP_PORT`, `NGINX_HTTPS_PORT` | `80`, `443` | 前段に別のプロキシがあり 80/443 を使えないとき |
 | `NGINX_BIND_ADDRESS` | `0.0.0.0` | nginx を特定の IP でのみ公開するとき |
 | `NGINX_MANAGER_BACKUP_KEEP` | `14` | `nm backup` が残すバックアップの数 |
+| `NGINX_MANAGER_BACKUP_AT` | `03:30` | 毎日の自動バックアップ(`nm backup --label auto`)の時刻。`off` で無効。変更後は `sudo nm backup-schedule` |
 | `TZ` | `Asia/Seoul` | サーバーのタイムゾーンが異なるとき |
 | `NGINX_MANAGER_IMPORT_ROOTS` | (空) | `/etc/nginx` 以外の設定ファイルをインポートするとき。直接編集せず `nm import-root add /home` を使います |
 | `SPRING_MAIL_*` | (空) | メール通知を送るときの SMTP サーバー |

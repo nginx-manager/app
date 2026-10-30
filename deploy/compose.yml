@@ -45,6 +45,8 @@ services:
       # 관리 도메인으로 들어온 요청의 원래 주소(HTTPS)를 nginx가 넘긴다
       NGINX_MANAGER_FORWARD_HEADERS: native
       NGINX_MANAGER_IMPORT_ROOTS: ${NGINX_MANAGER_IMPORT_ROOTS:-}
+      # 대시보드가 자동 백업이 켜졌는지 안다(백업은 호스트의 nm이 한다)
+      NGINX_MANAGER_BACKUP_AT: ${NGINX_MANAGER_BACKUP_AT:-off}
       SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-}
       SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
       SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
