@@ -4,7 +4,6 @@ import net.nginxmanager.apply.ApplyService;
 import net.nginxmanager.audit.AuditAction;
 import net.nginxmanager.audit.AuditResult;
 import net.nginxmanager.cert.CertificateUploadService;
-import net.nginxmanager.common.AppVersion;
 import net.nginxmanager.site.SiteForm;
 import net.nginxmanager.site.SiteService;
 import net.nginxmanager.site.SiteType;
@@ -143,7 +142,8 @@ class DashboardTest extends ConfigRootTest {
                 .andExpect(content().string(containsString("<footer class=\"footer\">")))
                 .andExpect(content().string(containsString(">dev</span></a>")))
                 .andExpect(content().string(containsString("class=\"icon icon-github\"")))
-                .andExpect(content().string(containsString("class=\"nav-manual\" href=\"" + AppVersion.MANUAL_URL + "\"")))
+                .andExpect(content().string(containsString("class=\"nav-manual\" href=\"/guide\"")))
+                .andExpect(content().string(containsString("<a href=\"/guide\"><svg")))
                 .andExpect(content().string(containsString(">사용 설명서</span></a>\n</footer>")));
         mvc.perform(get("/login"))
                 .andExpect(status().isOk())

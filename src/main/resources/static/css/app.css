@@ -98,7 +98,7 @@ li { margin: .25rem 0; }
 }
 .nav a.nav-manual:hover { background: rgba(45, 212, 191, .16); border-color: rgba(45, 212, 191, .6); }
 .nav a.nav-manual .icon { color: #2dd4bf; }
-.nav a.nav-manual .icon-external { width: 14px; height: 14px; margin-left: auto; color: var(--side-muted); }
+.nav a.nav-manual.active { background: rgba(45, 212, 191, .2); border-color: #2dd4bf; }
 .langs { display: grid; grid-template-columns: 1fr 1fr; gap: .2rem; padding: .5rem .35rem .75rem; }
 .nav .langs a { width: auto; justify-content: center; padding: .2rem .5rem; border-radius: 6px; font-size: .75rem; color: var(--side-muted); }
 .nav .langs a.active { background: rgba(148, 163, 184, .16); color: #fff; }
@@ -542,3 +542,59 @@ body > footer, .footer { padding: 1.25rem 2rem 2rem; text-align: center; color: 
 .footer a { color: var(--muted); display: inline-flex; align-items: center; gap: .3rem; }
 .footer .icon { width: 14px; height: 14px; }
 .footer .icon-github { fill: currentColor; stroke: none; }
+
+/* 사용 설명서(/guide): 왼쪽 장 목차, 가운데 본문, 넓은 화면에서는 오른쪽에 이 장의 소제목 */
+.page.guide { max-width: 1320px; display: grid; grid-template-columns: 220px minmax(0, 1fr) 200px; gap: 2rem; align-items: start; }
+.guide-toc, .guide-onpage { position: sticky; top: 1.5rem; max-height: calc(100vh - 3rem); overflow-y: auto; font-size: .87rem; }
+.guide-toc summary { list-style: none; margin: 0 0 .5rem; color: var(--muted); font-size: .75rem; font-weight: 600; letter-spacing: .06em; pointer-events: none; }
+.guide-toc summary::-webkit-details-marker { display: none; }
+.guide-toc a { display: block; padding: .38rem .7rem; border-radius: 7px; color: var(--fg-soft); line-height: 1.35; }
+.guide-toc a:hover { background: var(--chip); text-decoration: none; }
+.guide-toc a.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.guide-onpage p { margin: 0 0 .5rem; color: var(--muted); font-size: .75rem; font-weight: 600; letter-spacing: .06em; }
+.guide-onpage a { display: block; padding: .25rem 0 .25rem .75rem; border-left: 2px solid var(--line); color: var(--muted); line-height: 1.35; }
+.guide-onpage a:hover { color: var(--accent); border-left-color: var(--accent); text-decoration: none; }
+.guide-body { min-width: 0; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 2rem 2.5rem; }
+.guide-body p.guide-lang { margin: 0 0 1.25rem; padding: .6rem .9rem; border-radius: 8px; background: var(--subtle); border: 1px solid var(--line); color: var(--muted); font-size: .85rem; }
+.markdown { font-size: .97rem; line-height: 1.75; }
+.markdown > :first-child { margin-top: 0; }
+.markdown h1 { font-size: 1.75rem; margin: 0 0 1.25rem; padding-bottom: .75rem; border-bottom: 1px solid var(--line); }
+.markdown h2 { font-size: 1.3rem; margin: 2.5rem 0 .9rem; padding-bottom: .4rem; border-bottom: 1px solid var(--line); }
+.markdown h3 { font-size: 1.08rem; margin: 1.75rem 0 .6rem; }
+.markdown h1, .markdown h2, .markdown h3 { scroll-margin-top: 1.25rem; }
+.markdown p, .markdown ul, .markdown ol, .markdown table, .markdown pre, .markdown blockquote { margin: 0 0 1rem; }
+.markdown ul, .markdown ol { padding-left: 1.4rem; }
+.markdown li { margin: .2rem 0; }
+.markdown li > p { margin: 0; }
+.markdown img { max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); }
+.markdown p[align=center] { text-align: center; margin: 1.25rem 0 1.5rem; }
+.markdown pre { padding: 1rem 1.1rem; border-radius: 8px; background: #0b1220; color: #e2e8f0; border: 1px solid #1e293b; overflow-x: auto; font-size: .82rem; line-height: 1.6; }
+.markdown pre code { background: none; padding: 0; color: inherit; font-size: inherit; }
+.markdown table { display: block; overflow-x: auto; font-size: .88rem; }
+.markdown th, .markdown td { vertical-align: top; padding: .55rem .75rem; }
+.markdown td { line-height: 1.6; }
+.markdown blockquote { padding: .6rem 1rem; border-left: 3px solid var(--accent); background: var(--accent-soft); border-radius: 0 8px 8px 0; color: var(--fg-soft); }
+.markdown blockquote > :last-child { margin-bottom: 0; }
+.markdown hr { border: 0; border-top: 1px solid var(--line); margin: 2rem 0; }
+.guide-pager { display: flex; gap: 1rem; margin-top: 2.5rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }
+.guide-pager a { flex: 1; display: flex; flex-direction: column; gap: .15rem; padding: .8rem 1rem; border: 1px solid var(--line); border-radius: 8px; }
+.guide-pager a:hover { border-color: var(--accent); text-decoration: none; }
+.guide-pager a span { color: var(--muted); font-size: .78rem; }
+.guide-pager a.next { text-align: right; margin-left: auto; }
+.guide-pager a.prev span::before { content: "← "; }
+.guide-pager a.next span::after { content: " →"; }
+@media (max-width: 1180px) {
+    .page.guide { grid-template-columns: 200px minmax(0, 1fr); }
+    .guide-onpage { display: none; }
+}
+@media (max-width: 860px) {
+    .page.guide { display: block; }
+    .guide-toc { position: static; max-height: none; margin-bottom: 1rem; }
+    .guide-toc details { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: .6rem .75rem; }
+    .guide-toc details:not([open]) summary { margin: 0; }
+    .guide-toc summary { pointer-events: auto; cursor: pointer; font-size: .85rem; color: var(--fg); }
+    .guide-toc summary::after { content: " ▾"; color: var(--muted); }
+    .guide-body { padding: 1.25rem 1.1rem; }
+    .markdown h1 { font-size: 1.4rem; }
+    .guide-pager { flex-direction: column; }
+}

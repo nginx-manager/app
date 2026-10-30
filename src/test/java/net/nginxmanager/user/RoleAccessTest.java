@@ -58,6 +58,8 @@ class RoleAccessTest extends ConfigRootTest {
             "GET,  /logs/1,              VIEWER",
             "POST, /runtime/start,       ADMIN",
             "GET,  /account,             VIEWER",
+            "GET,  /guide,               VIEWER",
+            "GET,  /guide/04-sites,      VIEWER",
             "POST, /account,             VIEWER",
     })
     void routeRequiresRole(String method, String path, Role minimum) throws Exception {

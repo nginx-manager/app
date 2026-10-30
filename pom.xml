@@ -27,6 +27,7 @@
         <htmx.version>2.0.5</htmx.version>
         <acme4j.version>5.1.0</acme4j.version>
         <java-diff-utils.version>4.17</java-diff-utils.version>
+        <commonmark.version>0.30.1</commonmark.version>
         <error-prone.version>2.50.0</error-prone.version>
         <spotless.version>3.10.4</spotless.version>
     </properties>
@@ -90,6 +91,16 @@
             <groupId>io.github.java-diff-utils</groupId>
             <artifactId>java-diff-utils</artifactId>
             <version>${java-diff-utils.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.commonmark</groupId>
+            <artifactId>commonmark</artifactId>
+            <version>${commonmark.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.commonmark</groupId>
+            <artifactId>commonmark-ext-gfm-tables</artifactId>
+            <version>${commonmark.version}</version>
         </dependency>
         <dependency>
             <groupId>org.webjars.npm</groupId>
