@@ -132,6 +132,8 @@ public record SiteForm(
             "(?=.{1,253}$)([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)*[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?";
     private static final String EXTRA_DOMAIN = "(\\*\\.)?" + DOMAIN;
     private static final String STATIC_ROOT = "/[A-Za-z0-9._/-]*";
+    /** PHP-FPM 주소: 호스트:포트 또는 unix:/소켓 경로. */
+    private static final String FASTCGI_TARGET = "([A-Za-z0-9.-]+|\\[[0-9A-Fa-f:]+\\]):[0-9]{1,5}|unix:/[A-Za-z0-9._/-]+";
     private static final String PROXY_TARGET = "https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?(/[A-Za-z0-9._~/-]*)?";
     /** 리디렉션 주소. nginx 변수($)·따옴표·공백이 들어가지 않게 쓸 수 있는 문자를 좁힌다. */
     private static final String REDIRECT_TARGET =
@@ -155,9 +157,14 @@ public record SiteForm(
         return normalized == null || Arrays.stream(normalized.split(" ")).allMatch(d -> d.matches(EXTRA_DOMAIN));
     }
 
+    /** 문서 루트를 쓰는 유형(정적 파일, PHP). */
+    private boolean usesRoot() {
+        return type == SiteType.STATIC || type == SiteType.PHP;
+    }
+
     @AssertTrue(message = "{msg.validation.staticRoot}")
     public boolean isStaticRootValid() {
-        return type != SiteType.STATIC
+        return !usesRoot()
                 || (staticRoot != null && staticRoot.matches(STATIC_ROOT) && !staticRoot.contains(".."));
     }
 
@@ -193,6 +200,23 @@ public record SiteForm(
                 .map(b -> b.scheme() + b.path()).distinct().count() == 1;
     }
 
+    @AssertTrue(message = "{msg.validation.fastcgiTarget}")
+    public boolean isFastcgiTargetValid() {
+        if (type != SiteType.PHP) {
+            return true;
+        }
+        List<String> targets = proxyTargets();
+        if (targets.size() != 1 || !targets.getFirst().matches(FASTCGI_TARGET)) {
+            return false;
+        }
+        String target = targets.getFirst();
+        if (target.startsWith("unix:")) {
+            return !target.contains("..");
+        }
+        int port = Integer.parseInt(target.substring(target.lastIndexOf(':') + 1));
+        return port >= 1 && port <= 65535;
+    }
+
     /** 관리 화면과 상태 확인 포트로 프록시하면 관리 화면이 사이트 포트로 공개된다. */
     @AssertTrue(message = "{msg.validation.proxyNotManager}")
     public boolean isProxyTargetNotManager() {
@@ -209,7 +233,7 @@ public record SiteForm(
 
     @AssertTrue(message = "{msg.validation.staticRootSafe}")
     public boolean isStaticRootSafe() {
-        if (type != SiteType.STATIC || staticRoot == null || !isStaticRootValid()) {
+        if (!usesRoot() || staticRoot == null || !isStaticRootValid()) {
             return true;
         }
         String root = staticRoot.replaceAll("/+$", "");

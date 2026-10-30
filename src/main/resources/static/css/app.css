@@ -158,10 +158,13 @@ form.inline { display: inline; }
 .https-choice .https-uploaded, .https-choice .https-on { margin-top: .6rem; }
 .https-choice:has(input[value="NONE"]:checked) .https-on { display: none; }
 .https-choice:not(:has(input[value="UPLOADED"]:checked)) .https-uploaded { display: none; }
-/* 사이트 폼의 유형 선택: 고른 유형(프록시·정적·리디렉션)에 쓰는 항목만 보인다 */
+/* 사이트 폼의 유형 선택: 고른 유형(프록시·정적·리디렉션·PHP)에 쓰는 항목만 보인다. 두 유형이 같이 쓰는 칸은 type-proxy-php처럼 둘 다 적는다 */
 form:has(input[name=type]:checked):not(:has(input[name=type][value=PROXY]:checked)) .type-proxy,
 form:has(input[name=type]:checked):not(:has(input[name=type][value=STATIC]:checked)) .type-static,
-form:has(input[name=type]:checked):not(:has(input[name=type][value=REDIRECT]:checked)) .type-redirect { display: none; }
+form:has(input[name=type]:checked):not(:has(input[name=type][value=REDIRECT]:checked)) .type-redirect,
+form:has(input[name=type]:checked):not(:has(input[name=type][value=PHP]:checked)) .type-php,
+form:has(input[name=type]:checked):not(:has(input[name=type][value=PROXY]:checked)):not(:has(input[name=type][value=PHP]:checked)) .type-proxy-php,
+form:has(input[name=type]:checked):not(:has(input[name=type][value=STATIC]:checked)):not(:has(input[name=type][value=PHP]:checked)) .type-static-php { display: none; }
 /* 폼과 나란히 두는 미리보기는 긴 폼을 내려도 화면에 남는다 */
 .columns > .card.sticky { position: sticky; top: 1rem; }
 .columns > .card.sticky pre.code { max-height: calc(100vh - 8rem); overflow: auto; }

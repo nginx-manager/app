@@ -31,6 +31,9 @@ public class SiteImporter {
     private static final Pattern DOMAIN = Pattern.compile(SiteForm.DOMAIN);
     private static final Pattern DURATION = Pattern.compile("(\\d+)(ms|s|m|h)?");
     private static final Pattern SIZE = Pattern.compile("(\\d+)([kKmMgG])?");
+    /** PHP-FPM으로 넘기는 location의 흔한 모양(016). */
+    private static final Set<List<String>> PHP_LOCATIONS = Set.of(List.of("~", "\\.php$"), List.of("~*", "\\.php$"),
+            List.of("~", "\\.php(/|$)"), List.of("~", "[^/]\\.php(/|$)"));
 
     private final Validator validator;
 
@@ -144,6 +147,8 @@ public class SiteImporter {
         Integer port;
         String root;
         String proxyPass;
+        /** location ~ \\.php$ 의 fastcgi_pass(016). */
+        String fastcgiPass;
         Integer redirectCode;
         String redirectTarget;
         boolean websocket;
@@ -182,6 +187,8 @@ public class SiteImporter {
                         }
                         if (d.args().equals(List.of("/")) && d.isBlock()) {
                             rootLocation = d;
+                        } else if (PHP_LOCATIONS.contains(d.args()) && d.isBlock()) {
+                            php(d);
                         } else {
                             unsupported("import.reason.location", String.join(" ", d.args()));
                         }
@@ -218,6 +225,10 @@ public class SiteImporter {
             }
             int kinds = (proxyPass != null ? 1 : 0) + (redirectTarget != null ? 1 : 0)
                     + (proxyPass == null && redirectTarget == null && root != null ? 1 : 0);
+            if (fastcgiPass != null && (proxyPass != null || redirectTarget != null || root == null)) {
+                unsupported("import.reason.mixedContent", null);
+                return null;
+            }
             if (proxyPass != null && redirectTarget != null) {
                 unsupported("import.reason.mixedContent", null);
                 return null;
@@ -226,8 +237,10 @@ public class SiteImporter {
                 unsupported("import.reason.noContent", null);
                 return null;
             }
-            SiteType type = proxyPass != null ? SiteType.PROXY : redirectTarget != null ? SiteType.REDIRECT : SiteType.STATIC;
-            if (type != SiteType.STATIC && root != null) {
+            SiteType type = proxyPass != null ? SiteType.PROXY : redirectTarget != null ? SiteType.REDIRECT
+                    : fastcgiPass != null ? SiteType.PHP : SiteType.STATIC;
+            boolean usesRoot = type == SiteType.STATIC || type == SiteType.PHP;
+            if (!usesRoot && root != null) {
                 change("import.change.root", root);
             }
             if (type != SiteType.STATIC && autoindex) {
@@ -243,6 +256,8 @@ public class SiteImporter {
                 }
                 targets = resolved.targets();
                 balancing = resolved.balancing();
+            } else if (type == SiteType.PHP && upstreams.isEmpty()) {
+                targets = fastcgiPass;
             } else if (!upstreams.isEmpty()) {
                 unsupported("import.reason.directive", "upstream");
                 return null;
@@ -261,10 +276,32 @@ public class SiteImporter {
                     null, null, null, null, null, null, autoindex);
             String extra = String.join(" ", domains.subList(1, domains.size()));
             return new SiteForm(primary, extra, type, port == null ? 80 : port,
-                    type == SiteType.STATIC ? root : null, targets, null, false, true, null,
+                    usesRoot ? root : null, targets, null, false, true, null,
                     type == SiteType.PROXY && websocket, type == SiteType.PROXY ? connectTimeout : null,
                     type == SiteType.PROXY ? readTimeout : null, balancing, redirect,
                     type == SiteType.REDIRECT ? redirectCode : null, keepPath, options);
+        }
+
+        /** PHP-FPM으로 넘기는 location(016). 폼이 만드는 것과 같은 역할의 지시어만 받는다. */
+        private void php(Directive location) {
+            for (Directive d : location.block()) {
+                switch (d.name()) {
+                    case "fastcgi_pass" -> fastcgiPass = d.arg(0);
+                    case "include" -> {
+                        if (!List.of("fastcgi_params", "fastcgi.conf", "snippets/fastcgi-php.conf").contains(d.arg(0))) {
+                            unsupported("import.reason.directive", "include " + d.arg(0));
+                        }
+                    }
+                    case "fastcgi_param" -> {
+                        if (!"SCRIPT_FILENAME".equals(d.arg(0)) && !"HTTPS".equals(d.arg(0))) {
+                            change("import.change.fastcgiParam", d.arg(0));
+                        }
+                    }
+                    case "fastcgi_index", "fastcgi_split_path_info", "try_files", "fastcgi_read_timeout" -> {
+                    }
+                    default -> unsupported("import.reason.directive", d.name());
+                }
+            }
         }
 
         /** server와 location / 에 함께 둘 수 있는 지시어. */
@@ -277,7 +314,8 @@ public class SiteImporter {
                     root = stripSlash(d.arg(0));
                 }
                 case "index" -> {
-                    if (!d.args().equals(List.of("index.html"))) {
+                    if (!d.args().equals(List.of("index.html")) && !d.args().equals(List.of("index.php", "index.html"))
+                            && !d.args().equals(List.of("index.php"))) {
                         change("import.change.index", String.join(" ", d.args()));
                     }
                 }

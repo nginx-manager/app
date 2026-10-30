@@ -124,9 +124,11 @@ public class Site extends BaseEntity {
         this.extraDomains = form.extraDomainsNormalized();
         this.type = form.type();
         this.listenHttpPort = form.listenHttpPort();
-        this.staticRoot = form.type() == SiteType.STATIC ? form.staticRoot() : null;
+        boolean php = form.type() == SiteType.PHP;
+        this.staticRoot = form.type() == SiteType.STATIC || php ? form.staticRoot() : null;
         boolean proxy = form.type() == SiteType.PROXY;
-        this.proxyTarget = proxy ? form.proxyTargetNormalized() : null;
+        // PHP 사이트는 PHP-FPM 주소를 proxyTarget에 둔다(016)
+        this.proxyTarget = proxy || php ? form.proxyTargetNormalized() : null;
         this.proxyWebsocket = proxy && form.proxyWebsocket();
         this.proxyConnectTimeout = proxy ? form.proxyConnectTimeout() : null;
         this.proxyReadTimeout = proxy ? form.proxyReadTimeout() : null;

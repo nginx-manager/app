@@ -3,13 +3,18 @@
 <body>
 <!-- 사이트 추가·수정 폼이 함께 쓰는 리버스 프록시 항목. th:object 안에서 넣는다 -->
 <th:block th:fragment="fields(editable)">
+<!-- PHP 사이트는 같은 칸에 PHP-FPM 주소를 적는다(016). 같은 이름의 입력이 둘이면 값이 합쳐지므로 칸은 하나다 -->
+<label class="type-fields type-proxy-php">
+    <span class="type-fields type-proxy" th:text="#{sites.proxy.target}">프록시 대상 (리버스 프록시, 여러 개면 줄마다 하나)</span>
+    <span class="type-fields type-php" th:text="#{sites.php.target}">PHP-FPM 주소</span>
+    <span class="hint type-fields type-proxy" th:text="#{sites.proxy.target.hint}">요청을 넘길 백엔드 주소입니다.</span>
+    <span class="hint type-fields type-php" th:text="#{sites.php.target.hint}">.php 요청을 넘길 PHP-FPM 주소입니다.</span>
+    <textarea th:field="*{proxyTarget}" rows="3" placeholder="http://127.0.0.1:8080" th:disabled="${!editable}"></textarea>
+    <span class="error" th:errors="*{proxyTargetValid}"></span>
+    <span class="error" th:errors="*{proxyTargetNotManager}"></span>
+    <span class="error" th:errors="*{fastcgiTargetValid}"></span>
+</label>
 <div class="type-fields type-proxy">
-    <label><th:block th:text="#{sites.proxy.target}">프록시 대상 (리버스 프록시, 여러 개면 줄마다 하나)</th:block>
-        <span class="hint" th:text="#{sites.proxy.target.hint}">요청을 넘길 백엔드 주소입니다.</span>
-        <textarea th:field="*{proxyTarget}" rows="3" placeholder="http://127.0.0.1:8080" th:disabled="${!editable}"></textarea>
-        <span class="error" th:errors="*{proxyTargetValid}"></span>
-        <span class="error" th:errors="*{proxyTargetNotManager}"></span>
-    </label>
     <details class="proxy-options">
         <summary th:text="#{sites.proxy.options}">프록시 세부 설정 (웹소켓, 타임아웃, 부하 분산)</summary>
         <label class="inline"><input type="checkbox" th:field="*{proxyWebsocket}" th:disabled="${!editable}"> <th:block th:text="#{sites.proxy.websocket}">웹소켓 연결 넘기기</th:block></label>
