@@ -32,7 +32,11 @@ class SiteModuleOptionsTest {
                 (Integer) values.get("rateBurst"), (Integer) values.get("connLimit"),
                 (String) values.get("realIpFrom"), (SiteOptions.RealIpHeader) values.get("realIpHeader"),
                 (Integer) values.get("cacheMinutes"), (Boolean) values.get("autoindex"),
-                (String) values.get("authRequestUrl"), (String) values.get("authSignInUrl"));
+                (String) values.get("authRequestUrl"), (String) values.get("authSignInUrl"),
+                (String) values.get("pathRoutes"), (String) values.get("backupTargets"),
+                (Integer) values.get("upstreamMaxFails"), (Integer) values.get("upstreamFailTimeout"),
+                (Integer) values.get("upstreamKeepalive"), (Boolean) values.get("maintenance"),
+                (String) values.get("maintenanceMessage"), (String) values.get("maintenanceAllowFrom"));
     }
 
     static SiteOptions options(Object... keyValues) {

@@ -50,6 +50,7 @@
                 <td class="badges">
                     <span th:if="${s.enabled}" class="badge ok" th:text="#{sites.status.enabled}">활성</span>
                     <span th:unless="${s.enabled}" class="badge" th:text="#{sites.status.disabled}">비활성</span>
+                    <span th:if="${s.maintenance()}" class="badge warn" th:text="#{sites.status.maintenance}">점검 중</span>
                     <span th:if="${s.deleting}" class="badge bad" th:text="#{sites.status.deleting}">삭제 대기</span>
                     <span th:if="${s.pending and !s.deleting}" class="badge warn" th:text="#{sites.status.pending}">적용 대기</span>
                 </td>

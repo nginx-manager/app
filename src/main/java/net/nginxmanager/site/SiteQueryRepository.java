@@ -20,7 +20,13 @@ public class SiteQueryRepository {
     public record SiteRow(Long id, String primaryDomain, String extraDomains, SiteType type, int listenHttpPort,
                           boolean enabled, boolean pending, Long configFileId, boolean httpsEnabled,
                           String proxyTarget, String staticRoot, String redirectTarget,
-                          Long ownerId, String ownerName, Boolean ownerEnabled, boolean deleting) {
+                          Long ownerId, String ownerName, Boolean ownerEnabled, boolean deleting,
+                          String options) {
+
+        /** 점검 모드를 켠 사이트인지(021). 옵션은 Properties 형식으로 저장된다. */
+        public boolean maintenance() {
+            return options != null && options.lines().anyMatch("maintenance=true"::equals);
+        }
 
         /** 목록의 대상 칸. 프록시는 백엔드 주소들, 정적은 문서 루트, 리디렉션은 보낼 주소, PHP는 PHP-FPM 주소. 원문 편집 사이트는 비운다 */
         public List<String> targets() {
@@ -77,7 +83,7 @@ public class SiteQueryRepository {
                         site.enabled,
                         configFile.draftContent.isNotNull().or(configFile.draftDelete.isTrue()),
                         configFile.id, site.httpsEnabled, site.proxyTarget, site.staticRoot, site.redirectTarget,
-                        site.ownerId, user.username, user.enabled, configFile.draftDelete))
+                        site.ownerId, user.username, user.enabled, configFile.draftDelete, site.options))
                 .from(site)
                 .join(site.configFile, configFile)
                 .leftJoin(user).on(user.id.eq(site.ownerId))

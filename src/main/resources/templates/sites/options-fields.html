@@ -23,6 +23,31 @@
 
 <!-- 유형과 관계없이 켜는 모듈 설정(접근 제한, 속도 제한, 성능·보안) -->
 <th:block th:fragment="options(editable)">
+    <details class="site-options" th:open="${form?.options?.maintenance == true}">
+        <summary th:text="#{sites.opt.maintenance.title}">점검 모드</summary>
+        <label class="inline"><input type="checkbox" th:field="*{options.maintenance}" value="true" th:disabled="${!editable}"> <th:block th:text="#{sites.opt.maintenance}">점검 모드 켜기</th:block></label>
+        <p class="hint" th:text="#{sites.opt.maintenance.hint}">설명</p>
+        <label><th:block th:text="#{sites.opt.maintenanceMessage}">안내 문구</th:block>
+            <textarea th:field="*{options.maintenanceMessage}" rows="2" maxlength="500" th:placeholder="#{sites.opt.maintenanceMessage.placeholder}" th:disabled="${!editable}"></textarea>
+            <span class="error" th:errors="*{options.maintenanceMessageValid}"></span>
+        </label>
+        <label><th:block th:text="#{sites.opt.maintenanceAllowFrom}">점검 중에도 들어올 수 있는 주소</th:block>
+            <span class="hint" th:text="#{sites.opt.maintenanceAllowFrom.hint}">설명</span>
+            <textarea th:field="*{options.maintenanceAllowFrom}" rows="2" placeholder="203.0.113.7" th:disabled="${!editable}"></textarea>
+            <span class="error" th:errors="*{options.maintenanceAllowFromValid}"></span>
+        </label>
+    </details>
+
+    <details class="site-options type-fields type-proxy-static" th:open="${form?.options?.pathRoutes != null}">
+        <summary th:text="#{sites.opt.routes.title}">경로별 라우팅 (location)</summary>
+        <label><th:block th:text="#{sites.opt.pathRoutes}">경로와 대상</th:block>
+            <span class="hint" th:text="#{sites.opt.pathRoutes.hint}">설명</span>
+            <textarea th:field="*{options.pathRoutes}" rows="3" placeholder="/api/ http://127.0.0.1:8080/&#10;/files/ /srv/uploads" spellcheck="false" th:disabled="${!editable}"></textarea>
+            <span class="error" th:errors="*{options.pathRoutesValid}"></span>
+            <span class="error" th:errors="*{pathRoutesAllowed}"></span>
+        </label>
+    </details>
+
     <details class="site-options" th:open="${form?.options?.accessRestricted() == true or form?.options?.authEnabled() == true or form?.options?.authRequestEnabled() == true}">
         <summary th:text="#{sites.opt.access.title}">접근 제한 (IP, 비밀번호)</summary>
         <p class="hint" th:text="#{sites.opt.access.intro}">설명</p>

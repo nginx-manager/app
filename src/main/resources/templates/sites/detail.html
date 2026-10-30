@@ -8,6 +8,7 @@
         <h1 th:text="${site.primaryDomain}">app.local</h1>
         <span th:if="${site.enabled}" class="badge ok" th:text="#{sites.status.enabled}">활성</span>
         <span th:unless="${site.enabled}" class="badge" th:text="#{sites.status.disabled}">비활성</span>
+        <span th:if="${site.options.maintenance}" class="badge warn" th:text="#{sites.status.maintenance}">점검 중</span>
         <span th:if="${site.configFile.draftDelete}" class="badge bad" th:text="#{sites.status.deleting}">삭제 대기</span>
         <span th:if="${site.configFile.hasPendingChange() and !site.configFile.draftDelete}" class="badge warn" th:text="#{sites.status.pending}">적용 대기</span>
         <a class="button secondary" th:href="@{/logs/{id}(id=${site.id})}" th:text="#{sites.detail.viewLogs}">로그 보기</a>

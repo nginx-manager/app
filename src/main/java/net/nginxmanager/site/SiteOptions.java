@@ -31,6 +31,14 @@ import java.util.regex.Pattern;
  * @param authRequestUrl 요청마다 먼저 물어볼 인증 서버 주소(auth_request, 018). 2xx면 통과, 401·403이면 거절.
  *                       oauth2-proxy, Authelia, Authentik 같은 SSO 앞단에 쓴다
  * @param authSignInUrl 인증 서버가 401을 주면 보낼 로그인 주소. 원래 주소를 rd 파라미터로 붙인다. 비우면 401을 그대로 준다
+ * @param pathRoutes 경로별 라우팅(019). 줄마다 "경로 대상". 대상은 프록시 주소나 디렉터리. 리버스 프록시·정적 사이트에서만 쓴다
+ * @param backupTargets 주 업스트림이 모두 실패할 때만 받는 백업 업스트림(020, upstream의 backup). 리버스 프록시에서만 쓴다
+ * @param upstreamMaxFails 이 횟수만큼 실패하면 업스트림을 잠시 뺀다(max_fails). null이면 nginx 기본값 1
+ * @param upstreamFailTimeout 실패를 세는 시간이자 빼 두는 시간(초, fail_timeout). null이면 nginx 기본값 10초
+ * @param upstreamKeepalive 업스트림 연결을 재사용할 유휴 연결 수(keepalive). null이면 요청마다 새로 연결한다
+ * @param maintenance 점검 모드(021). 사이트 내용 요청에 503과 안내 페이지를 준다
+ * @param maintenanceMessage 점검 안내 문구. 비우면 기본 문구
+ * @param maintenanceAllowFrom 점검 중에도 평소처럼 들어올 수 있는 주소(작업자)
  */
 public record SiteOptions(
         Boolean gzip,
@@ -55,10 +63,26 @@ public record SiteOptions(
         Integer cacheMinutes,
         Boolean autoindex,
         String authRequestUrl,
-        String authSignInUrl) {
+        String authSignInUrl,
+        String pathRoutes,
+        String backupTargets,
+        @Min(value = 1, message = "{msg.validation.upstreamMaxFails}") @Max(value = 100, message = "{msg.validation.upstreamMaxFails}")
+        Integer upstreamMaxFails,
+        @Min(value = 1, message = "{msg.validation.upstreamFailTimeout}") @Max(value = 3600, message = "{msg.validation.upstreamFailTimeout}")
+        Integer upstreamFailTimeout,
+        @Min(value = 1, message = "{msg.validation.upstreamKeepalive}") @Max(value = 1024, message = "{msg.validation.upstreamKeepalive}")
+        Integer upstreamKeepalive,
+        Boolean maintenance,
+        String maintenanceMessage,
+        String maintenanceAllowFrom) {
 
     public static final SiteOptions DEFAULTS = new SiteOptions(false, false, false, false, null, null, null, null,
-            false, null, null, null, null, null, null, false, null, null);
+            false, null, null, null, null, null, null, false, null, null, null, null, null, null, null, false, null,
+            null);
+
+    /** 점검 안내 문구에 쓸 수 없는 문자: nginx 문자열('…')과 변수를 깨뜨린다. */
+    private static final Pattern MAINTENANCE_FORBIDDEN = Pattern.compile("['\\\\${}]");
+    static final int MAX_MAINTENANCE_MESSAGE = 500;
 
     /** 인증 서버 주소. nginx 변수($)·따옴표·공백이 들어가지 않게 쓸 수 있는 문자를 좁힌다. */
     private static final Pattern AUTH_REQUEST_URL = Pattern.compile(
@@ -89,6 +113,46 @@ public record SiteOptions(
         authRequestUrl = authRequestUrl == null || authRequestUrl.isBlank() ? null : authRequestUrl.strip();
         authSignInUrl = authRequestUrl == null || authSignInUrl == null || authSignInUrl.isBlank()
                 ? null : authSignInUrl.strip();
+        pathRoutes = pathRoutes == null || pathRoutes.isBlank() ? null : pathRoutes;
+        backupTargets = backupTargets == null || backupTargets.isBlank() ? null : backupTargets;
+        maintenance = maintenance != null && maintenance;
+        maintenanceMessage = maintenanceMessage == null || maintenanceMessage.isBlank() ? null : maintenanceMessage.strip();
+    }
+
+    public List<String> maintenanceAllowList() {
+        return addresses(maintenanceAllowFrom);
+    }
+
+    @AssertTrue(message = "{msg.validation.addresses}")
+    public boolean isMaintenanceAllowFromValid() {
+        return validAddresses(maintenanceAllowFrom);
+    }
+
+    @AssertTrue(message = "{msg.validation.maintenanceMessage}")
+    public boolean isMaintenanceMessageValid() {
+        return maintenanceMessage == null || (maintenanceMessage.length() <= MAX_MAINTENANCE_MESSAGE
+                && !MAINTENANCE_FORBIDDEN.matcher(maintenanceMessage).find());
+    }
+
+    /** 백업 업스트림 주소 목록(020, 중복 제거, 순서 유지). */
+    public List<String> backupTargetList() {
+        return addresses(backupTargets);
+    }
+
+    /** upstream 블록이 있어야 쓸 수 있는 설정(백업, 장애 판정, keepalive)을 하나라도 쓰는지(020). */
+    public boolean upstreamTuned() {
+        return backupTargets != null || upstreamMaxFails != null || upstreamFailTimeout != null
+                || upstreamKeepalive != null;
+    }
+
+    /** 경로별 라우팅(019). 적은 순서대로. */
+    public List<PathRoute> pathRouteList() {
+        return PathRoute.parse(pathRoutes);
+    }
+
+    @AssertTrue(message = "{msg.validation.pathRoutes}")
+    public boolean isPathRoutesValid() {
+        return PathRoute.valid(pathRoutes);
     }
 
     /** 외부 인증 서버(auth_request)를 쓰는지(018). */
@@ -153,7 +217,9 @@ public record SiteOptions(
         return new SiteOptions(gzip, securityHeaders, hsts, http3, maxBodySizeMb, normalized(allowFrom),
                 normalized(denyFrom), names.isEmpty() ? null : String.join("\n", names), satisfyAny, rateLimit,
                 rateLimit == null ? null : rateBurst, connLimit, normalized(realIpFrom), realIpHeader, cacheMinutes,
-                autoindex, authRequestUrl, authSignInUrl);
+                autoindex, authRequestUrl, authSignInUrl, PathRoute.normalized(pathRoutes), normalized(backupTargets),
+                upstreamMaxFails, upstreamFailTimeout, upstreamKeepalive, maintenance, maintenanceMessage,
+                normalized(maintenanceAllowFrom));
     }
 
     /** 사이트 유형에서 쓰지 않는 설정은 버린다(유형을 바꿨을 때 남은 값이 설정에 섞이지 않게). */
@@ -161,7 +227,10 @@ public record SiteOptions(
         return new SiteOptions(gzip, securityHeaders, hsts, http3, maxBodySizeMb, allowFrom, denyFrom, authUsers,
                 satisfyAny, rateLimit, rateBurst, connLimit, realIpFrom, realIpHeader,
                 type == SiteType.PROXY ? cacheMinutes : null, type == SiteType.STATIC && autoindex, authRequestUrl,
-                authSignInUrl);
+                authSignInUrl, type == SiteType.PROXY || type == SiteType.STATIC ? pathRoutes : null,
+                type == SiteType.PROXY ? backupTargets : null, type == SiteType.PROXY ? upstreamMaxFails : null,
+                type == SiteType.PROXY ? upstreamFailTimeout : null, type == SiteType.PROXY ? upstreamKeepalive : null,
+                maintenance, maintenanceMessage, maintenanceAllowFrom);
     }
 
     @AssertTrue(message = "{msg.validation.addresses}")
@@ -278,6 +347,14 @@ public record SiteOptions(
         put(values, prefix + "autoindex", autoindex);
         put(values, prefix + "authRequestUrl", authRequestUrl);
         put(values, prefix + "authSignInUrl", authSignInUrl);
+        put(values, prefix + "pathRoutes", pathRoutes);
+        put(values, prefix + "backupTargets", backupTargets);
+        put(values, prefix + "upstreamMaxFails", upstreamMaxFails);
+        put(values, prefix + "upstreamFailTimeout", upstreamFailTimeout);
+        put(values, prefix + "upstreamKeepalive", upstreamKeepalive);
+        put(values, prefix + "maintenance", maintenance);
+        put(values, prefix + "maintenanceMessage", maintenanceMessage);
+        put(values, prefix + "maintenanceAllowFrom", maintenanceAllowFrom);
     }
 
     static SiteOptions load(Properties values, String prefix) {
@@ -290,7 +367,11 @@ public record SiteOptions(
                 integer(values, prefix + "rateBurst"), integer(values, prefix + "connLimit"),
                 values.getProperty(prefix + "realIpFrom"), header == null ? null : RealIpHeader.valueOf(header),
                 integer(values, prefix + "cacheMinutes"), bool(values, prefix + "autoindex"),
-                values.getProperty(prefix + "authRequestUrl"), values.getProperty(prefix + "authSignInUrl"));
+                values.getProperty(prefix + "authRequestUrl"), values.getProperty(prefix + "authSignInUrl"),
+                values.getProperty(prefix + "pathRoutes"), values.getProperty(prefix + "backupTargets"),
+                integer(values, prefix + "upstreamMaxFails"), integer(values, prefix + "upstreamFailTimeout"),
+                integer(values, prefix + "upstreamKeepalive"), bool(values, prefix + "maintenance"),
+                values.getProperty(prefix + "maintenanceMessage"), values.getProperty(prefix + "maintenanceAllowFrom"));
     }
 
     private static void put(Properties values, String key, Object value) {

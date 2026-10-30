@@ -272,6 +272,53 @@ class ImageModuleOptionsTest {
         assertThat(result).isEqualTo("502 2");
     }
 
+    @Test
+    @DisplayName("경로별 라우팅(019): /api/는 다른 백엔드로, /files/는 디렉터리로, 나머지는 사이트 내용으로")
+    void pathRoutesSendPathsToOtherTargets() throws Exception {
+        // 백엔드 대신 Basic 인증이 걸린 사이트를 8087 포트에 둔다. 401이 오면 그 백엔드로 넘어간 것이다
+        createStatic("routes-backend.local", "/etc/nginx/html", Map.of("listenHttpPort", "8087",
+                "options.authUsers", "kim:correct-pass-1"));
+        createStatic("routes.local", "/etc/nginx/html", Map.of(
+                "options.pathRoutes", "/api/ http://127.0.0.1:8087/\n/files/ /etc/nginx/html"));
+        apply("path routes");
+
+        awaitStatus("routes.local", "200");
+        assertThat(status("routes.local", "http://127.0.0.1/api/")).isEqualTo("401");
+        assertThat(status("routes.local", "-u", "kim:correct-pass-1", "http://127.0.0.1/api/")).isEqualTo("200");
+        assertThat(status("routes.local", "http://127.0.0.1/files/index.html")).isEqualTo("200");
+        assertThat(status("routes.local", "http://127.0.0.1/files/missing.html")).isEqualTo("404");
+    }
+
+    @Test
+    @DisplayName("백업 업스트림(020): 주 업스트림이 죽어 있으면 백업이 답하고, keepalive 설정도 nginx가 받아들인다")
+    void backupUpstreamAnswersWhenThePrimaryIsDown() throws Exception {
+        // 백업 대신 8088 포트의 정적 사이트를 둔다. 주 업스트림(8099)에는 아무것도 없다
+        createStatic("backup-origin.local", "/etc/nginx/html", Map.of("listenHttpPort", "8088"));
+        create("failover.local", "PROXY", Map.of("proxyTarget", "http://127.0.0.1:8099",
+                "options.backupTargets", "http://127.0.0.1:8088", "options.upstreamMaxFails", "1",
+                "options.upstreamFailTimeout", "30", "options.upstreamKeepalive", "8"));
+        apply("backup upstream");
+
+        awaitStatus("failover.local", "200");
+        assertThat(status("failover.local")).isEqualTo("200");
+    }
+
+    @Test
+    @DisplayName("점검 모드(021): 방문자는 503과 안내 문구, 허용 주소는 평소대로")
+    void maintenanceModeShowsThePageExceptToAllowedAddresses() throws Exception {
+        createStatic("closed.local", "/etc/nginx/html", Map.of("options.maintenance", "true",
+                "options.maintenanceMessage", "DB 작업 중입니다", "options.maintenanceAllowFrom", "10.99.0.0/16"));
+        createStatic("worker.local", "/etc/nginx/html", Map.of("options.maintenance", "true",
+                "options.maintenanceAllowFrom", "127.0.0.1"));
+        apply("maintenance");
+
+        awaitStatus("closed.local", "503");
+        String body = stack.nginxExec("curl", "--noproxy", "*", "-s", "-H", "Host: closed.local",
+                "http://127.0.0.1/").getStdout();
+        assertThat(body).contains("DB 작업 중입니다");
+        assertThat(status("worker.local")).isEqualTo("200");
+    }
+
     private static void createStatic(String domain, String root, Map<String, String> fields) throws Exception {
         Map<String, String> all = new LinkedHashMap<>(Map.of("staticRoot", root));
         all.putAll(fields);

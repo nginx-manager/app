@@ -81,7 +81,9 @@ public class SiteConfigRenderer {
     }
 
     private static void content(StringBuilder out, String primaryDomain, SiteForm form, boolean https) {
+        maintenanceLocation(out, form.options());
         authRequestLocations(out, form.options());
+        pathRouteLocations(out, primaryDomain, form, https);
         switch (form.type()) {
             case PROXY -> proxyLocation(out, primaryDomain, form, https);
             case STATIC -> {
@@ -105,6 +107,81 @@ public class SiteConfigRenderer {
             }
             case PHP -> phpLocations(out, primaryDomain, form, https);
             case RAW -> throw new IllegalArgumentException("raw sites are not rendered");
+        }
+    }
+
+    static final String MAINTENANCE_LOCATION = "@nginx_manager_maintenance";
+    static final String DEFAULT_MAINTENANCE_MESSAGE =
+            "서비스 점검 중입니다. 잠시 후 다시 접속해 주세요.\nWe are down for maintenance. Please try again soon.";
+
+    /**
+     * 점검 모드(021): 내용 location이 돌려준 503을 안내 페이지로 바꾼다. 문구는 HTML로 이스케이프하고,
+     * nginx 문자열을 깨는 문자(', \, $, {, })는 검증에서 막는다.
+     */
+    private static void maintenanceLocation(StringBuilder out, SiteOptions options) {
+        if (!options.maintenance()) {
+            return;
+        }
+        String message = options.maintenanceMessage() == null ? DEFAULT_MAINTENANCE_MESSAGE : options.maintenanceMessage();
+        String html = "<!doctype html><html><head><meta charset=\"utf-8\">"
+                + "<meta name=\"viewport\" content=\"width=device-width\"><title>503</title></head>"
+                + "<body style=\"font-family:sans-serif;max-width:40rem;margin:4rem auto;padding:0 1rem\"><p>"
+                + String.join("<br>", message.lines().map(SiteConfigRenderer::escapeHtml).toList())
+                + "</p></body></html>";
+        out.append("    error_page 503 ").append(MAINTENANCE_LOCATION).append(";\n")
+                .append("    location ").append(MAINTENANCE_LOCATION).append(" {\n")
+                .append("        default_type text/html;\n")
+                .append("        add_header Retry-After 600 always;\n")
+                .append("        add_header Cache-Control no-store always;\n")
+                .append("        return 503 '").append(html).append("';\n")
+                .append("    }\n\n");
+    }
+
+    private static String escapeHtml(String value) {
+        return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
+    }
+
+    private static String maintenanceVariable(String primaryDomain) {
+        return "$nm_maintenance_" + identifier(primaryDomain);
+    }
+
+    /**
+     * 경로별 라우팅(019): 경로마다 location ^~ 를 두고 프록시 주소나 디렉터리로 보낸다.
+     * 기본 location과 같은 접근·속도·헤더 옵션을 걸어 경로로 빠져나가는 구멍이 없게 한다.
+     */
+    private static void pathRouteLocations(StringBuilder out, String primaryDomain, SiteForm form, boolean https) {
+        if (form.type() != SiteType.PROXY && form.type() != SiteType.STATIC || form.grpc()) {
+            return;
+        }
+        for (PathRoute route : form.options().pathRouteList()) {
+            out.append("    location ^~ ").append(route.locationPath()).append(" {\n");
+            locationOptions(out, primaryDomain, form, https);
+            if (!route.proxy()) {
+                out.append("        alias ").append(route.aliasDirectory()).append(";\n")
+                        .append("    }\n\n");
+                continue;
+            }
+            out.append("        proxy_pass ").append(route.target()).append(";\n")
+                    .append("        proxy_http_version 1.1;\n")
+                    .append("        proxy_set_header Host $host;\n")
+                    .append("        proxy_set_header X-Real-IP $remote_addr;\n")
+                    .append("        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n")
+                    .append("        proxy_set_header X-Forwarded-Proto $scheme;\n");
+            if (route.target().startsWith("https://")) {
+                out.append("        proxy_ssl_server_name on;\n");
+            }
+            if (form.type() == SiteType.PROXY && form.proxyWebsocket()) {
+                out.append("        proxy_set_header Upgrade $http_upgrade;\n")
+                        .append("        proxy_set_header Connection ").append(connectionVariable(primaryDomain)).append(";\n");
+            }
+            if (form.type() == SiteType.PROXY && form.proxyConnectTimeout() != null) {
+                out.append("        proxy_connect_timeout ").append(form.proxyConnectTimeout()).append("s;\n");
+            }
+            if (form.type() == SiteType.PROXY && form.proxyReadTimeout() != null) {
+                out.append("        proxy_read_timeout ").append(form.proxyReadTimeout()).append("s;\n")
+                        .append("        proxy_send_timeout ").append(form.proxyReadTimeout()).append("s;\n");
+            }
+            out.append("    }\n\n");
         }
     }
 
@@ -175,6 +252,16 @@ public class SiteConfigRenderer {
         SiteOptions options = form.options();
         String id = identifier(primaryDomain);
         boolean any = false;
+        if (options.maintenance()) {
+            // 점검 중 막을 요청(1)과 작업자 주소(0)를 나눈다(021)
+            out.append("geo ").append(maintenanceVariable(primaryDomain)).append(" {\n")
+                    .append("    default 1;\n");
+            for (String address : options.maintenanceAllowList()) {
+                out.append("    ").append(address).append(" 0;\n");
+            }
+            out.append("}\n");
+            any = true;
+        }
         if (options.rateLimit() != null) {
             out.append("limit_req_zone $binary_remote_addr zone=req_").append(id).append(":10m rate=")
                     .append(options.rateLimit()).append("r/s;\n");
@@ -242,6 +329,12 @@ public class SiteConfigRenderer {
         String id = identifier(primaryDomain);
         boolean access = options.accessRestricted();
         boolean auth = options.authEnabled() || options.authRequestEnabled();
+        if (options.maintenance()) {
+            // rewrite 단계라 접근 제한·인증보다 먼저 503을 준다. if 안에서 return만 쓰는 것은 안전한 형태다
+            out.append("        if (").append(maintenanceVariable(primaryDomain)).append(") {\n")
+                    .append("            return 503;\n")
+                    .append("        }\n");
+        }
         if (access && auth) {
             out.append("        satisfy ").append(options.satisfyAny() ? "any" : "all").append(";\n");
         }
@@ -308,22 +401,34 @@ public class SiteConfigRenderer {
      */
     private static void proxyPrelude(StringBuilder out, String primaryDomain, SiteForm form) {
         List<String> targets = form.proxyTargets();
-        if (targets.size() > 1) {
+        SiteOptions options = form.options();
+        if (form.usesUpstream()) {
             out.append("upstream ").append(upstreamName(primaryDomain)).append(" {\n");
             String directive = form.proxyLoadBalancing().directive();
             if (directive != null) {
                 out.append("    ").append(directive).append(";\n");
             }
+            String failure = (options.upstreamMaxFails() == null ? "" : " max_fails=" + options.upstreamMaxFails())
+                    + (options.upstreamFailTimeout() == null ? "" : " fail_timeout=" + options.upstreamFailTimeout() + "s");
             for (String target : targets) {
-                out.append("    server ").append(ProxyBackend.parse(target).server()).append(";\n");
+                out.append("    server ").append(ProxyBackend.parse(target).server()).append(failure).append(";\n");
+            }
+            for (String target : options.backupTargetList()) {
+                out.append("    server ").append(ProxyBackend.parse(target).server()).append(failure)
+                        .append(" backup;\n");
+            }
+            if (options.upstreamKeepalive() != null) {
+                // 분산 방식(least_conn 등) 뒤에 와야 한다
+                out.append("    keepalive ").append(options.upstreamKeepalive()).append(";\n");
             }
             out.append("}\n\n");
         }
         if (form.proxyWebsocket() && !form.grpc()) {
-            // 업그레이드 요청만 Connection: upgrade로 넘기고, 나머지는 보통 요청처럼 close로 넘긴다
+            // 업그레이드 요청만 Connection: upgrade로 넘기고, 나머지는 보통 요청처럼 close로 넘긴다.
+            // keepalive를 쓰면 연결을 다시 쓰도록 빈 값으로 넘긴다(020)
             out.append("map $http_upgrade ").append(connectionVariable(primaryDomain)).append(" {\n")
                     .append("    default upgrade;\n")
-                    .append("    ''      close;\n")
+                    .append(options.upstreamKeepalive() == null ? "    ''      close;\n" : "    ''      \"\";\n")
                     .append("}\n\n");
         }
     }
@@ -331,7 +436,7 @@ public class SiteConfigRenderer {
     private static void proxyLocation(StringBuilder out, String primaryDomain, SiteForm form, boolean https) {
         List<String> targets = form.proxyTargets();
         String pass;
-        if (targets.size() > 1) {
+        if (form.usesUpstream()) {
             ProxyBackend first = ProxyBackend.parse(targets.getFirst());
             pass = first.scheme() + "://" + upstreamName(primaryDomain) + first.path();
         } else {
@@ -353,13 +458,16 @@ public class SiteConfigRenderer {
             // https 백엔드에 SNI를 보낸다(가상 호스트·CDN 백엔드는 SNI가 없으면 핸드셰이크를 거절한다).
             // upstream으로 묶으면 보낼 이름이 upstream 이름이 되므로 첫 백엔드의 호스트 이름을 쓴다
             out.append("        proxy_ssl_server_name on;\n");
-            if (targets.size() > 1) {
+            if (form.usesUpstream()) {
                 out.append("        proxy_ssl_name ").append(ProxyBackend.parse(targets.getFirst()).host()).append(";\n");
             }
         }
         if (form.proxyWebsocket()) {
             out.append("        proxy_set_header Upgrade $http_upgrade;\n")
                     .append("        proxy_set_header Connection ").append(connectionVariable(primaryDomain)).append(";\n");
+        } else if (form.options().upstreamKeepalive() != null) {
+            // keepalive 연결을 다시 쓰려면 Connection: close를 보내지 않아야 한다(020)
+            out.append("        proxy_set_header Connection \"\";\n");
         }
         if (form.proxyConnectTimeout() != null) {
             out.append("        proxy_connect_timeout ").append(form.proxyConnectTimeout()).append("s;\n");
@@ -383,7 +491,7 @@ public class SiteConfigRenderer {
                 .append("        grpc_set_header X-Forwarded-Proto $scheme;\n");
         if (pass.startsWith("grpcs://")) {
             out.append("        grpc_ssl_server_name on;\n");
-            if (targets.size() > 1) {
+            if (form.usesUpstream()) {
                 out.append("        grpc_ssl_name ").append(ProxyBackend.parse(targets.getFirst()).host()).append(";\n");
             }
         }
