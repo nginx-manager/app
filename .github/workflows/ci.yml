@@ -49,3 +49,13 @@ jobs:
           wait $nginx
       - name: Image tests
         run: mvn -B -Pimage-test test -Dimage.name=nginx-manager/app:ci -Dnginx.image.name=nginx-manager/nginx:ci
+      # 설치 묶음: 설치 → manager만 업그레이드(nginx 무중단) → 실패 되돌림 → nginx 이미지 업그레이드 → 백업·복원(008)
+      - name: Install bundle smoke test
+        run: |
+          for v in 0.0.1 0.0.2; do
+            docker tag nginx-manager/app:ci ghcr.io/nginx-manager/app:$v
+            docker tag nginx-manager/nginx:ci ghcr.io/nginx-manager/nginx:$v-nginx-ci
+          done
+          printf 'FROM nginx-manager/app:ci\nENTRYPOINT ["false"]\n' | docker build -q -t ghcr.io/nginx-manager/app:0.0.3 -
+          OLD=0.0.1 NEW=0.0.2 BROKEN=0.0.3 OLD_NGINX=0.0.1-nginx-ci NEW_NGINX=0.0.2-nginx-ci NM_WAIT_TIMEOUT=240 \
+            sh deploy/test/smoke.sh

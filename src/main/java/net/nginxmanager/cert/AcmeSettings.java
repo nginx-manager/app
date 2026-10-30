@@ -27,6 +27,13 @@ public class AcmeSettings extends BaseEntity {
         this.contactEmail = contactEmail == null || contactEmail.isBlank() ? null : contactEmail.trim();
     }
 
+    /** 화면에서 이메일을 정하지 않았으면 설치 설정(.env)의 이메일을 쓴다. */
+    public void useContactEmailIfMissing(String email) {
+        if (contactEmail == null && email != null && !email.isBlank()) {
+            contactEmail = email.trim();
+        }
+    }
+
     public AcmeEnvironment getEnvironment() {
         return environment;
     }

@@ -20,4 +20,5 @@
 
 ## 업그레이드할 때
 
-- 설정·볼륨·환경 변수에서 손볼 것이 있으면 씁니다. 없으면 이 절을 지웁니다.
+- `nm upgrade`로 manager만 올리면 되는지, nginx 이미지도 함께 올려야 하는지(`nm upgrade --nginx`) 씁니다. 에이전트 API 판(`AgentNginxRuntime.PROTOCOL`)을 바꾼 릴리스는 `MIN_AGENT_PROTOCOL`로 이전 nginx 이미지도 계속 쓸 수 있는지 확인하고, 그렇지 않으면 "nginx도 함께 올려야 함"을 적습니다.
+- `.env`·설치 묶음·환경 변수에서 손볼 것이 있으면 씁니다. 없으면 이 절을 지웁니다.

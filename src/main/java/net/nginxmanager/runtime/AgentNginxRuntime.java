@@ -27,6 +27,11 @@ public class AgentNginxRuntime implements NginxRuntime {
 
     /** 에이전트 API 판. 에이전트(agent/server.go)의 Protocol과 같아야 한다. */
     public static final int PROTOCOL = 1;
+    /**
+     * 함께 쓸 수 있는 가장 오래된 에이전트 API 판. 에이전트 API를 바꿀 때는 이전 판도 말할 수 있게 해서
+     * manager를 먼저 올리고 nginx 이미지는 나중에 올릴 수 있게 한다(008 FR-809).
+     */
+    public static final int MIN_AGENT_PROTOCOL = 1;
 
     static final String HEADER_PROTOCOL = "X-Nginx-Manager-Protocol";
     static final String HEADER_VERSION = "X-Nginx-Manager-Version";
@@ -40,6 +45,7 @@ public class AgentNginxRuntime implements NginxRuntime {
 
     private volatile String token;
     private volatile AgentInfo agent = AgentInfo.unknown();
+    private volatile String nginxVersion;
 
     public AgentNginxRuntime(NginxRuntimeProperties properties, JsonMapper json, String appVersion) {
         this.properties = properties;
@@ -67,8 +73,21 @@ public class AgentNginxRuntime implements NginxRuntime {
             version = NginxOutputParser.parseVersion(output);
             modules = NginxOutputParser.parseModules(output);
         }
+        if (version != null) {
+            nginxVersion = version;
+        }
         Long pid = pid(body);
         return new RuntimeStatus(pid == null ? State.STOPPED : State.RUNNING, version, modules, pid);
+    }
+
+    /** 이 관리도구가 말할 수 있는 에이전트 API 판인지. */
+    public static boolean supports(int agentProtocol) {
+        return agentProtocol >= MIN_AGENT_PROTOCOL && agentProtocol <= PROTOCOL;
+    }
+
+    @Override
+    public String nginxVersion() {
+        return nginxVersion;
     }
 
     @Override

@@ -102,6 +102,15 @@
                 <dd th:text="${status.masterPid} ?: '-'">1</dd>
                 <dt th:text="#{dashboard.facts.sites}">사이트</dt>
                 <dd><a th:href="@{/sites}" th:text="#{dashboard.facts.siteCount(${'' + dashboard.enabledSiteCount}, ${'' + dashboard.siteCount})}">3 / 4</a></dd>
+                <th:block th:if="${currentUser.isAdmin() and adminDomain.state.name() != 'DISABLED'}">
+                    <dt th:text="#{dashboard.facts.adminDomain}">관리 화면 도메인</dt>
+                    <dd id="admin-domain">
+                        <a th:if="${adminDomain.state.name() == 'ACTIVE'}" th:href="'https://' + ${adminDomain.domain}" th:text="${adminDomain.domain}">nm.example.com</a>
+                        <span th:unless="${adminDomain.state.name() == 'ACTIVE'}" th:text="${adminDomain.domain}">nm.example.com</span>
+                        <span class="small muted" th:text="#{|dashboard.adminDomain.${adminDomain.state.name()}|}">(HTTPS)</span>
+                        <div class="small muted" th:if="${adminDomain.detail != null}" th:text="${adminDomain.detail}">오류</div>
+                    </dd>
+                </th:block>
                 <th:block th:if="${currentUser.isAdmin()}">
                     <dt th:text="#{dashboard.facts.dbSize}">DB 크기</dt>
                     <dd th:text="${#numbers.formatDecimal(dashboard.databaseBytes / 1048576.0, 1, 1)} + ' MB'">1.2 MB</dd>

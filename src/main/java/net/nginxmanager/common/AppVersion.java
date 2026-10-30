@@ -10,6 +10,7 @@ import java.util.regex.Pattern;
 @Component
 public class AppVersion {
 
+    static final String REPOSITORY_URL = "https://github.com/nginx-manager/app";
     static final String RELEASE_NOTES_BASE = "https://github.com/nginx-manager/app/blob/main/docs/releases/";
 
     private static final Pattern RELEASE = Pattern.compile("v?\\d+\\.\\d+\\.\\d+");
@@ -37,6 +38,11 @@ public class AppVersion {
 
     static String label(String version) {
         return isDevelopment(version) ? "dev" : "v" + strip(version);
+    }
+
+    /** 로그인 화면의 GitHub 링크. */
+    public String repositoryUrl() {
+        return REPOSITORY_URL;
     }
 
     /** 정식 릴리스(1.0.0)는 그 버전의 노트로, 개발 빌드나 시험 태그(1.1.0-rc1)는 릴리스 목록으로 보낸다. */

@@ -21,14 +21,23 @@
 
 ## 실행
 
-[docker/docker-compose.yml](docker/docker-compose.yml)을 받아 띄웁니다. 컨테이너 두 개와 볼륨, 에이전트 토큰이 모두 들어 있어 따로 정할 것은 없습니다.
+서버에는 릴리스에 첨부된 설치 묶음을 씁니다. 명령 한 줄로 `/opt/nginx-manager`에 깔고 띄웁니다(Docker와 Compose v2 필요).
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/nginx-manager/app/main/docker/docker-compose.yml
-docker compose up -d
+curl -fsSL https://github.com/nginx-manager/app/releases/latest/download/install.sh | sudo sh -s -- \
+    --admin-domain nm.example.com --email ops@example.com
 ```
 
-`http://<호스트>:9000`에 접속하면 최초 관리자 계정을 만드는 화면이 나옵니다. 관리 화면은 인터넷에 그대로 열지 말고 사내망·VPN에서 쓰거나 HTTPS 프록시 뒤에 두세요([보안 점검](docs/security.md)).
+- 관리 화면은 기본으로 서버 안(`http://127.0.0.1:9000`)에서만 열립니다. `--admin-domain`(또는 `.env`의 `NGINX_MANAGER_ADMIN_DOMAIN`)을 주면 함께 든 nginx가 그 도메인으로 Let's Encrypt 인증서를 받아 HTTPS로만 관리 화면을 엽니다(80은 443으로 넘김).
+- 포트·도메인·버전은 설치 디렉터리의 `.env`에서 바꿉니다. 데이터는 `data/` 아래에 있습니다.
+- 운영은 `nm` 명령으로 합니다: `nm status`, `nm upgrade`(manager만 올려 nginx는 끊기지 않음), `nm upgrade --nginx`, `nm backup`, `nm restore`, `nm migrate`(v1.1 이전 설치 옮기기).
+- 자세한 내용은 사용 설명서 [1. 설치와 실행](src/main/resources/guide/ko/01-install.md)에 있습니다. 묶음의 원본은 [deploy/](deploy/)입니다.
+
+개발·시험에는 저장소의 [docker/docker-compose.yml](docker/docker-compose.yml)을 씁니다(이름 붙은 볼륨, 관리 화면을 모든 주소에 엶).
+
+```bash
+NGINX_MANAGER_VERSION=1.1.0 docker compose -f docker/docker-compose.yml up -d
+```
 
 | 컨테이너 | 이미지 | 하는 일 |
 |----------|--------|---------|
@@ -77,18 +86,17 @@ Let's Encrypt는 HTTP-01 방식으로 인증하므로 도메인이 nginx 컨테�
 
 ## 업그레이드와 되돌리기
 
-두 이미지는 **같은 버전**으로 맞춥니다. compose 파일은 `NGINX_MANAGER_VERSION` 하나로 두 이미지의 태그를 함께 정합니다(기본 `latest`).
+manager와 nginx 이미지는 따로 올립니다. `.env`의 `MANAGER_VERSION`과 `NGINX_IMAGE`가 두 이미지의 태그입니다.
 
 ```bash
-NGINX_MANAGER_VERSION=1.0.0 docker compose pull
-NGINX_MANAGER_VERSION=1.0.0 docker compose up -d
+sudo /opt/nginx-manager/nm upgrade           # manager만. nginx는 계속 트래픽을 받는다
+sudo /opt/nginx-manager/nm upgrade --nginx   # nginx 이미지도. 새 nginx로 설정을 검사한 뒤 바꾼다(몇 초 재시작)
 ```
 
-- 관리 화면만 바꾸면 nginx는 끊기지 않습니다(`docker compose up -d manager`).
-- 버전이 다르거나 에이전트에 연결할 수 없으면 모든 화면 위에 경고가 뜹니다. 관리도구와 에이전트가 서로 알아들을 수 없는 판이면 에이전트가 요청을 거절하고 화면이 그 사실을 알립니다.
-- nginx 이미지 태그는 `<관리도구 버전>-nginx<nginx 버전>`(예: `1.0.0-nginx1.31.6`), `<관리도구 버전>`, `latest`입니다. nginx 새 릴리스가 나오면 nginx 이미지만 자동으로 다시 빌드·테스트·게시되고, 이전 태그는 그대로 남습니다.
-- 새 nginx 이미지는 시작할 때 nginx를 띄우기 전에 볼륨의 설정을 검증합니다. 새 nginx가 설정을 받아들이지 않으면 nginx는 띄우지 않고 에이전트만 뜹니다. 관리 화면이 이를 알아채 대시보드에 문제의 파일·줄과 이전/현재 버전을 보여 줍니다.
-- 고치는 방법은 둘입니다. 화면에서 설정을 고쳐 적용한 뒤 대시보드의 "nginx 시작"을 누르거나, nginx 컨테이너를 이전 태그로 다시 띄웁니다(볼륨은 그대로 씁니다).
+- `nm upgrade`는 올리기 전에 백업하고, 새 manager가 healthy가 되지 않으면 이전 버전과 업그레이드 전 DB로 되돌립니다(DB 변경은 앞으로만 가므로).
+- 두 컨테이너의 릴리스 버전이 달라도 정상입니다. 에이전트 API 판이 맞지 않을 때만 경고가 뜨고 nginx도 함께 올리라고 알립니다. 에이전트 API를 바꿀 때는 이전 판도 받게 해서 manager를 먼저 올릴 수 있게 합니다(`AgentNginxRuntime.MIN_AGENT_PROTOCOL`).
+- nginx 이미지 태그는 `<관리도구 버전>-nginx<nginx 버전>`(예: `1.2.0-nginx1.31.8`), `<관리도구 버전>`, `latest`입니다. nginx 새 릴리스가 나오면 nginx 이미지만 자동으로 다시 빌드·테스트·게시되고, 그 릴리스의 설치 묶음도 새 nginx 태그로 바뀝니다. 이전 태그는 그대로 남습니다.
+- 새 nginx 이미지는 시작할 때 nginx를 띄우기 전에 볼륨의 설정을 검증합니다. 받아들이지 않으면 nginx는 띄우지 않고 에이전트만 뜨며, 대시보드에 문제의 파일·줄과 이전/현재 버전을 보여 줍니다.
 - 버전이 바뀌면 대시보드와 감사 로그에 남습니다.
 
 설정 자체를 되돌릴 때는 이력 화면에서 원하는 버전의 "되돌리기"를 씁니다.

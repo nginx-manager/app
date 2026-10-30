@@ -12,15 +12,16 @@
     <p class="warning" th:if="${site != null and site.type.name() != 'RAW'}" th:text="#{files.edit.formSiteWarning}">
         폼으로 만든 사이트의 파일입니다. 여기서 저장하면 이 사이트는 원문 편집 전용으로 바뀌고, 폼으로 다시 고칠 수 없습니다.
     </p>
+    <p class="notice" th:if="${managed}" th:text="#{files.edit.managed}">관리 화면 도메인 설정입니다. 관리도구가 .env로 만들어 유지하므로 여기서 고칠 수 없습니다.</p>
     <section class="card">
-        <p class="hint" th:if="${currentUser.canEdit()}" th:text="#{files.edit.help}">저장하면 초안으로만 남고 서버의 파일은 그대로입니다. 적용 화면에서 검증 후 적용해야 반영되며, 그 전에는 초안을 버릴 수도 있습니다.</p>
+        <p class="hint" th:if="${currentUser.canEdit() and !managed}" th:text="#{files.edit.help}">저장하면 초안으로만 남고 서버의 파일은 그대로입니다. 적용 화면에서 검증 후 적용해야 반영되며, 그 전에는 초안을 버릴 수도 있습니다.</p>
         <form th:action="@{/files/{id}(id=${file.id})}" method="post">
             <input type="hidden" name="version" th:value="${file.version}">
             <textarea name="content" class="editor" spellcheck="false" th:text="${content}"
-                      th:readonly="${!currentUser.canEdit()}"></textarea>
-            <button type="submit" th:if="${currentUser.canEdit()}" th:text="#{files.edit.submit}">초안 저장</button>
+                      th:readonly="${!currentUser.canEdit() or managed}"></textarea>
+            <button type="submit" th:if="${currentUser.canEdit() and !managed}" th:text="#{files.edit.submit}">초안 저장</button>
         </form>
-        <form th:if="${currentUser.canEdit() and deletable}" th:action="@{/files/{id}/delete(id=${file.id})}" method="post">
+        <form th:if="${currentUser.canEdit() and deletable and !managed}" th:action="@{/files/{id}/delete(id=${file.id})}" method="post">
             <input type="hidden" name="version" th:value="${file.version}">
             <button type="submit" class="secondary" th:text="#{files.edit.delete}">이 파일 지우기 (초안)</button>
             <p class="hint" th:text="#{files.edit.delete.hint}">설명</p>

@@ -34,7 +34,11 @@
 
 ## 운영할 때 알아 둘 것
 
-- 관리 화면(9000)은 HTTP로 뜬다. 인터넷에 그대로 열지 말고 사내망·VPN에서 쓰거나 HTTPS 프록시 뒤에 둔다. HTTPS 뒤에 두면 `SERVER_SERVLET_SESSION_COOKIE_SECURE=true`로 세션 쿠키를 HTTPS 전용으로 만든다.
+- 관리 화면(9000)은 HTTP로 뜬다. 설치 묶음(v1.2.0, 008)은 9000을 `127.0.0.1`에만 열고, 인터넷에서는 관리 도메인(`NGINX_MANAGER_ADMIN_DOMAIN`)으로만 들어오게 한다. 관리 도메인 설정은 Let's Encrypt 인증서를 받기 전에는 관리 화면을 열지 않고(503), 받은 뒤에는 HTTP를 HTTPS로 넘기며 HSTS를 붙인다. 관리 화면은 nginx가 넘긴 `X-Forwarded-Proto`(사설망 주소의 프록시만 믿는다)로 HTTPS 요청을 알아보고 그 요청의 세션 쿠키에 `Secure`를 붙인다. `NGINX_MANAGER_ADMIN_ALLOW`로 접속 주소를 nginx 단계에서 좁힐 수 있다.
+- 관리 도메인 설정 파일(`conf.d/sites/_nginx-manager-admin.conf`)은 관리도구만 쓴다. 원문 편집기의 저장·삭제는 403이고, 같은 도메인으로 사이트를 만들 수 없다. 사이트 폼·스트림의 `manager:9000` 차단 규칙은 그대로다.
+- 직접 compose로 띄워 HTTPS 프록시 뒤에 두면 `SERVER_SERVLET_SESSION_COOKIE_SECURE=true`로 세션 쿠키를 HTTPS 전용으로 만든다.
+- `.env`(SMTP 비밀번호 등)와 `nm backup`의 백업 파일(개인 키, DB 포함)은 권한 600으로 만든다. 백업 파일을 서버 밖으로 옮길 때도 같은 수준으로 보관한다.
+- 업그레이드·백업은 호스트의 `nm`이 Docker로 한다. 관리도구 컨테이너에는 여전히 Docker 소켓을 주지 않는다.
 - 스트림 화면은 관리용 포트(80, 443, 7070, 8081, 9000)로 받거나, 에이전트·관리 화면 주소로 넘기는 설정을 거절한다. 원문 편집기는 `certs/`, `htpasswd/` 아래에 새 파일을 만들지 못하고 `nginx.conf`, `mime.types`는 지우지 못한다.
 - 알림 웹훅은 관리자가 정한 URL로 서버가 요청을 보낸다(내부망 주소도 가능). 관리자 계정을 신뢰할 수 있는 사람에게만 준다.
 - 화면에 인라인 이벤트 처리기(`onchange`)가 있어 Content-Security-Policy는 아직 걸지 않았다. 기본 보안 헤더(X-Frame-Options, X-Content-Type-Options 등)는 Spring Security 기본값을 쓴다.
