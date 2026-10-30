@@ -30,6 +30,19 @@ public class StreamConfigRenderer {
                 .append("    listen ").append(form.listenPort()).append(form.protocol() == StreamProtocol.UDP ? " udp" : "")
                 .append(";\n")
                 .append("    proxy_pass ").append(upstream).append(";\n");
+        // 접근 제한(025): 사이트와 같은 순서. 막을 주소가 먼저 걸린다
+        for (String address : form.denyList()) {
+            out.append("    deny ").append(address).append(";\n");
+        }
+        for (String address : form.allowList()) {
+            out.append("    allow ").append(address).append(";\n");
+        }
+        if (!form.allowList().isEmpty()) {
+            out.append("    deny all;\n");
+        }
+        if (form.proxyProtocol()) {
+            out.append("    proxy_protocol on;\n");
+        }
         if (form.connectTimeout() != null) {
             out.append("    proxy_connect_timeout ").append(form.connectTimeout()).append("s;\n");
         }

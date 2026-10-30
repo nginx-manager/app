@@ -42,6 +42,8 @@ import java.util.regex.Pattern;
  * @param responseHeaders 응답에 붙일 헤더(022). 줄마다 "이름: 값"
  * @param requestHeaders 백엔드로 보낼 헤더(022). 줄마다 "이름: 값". 리버스 프록시에서만 쓴다
  * @param redirectToPrimary 추가 도메인으로 온 요청을 대표 도메인으로 301 보낸다(023)
+ * @param backendErrorPage nginx가 백엔드 장애로 502·504를 낼 때 안내 페이지를 보여 준다(026). 리버스 프록시·PHP에서만 쓴다
+ * @param backendErrorMessage 백엔드 장애 안내 문구. 비우면 기본 문구
  */
 public record SiteOptions(
         Boolean gzip,
@@ -80,11 +82,13 @@ public record SiteOptions(
         String maintenanceAllowFrom,
         String responseHeaders,
         String requestHeaders,
-        Boolean redirectToPrimary) {
+        Boolean redirectToPrimary,
+        Boolean backendErrorPage,
+        String backendErrorMessage) {
 
     public static final SiteOptions DEFAULTS = new SiteOptions(false, false, false, false, null, null, null, null,
             false, null, null, null, null, null, null, false, null, null, null, null, null, null, null, false, null,
-            null, null, null, false);
+            null, null, null, false, false, null);
 
     /** 점검 안내 문구에 쓸 수 없는 문자: nginx 문자열('…')과 변수를 깨뜨린다. */
     private static final Pattern MAINTENANCE_FORBIDDEN = Pattern.compile("['\\\\${}]");
@@ -126,6 +130,8 @@ public record SiteOptions(
         responseHeaders = responseHeaders == null || responseHeaders.isBlank() ? null : responseHeaders;
         requestHeaders = requestHeaders == null || requestHeaders.isBlank() ? null : requestHeaders;
         redirectToPrimary = redirectToPrimary != null && redirectToPrimary;
+        backendErrorPage = backendErrorPage != null && backendErrorPage;
+        backendErrorMessage = backendErrorMessage == null || backendErrorMessage.isBlank() ? null : backendErrorMessage.strip();
     }
 
     public List<CustomHeader> responseHeaderList() {
@@ -157,8 +163,18 @@ public record SiteOptions(
 
     @AssertTrue(message = "{msg.validation.maintenanceMessage}")
     public boolean isMaintenanceMessageValid() {
-        return maintenanceMessage == null || (maintenanceMessage.length() <= MAX_MAINTENANCE_MESSAGE
-                && !MAINTENANCE_FORBIDDEN.matcher(maintenanceMessage).find());
+        return validNotice(maintenanceMessage);
+    }
+
+    @AssertTrue(message = "{msg.validation.backendErrorMessage}")
+    public boolean isBackendErrorMessageValid() {
+        return validNotice(backendErrorMessage);
+    }
+
+    /** 안내 페이지 문구(점검 모드, 백엔드 장애): nginx 문자열('…')에 넣으므로 그 문자열을 깨는 문자를 막는다. */
+    private static boolean validNotice(String message) {
+        return message == null || (message.length() <= MAX_MAINTENANCE_MESSAGE
+                && !MAINTENANCE_FORBIDDEN.matcher(message).find());
     }
 
     /** 백업 업스트림 주소 목록(020, 중복 제거, 순서 유지). */
@@ -247,7 +263,7 @@ public record SiteOptions(
                 autoindex, authRequestUrl, authSignInUrl, PathRoute.normalized(pathRoutes), normalized(backupTargets),
                 upstreamMaxFails, upstreamFailTimeout, upstreamKeepalive, maintenance, maintenanceMessage,
                 normalized(maintenanceAllowFrom), CustomHeader.normalized(responseHeaders),
-                CustomHeader.normalized(requestHeaders), redirectToPrimary);
+                CustomHeader.normalized(requestHeaders), redirectToPrimary, backendErrorPage, backendErrorMessage);
     }
 
     /** 비밀번호 보호 사용자를 뺀 값(024, 사이트 복제). 비밀번호는 해시로만 남아 옮길 수 없다. */
@@ -267,7 +283,9 @@ public record SiteOptions(
                 type == SiteType.PROXY ? backupTargets : null, type == SiteType.PROXY ? upstreamMaxFails : null,
                 type == SiteType.PROXY ? upstreamFailTimeout : null, type == SiteType.PROXY ? upstreamKeepalive : null,
                 maintenance, maintenanceMessage, maintenanceAllowFrom, responseHeaders,
-                type == SiteType.PROXY ? requestHeaders : null, redirectToPrimary);
+                type == SiteType.PROXY ? requestHeaders : null, redirectToPrimary,
+                (type == SiteType.PROXY || type == SiteType.PHP) && backendErrorPage,
+                type == SiteType.PROXY || type == SiteType.PHP ? backendErrorMessage : null);
     }
 
     @AssertTrue(message = "{msg.validation.addresses}")
@@ -311,7 +329,7 @@ public record SiteOptions(
         return list.size() <= MAX_ADDRESSES && list.stream().allMatch(SiteOptions::isAddress);
     }
 
-    static boolean isAddress(String value) {
+    public static boolean isAddress(String value) {
         return IPV4.matcher(value).matches() || isIpv6(value);
     }
 
@@ -352,7 +370,7 @@ public record SiteOptions(
         return compressed < 0 ? groups == 8 : groups <= 7;
     }
 
-    static List<String> addresses(String value) {
+    public static List<String> addresses(String value) {
         if (value == null || value.isBlank()) {
             return List.of();
         }
@@ -395,6 +413,8 @@ public record SiteOptions(
         put(values, prefix + "responseHeaders", responseHeaders);
         put(values, prefix + "requestHeaders", requestHeaders);
         put(values, prefix + "redirectToPrimary", redirectToPrimary);
+        put(values, prefix + "backendErrorPage", backendErrorPage);
+        put(values, prefix + "backendErrorMessage", backendErrorMessage);
     }
 
     static SiteOptions load(Properties values, String prefix) {
@@ -413,7 +433,8 @@ public record SiteOptions(
                 integer(values, prefix + "upstreamKeepalive"), bool(values, prefix + "maintenance"),
                 values.getProperty(prefix + "maintenanceMessage"), values.getProperty(prefix + "maintenanceAllowFrom"),
                 values.getProperty(prefix + "responseHeaders"), values.getProperty(prefix + "requestHeaders"),
-                bool(values, prefix + "redirectToPrimary"));
+                bool(values, prefix + "redirectToPrimary"), bool(values, prefix + "backendErrorPage"),
+                values.getProperty(prefix + "backendErrorMessage"));
     }
 
     private static void put(Properties values, String key, Object value) {

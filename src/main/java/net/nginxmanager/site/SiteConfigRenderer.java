@@ -121,6 +121,7 @@ public class SiteConfigRenderer {
 
     private static void content(StringBuilder out, String primaryDomain, SiteForm form, boolean https) {
         maintenanceLocation(out, form.options());
+        backendErrorLocation(out, form);
         authRequestLocations(out, form.options());
         pathRouteLocations(out, primaryDomain, form, https);
         switch (form.type()) {
@@ -162,17 +163,42 @@ public class SiteConfigRenderer {
             return;
         }
         String message = options.maintenanceMessage() == null ? DEFAULT_MAINTENANCE_MESSAGE : options.maintenanceMessage();
+        noticeLocation(out, "503", MAINTENANCE_LOCATION, 600, 503, message);
+    }
+
+    static final String BACKEND_DOWN_LOCATION = "@nginx_manager_backend_down";
+    static final String DEFAULT_BACKEND_ERROR_MESSAGE =
+            "일시적으로 서비스에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.\n"
+                    + "The service is temporarily unavailable. Please try again shortly.";
+
+    /**
+     * 백엔드 장애 안내(026): nginx가 백엔드에 닿지 못하거나 시간이 지나 낸 502·504를 안내 페이지로 바꾼다.
+     * proxy_intercept_errors는 켜지 않으므로 백엔드가 직접 돌려준 오류 응답은 그대로 간다.
+     */
+    private static void backendErrorLocation(StringBuilder out, SiteForm form) {
+        SiteOptions options = form.options();
+        if (!options.backendErrorPage() || !(form.type() == SiteType.PROXY && !form.grpc() || form.type() == SiteType.PHP)) {
+            return;
+        }
+        String message = options.backendErrorMessage() == null ? DEFAULT_BACKEND_ERROR_MESSAGE
+                : options.backendErrorMessage();
+        noticeLocation(out, "502 504", BACKEND_DOWN_LOCATION, 30, 502, message);
+    }
+
+    /** 안내 HTML을 돌려주는 named location. 문구는 HTML로 이스케이프하고, nginx 문자열을 깨는 문자는 검증에서 막는다. */
+    private static void noticeLocation(StringBuilder out, String codes, String location, int retryAfter, int status,
+                                       String message) {
         String html = "<!doctype html><html><head><meta charset=\"utf-8\">"
-                + "<meta name=\"viewport\" content=\"width=device-width\"><title>503</title></head>"
+                + "<meta name=\"viewport\" content=\"width=device-width\"><title>" + status + "</title></head>"
                 + "<body style=\"font-family:sans-serif;max-width:40rem;margin:4rem auto;padding:0 1rem\"><p>"
                 + String.join("<br>", message.lines().map(SiteConfigRenderer::escapeHtml).toList())
                 + "</p></body></html>";
-        out.append("    error_page 503 ").append(MAINTENANCE_LOCATION).append(";\n")
-                .append("    location ").append(MAINTENANCE_LOCATION).append(" {\n")
+        out.append("    error_page ").append(codes).append(' ').append(location).append(";\n")
+                .append("    location ").append(location).append(" {\n")
                 .append("        default_type text/html;\n")
-                .append("        add_header Retry-After 600 always;\n")
+                .append("        add_header Retry-After ").append(retryAfter).append(" always;\n")
                 .append("        add_header Cache-Control no-store always;\n")
-                .append("        return 503 '").append(html).append("';\n")
+                .append("        return ").append(status).append(" '").append(html).append("';\n")
                 .append("    }\n\n");
     }
 
