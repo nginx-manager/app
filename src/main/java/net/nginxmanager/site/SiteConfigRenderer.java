@@ -11,6 +11,8 @@ import java.util.Locale;
 public class SiteConfigRenderer {
 
     static final String HEADER = "# nginx-manager: 폼으로 만든 사이트입니다. 원문을 고치면 이 사이트는 원문 편집 전용으로 바뀝니다.\n";
+    static final String AUTH_LOCATION = "/_nginx_manager_auth";
+    static final String SIGN_IN_LOCATION = "@nginx_manager_sign_in";
     static final String HTTPS_PENDING = "# HTTPS: 인증서가 준비되면 관리도구가 HTTPS 설정을 더해 자동으로 적용합니다.\n";
 
     public String render(String primaryDomain, SiteForm form) {
@@ -33,7 +35,12 @@ public class SiteConfigRenderer {
                 : primaryDomain + " " + form.extraDomainsNormalized();
         out.append("server {\n")
                 .append("    listen ").append(form.listenHttpPort()).append(";\n")
-                .append("    server_name ").append(serverNames).append(";\n\n");
+                .append("    server_name ").append(serverNames).append(";\n");
+        if (form.grpc()) {
+            // gRPC는 HTTP/2로만 오간다. 평문 포트에서는 h2c(사전 지식)로 받는다
+            out.append("    http2 on;\n");
+        }
+        out.append("\n");
         logs(out, primaryDomain);
         serverOptions(out, form);
         out.append("    location ^~ /.well-known/acme-challenge/ {\n")
@@ -74,6 +81,7 @@ public class SiteConfigRenderer {
     }
 
     private static void content(StringBuilder out, String primaryDomain, SiteForm form, boolean https) {
+        authRequestLocations(out, form.options());
         switch (form.type()) {
             case PROXY -> proxyLocation(out, primaryDomain, form, https);
             case STATIC -> {
@@ -97,6 +105,39 @@ public class SiteConfigRenderer {
             }
             case PHP -> phpLocations(out, primaryDomain, form, https);
             case RAW -> throw new IllegalArgumentException("raw sites are not rendered");
+        }
+    }
+
+    /**
+     * 외부 인증 서버에 묻는 내부 location(018). 본문은 넘기지 않고 원래 주소·메서드를 헤더로 알린다.
+     * 401이면 로그인 주소로 보내고 돌아올 주소를 rd로 붙인다(oauth2-proxy, Authelia가 쓰는 이름).
+     */
+    private static void authRequestLocations(StringBuilder out, SiteOptions options) {
+        if (!options.authRequestEnabled()) {
+            return;
+        }
+        out.append("    location = ").append(AUTH_LOCATION).append(" {\n")
+                .append("        internal;\n")
+                .append("        proxy_pass ").append(options.authRequestUrl()).append(";\n")
+                .append("        proxy_pass_request_body off;\n")
+                .append("        proxy_set_header Content-Length \"\";\n")
+                .append("        proxy_set_header Host $host;\n")
+                .append("        proxy_set_header X-Original-URI $request_uri;\n")
+                .append("        proxy_set_header X-Original-Method $request_method;\n")
+                .append("        proxy_set_header X-Forwarded-Proto $scheme;\n")
+                .append("        proxy_set_header X-Forwarded-Host $host;\n")
+                .append("        proxy_set_header X-Forwarded-Uri $request_uri;\n")
+                .append("        proxy_set_header X-Real-IP $remote_addr;\n");
+        if (options.authRequestUrl().startsWith("https://")) {
+            out.append("        proxy_ssl_server_name on;\n");
+        }
+        out.append("    }\n\n");
+        if (options.authSignInUrl() != null) {
+            String separator = options.authSignInUrl().contains("?") ? "&" : "?";
+            out.append("    location ").append(SIGN_IN_LOCATION).append(" {\n")
+                    .append("        return 302 ").append(options.authSignInUrl()).append(separator)
+                    .append("rd=$scheme://$host$request_uri;\n")
+                    .append("    }\n\n");
         }
     }
 
@@ -143,7 +184,7 @@ public class SiteConfigRenderer {
             out.append("limit_conn_zone $binary_remote_addr zone=conn_").append(id).append(":10m;\n");
             any = true;
         }
-        if (form.type() == SiteType.PROXY && options.cacheMinutes() != null) {
+        if (form.type() == SiteType.PROXY && !form.grpc() && options.cacheMinutes() != null) {
             out.append("proxy_cache_path /var/cache/nginx/site-").append(primaryDomain)
                     .append(" levels=1:2 keys_zone=cache_").append(id)
                     .append(":10m max_size=1g inactive=").append(Math.max(60, options.cacheMinutes()))
@@ -200,7 +241,7 @@ public class SiteConfigRenderer {
         SiteOptions options = form.options();
         String id = identifier(primaryDomain);
         boolean access = options.accessRestricted();
-        boolean auth = options.authEnabled();
+        boolean auth = options.authEnabled() || options.authRequestEnabled();
         if (access && auth) {
             out.append("        satisfy ").append(options.satisfyAny() ? "any" : "all").append(";\n");
         }
@@ -213,9 +254,22 @@ public class SiteConfigRenderer {
         if (!options.allowList().isEmpty()) {
             out.append("        deny all;\n");
         }
-        if (auth) {
+        if (options.authEnabled()) {
             out.append("        auth_basic \"").append(primaryDomain).append("\";\n")
                     .append("        auth_basic_user_file ").append(Htpasswd.path(primaryDomain)).append(";\n");
+        }
+        if (options.authRequestEnabled()) {
+            out.append("        auth_request ").append(AUTH_LOCATION).append(";\n");
+            if (options.authSignInUrl() != null) {
+                out.append("        error_page 401 = ").append(SIGN_IN_LOCATION).append(";\n");
+            }
+            if (form.type() == SiteType.PROXY && !form.grpc()) {
+                // 인증 서버가 알려 준 사용자를 백엔드에 넘긴다(oauth2-proxy, Authelia 등의 응답 헤더)
+                out.append("        auth_request_set $nm_auth_user $upstream_http_x_auth_request_user;\n")
+                        .append("        auth_request_set $nm_auth_email $upstream_http_x_auth_request_email;\n")
+                        .append("        proxy_set_header X-Auth-Request-User $nm_auth_user;\n")
+                        .append("        proxy_set_header X-Auth-Request-Email $nm_auth_email;\n");
+            }
         }
         if (options.rateLimit() != null) {
             out.append("        limit_req zone=req_").append(id);
@@ -239,7 +293,7 @@ public class SiteConfigRenderer {
         if (https && options.http3()) {
             out.append("        add_header Alt-Svc 'h3=\":443\"; ma=86400' always;\n");
         }
-        if (form.type() == SiteType.PROXY && options.cacheMinutes() != null) {
+        if (form.type() == SiteType.PROXY && !form.grpc() && options.cacheMinutes() != null) {
             out.append("        proxy_cache cache_").append(id).append(";\n")
                     .append("        proxy_cache_valid 200 301 302 ").append(options.cacheMinutes()).append("m;\n")
                     .append("        proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;\n")
@@ -265,7 +319,7 @@ public class SiteConfigRenderer {
             }
             out.append("}\n\n");
         }
-        if (form.proxyWebsocket()) {
+        if (form.proxyWebsocket() && !form.grpc()) {
             // 업그레이드 요청만 Connection: upgrade로 넘기고, 나머지는 보통 요청처럼 close로 넘긴다
             out.append("map $http_upgrade ").append(connectionVariable(primaryDomain)).append(" {\n")
                     .append("    default upgrade;\n")
@@ -282,6 +336,10 @@ public class SiteConfigRenderer {
             pass = first.scheme() + "://" + upstreamName(primaryDomain) + first.path();
         } else {
             pass = targets.getFirst();
+        }
+        if (form.grpc()) {
+            grpcLocation(out, primaryDomain, form, https, pass);
+            return;
         }
         out.append("    location / {\n");
         locationOptions(out, primaryDomain, form, https);
@@ -309,6 +367,32 @@ public class SiteConfigRenderer {
         if (form.proxyReadTimeout() != null) {
             out.append("        proxy_read_timeout ").append(form.proxyReadTimeout()).append("s;\n")
                     .append("        proxy_send_timeout ").append(form.proxyReadTimeout()).append("s;\n");
+        }
+        out.append("    }\n");
+    }
+
+    /** gRPC 백엔드(018): grpc_pass로 넘긴다. 헤더와 타임아웃도 grpc_ 지시어를 쓴다. */
+    private static void grpcLocation(StringBuilder out, String primaryDomain, SiteForm form, boolean https,
+                                     String pass) {
+        List<String> targets = form.proxyTargets();
+        out.append("    location / {\n");
+        locationOptions(out, primaryDomain, form, https);
+        out.append("        grpc_pass ").append(pass).append(";\n")
+                .append("        grpc_set_header X-Real-IP $remote_addr;\n")
+                .append("        grpc_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n")
+                .append("        grpc_set_header X-Forwarded-Proto $scheme;\n");
+        if (pass.startsWith("grpcs://")) {
+            out.append("        grpc_ssl_server_name on;\n");
+            if (targets.size() > 1) {
+                out.append("        grpc_ssl_name ").append(ProxyBackend.parse(targets.getFirst()).host()).append(";\n");
+            }
+        }
+        if (form.proxyConnectTimeout() != null) {
+            out.append("        grpc_connect_timeout ").append(form.proxyConnectTimeout()).append("s;\n");
+        }
+        if (form.proxyReadTimeout() != null) {
+            out.append("        grpc_read_timeout ").append(form.proxyReadTimeout()).append("s;\n")
+                    .append("        grpc_send_timeout ").append(form.proxyReadTimeout()).append("s;\n");
         }
         out.append("    }\n");
     }

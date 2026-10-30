@@ -1,0 +1,74 @@
+name: Manual screenshots
+
+# 사용 설명서 그림을 실제 이미지로 다시 찍는다(docs/guide.md "그림 다시 찍기").
+# 찍은 그림은 screenshots/<실행 번호> 브랜치에 올린다. 그 브랜치의 그림을 작업 브랜치로 가져와 PR에 넣는다.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  shots:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build images
+        run: |
+          docker build -f docker/nginx/Dockerfile -t ghcr.io/nginx-manager/nginx:shots . &
+          nginx=$!
+          docker build -f docker/manager/Dockerfile -t ghcr.io/nginx-manager/app:shots .
+          wait $nginx
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install playwright
+        run: |
+          npm i -g playwright@1.56.1
+          npx -y playwright@1.56.1 install --with-deps chromium
+      - name: Example files for the import screen
+        run: |
+          mkdir -p /tmp/nm-home/alice/nginx /tmp/nm-home/bob/nginx
+          cat > /tmp/nm-home/alice/nginx/blog.conf <<'CONF'
+          server {
+              listen 80;
+              server_name blog.example.com;
+              location / {
+                  proxy_pass http://10.0.0.21:8080;
+              }
+          }
+          CONF
+          cat > /tmp/nm-home/bob/nginx/shop.conf <<'CONF'
+          server {
+              listen 80;
+              server_name shop.example.com;
+              location / {
+                  proxy_pass http://10.0.0.31:3000;
+              }
+              location /static/ {
+                  root /srv/shop;
+                  expires 7d;
+              }
+          }
+          CONF
+          chmod -R a+rX /tmp/nm-home
+          cat > /tmp/nm-override.yml <<'YAML'
+          services:
+            manager:
+              volumes: ["/tmp/nm-home:/home:ro"]
+              environment: { NGINX_MANAGER_IMPORT_ROOTS: /home }
+          YAML
+      - name: Take screenshots
+        run: |
+          NGINX_MANAGER_VERSION=shots docker compose -f docker/docker-compose.yml -f /tmp/nm-override.yml -p nm-manual up -d --wait
+          TRAFFIC_URL=http://localhost IMPORT_PATTERN='/home/*/nginx/*.conf' NODE_PATH="$(npm root -g)" \
+            node scripts/manual-screenshots.mjs http://localhost:9000 src/main/resources/static/guide/images
+          docker compose -f docker/docker-compose.yml -f /tmp/nm-override.yml -p nm-manual down -v
+      - name: Push to a screenshots branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "screenshots/${GITHUB_RUN_NUMBER}"
+          git add src/main/resources/static/guide/images
+          git commit -m "설명서 그림 다시 찍기 (${GITHUB_SHA::7})" || { echo "바뀐 그림 없음"; exit 0; }
+          git push origin "screenshots/${GITHUB_RUN_NUMBER}"

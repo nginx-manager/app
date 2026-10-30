@@ -134,7 +134,7 @@ public record SiteForm(
     private static final String STATIC_ROOT = "/[A-Za-z0-9._/-]*";
     /** PHP-FPM 주소: 호스트:포트 또는 unix:/소켓 경로. */
     private static final String FASTCGI_TARGET = "([A-Za-z0-9.-]+|\\[[0-9A-Fa-f:]+\\]):[0-9]{1,5}|unix:/[A-Za-z0-9._/-]+";
-    private static final String PROXY_TARGET = "https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?(/[A-Za-z0-9._~/-]*)?";
+    private static final String PROXY_TARGET = "(https?|grpcs?)://[A-Za-z0-9.-]+(:[0-9]{1,5})?(/[A-Za-z0-9._~/-]*)?";
     /** 리디렉션 주소. nginx 변수($)·따옴표·공백이 들어가지 않게 쓸 수 있는 문자를 좁힌다. */
     private static final String REDIRECT_TARGET =
             "https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?(/[A-Za-z0-9._~/%!&*+,=:@-]*)?(\\?[A-Za-z0-9._~/%!&*+,=:@?-]*)?";
@@ -195,9 +195,19 @@ public record SiteForm(
         if (!targets.stream().map(ProxyBackend::parse).allMatch(b -> b.port() >= 1 && b.port() <= 65535)) {
             return false;
         }
+        // grpc_pass는 경로를 받지 않는다(gRPC 메서드 경로를 그대로 넘긴다)
+        if (targets.stream().map(ProxyBackend::parse).anyMatch(b -> b.isGrpc() && !b.path().isEmpty())) {
+            return false;
+        }
         // upstream으로 묶으면 proxy_pass에 스킴과 경로가 하나만 들어가므로 모두 같아야 한다
         return targets.stream().map(ProxyBackend::parse)
                 .map(b -> b.scheme() + b.path()).distinct().count() == 1;
+    }
+
+    /** 리버스 프록시의 백엔드가 gRPC(grpc://, grpcs://)인지(018). 그러면 proxy_pass 대신 grpc_pass를 쓴다. */
+    public boolean grpc() {
+        return type == SiteType.PROXY && isProxyTargetValid()
+                && ProxyBackend.parse(proxyTargets().getFirst()).isGrpc();
     }
 
     @AssertTrue(message = "{msg.validation.fastcgiTarget}")

@@ -23,7 +23,7 @@
 
 <!-- 유형과 관계없이 켜는 모듈 설정(접근 제한, 속도 제한, 성능·보안) -->
 <th:block th:fragment="options(editable)">
-    <details class="site-options" th:open="${form?.options?.accessRestricted() == true or form?.options?.authEnabled() == true}">
+    <details class="site-options" th:open="${form?.options?.accessRestricted() == true or form?.options?.authEnabled() == true or form?.options?.authRequestEnabled() == true}">
         <summary th:text="#{sites.opt.access.title}">접근 제한 (IP, 비밀번호)</summary>
         <p class="hint" th:text="#{sites.opt.access.intro}">설명</p>
         <label><th:block th:text="#{sites.opt.allowFrom}">허용할 주소</th:block>
@@ -44,6 +44,16 @@
         </label>
         <label class="inline"><input type="checkbox" th:field="*{options.satisfyAny}" value="true" th:disabled="${!editable}"> <th:block th:text="#{sites.opt.satisfyAny}">허용 주소이거나 비밀번호가 맞으면 통과</th:block></label>
         <p class="hint" th:text="#{sites.opt.satisfyAny.hint}">설명</p>
+        <label><th:block th:text="#{sites.opt.authRequestUrl}">외부 인증 서버</th:block>
+            <span class="hint" th:text="#{sites.opt.authRequestUrl.hint}">설명</span>
+            <input type="url" th:field="*{options.authRequestUrl}" placeholder="http://oauth2-proxy:4180/oauth2/auth" spellcheck="false" th:disabled="${!editable}">
+            <span class="error" th:errors="*{options.authRequestUrlValid}"></span>
+        </label>
+        <label><th:block th:text="#{sites.opt.authSignInUrl}">로그인 주소</th:block>
+            <span class="hint" th:text="#{sites.opt.authSignInUrl.hint}">설명</span>
+            <input type="url" th:field="*{options.authSignInUrl}" placeholder="https://auth.example.com/oauth2/start" spellcheck="false" th:disabled="${!editable}">
+            <span class="error" th:errors="*{options.authSignInUrlValid}"></span>
+        </label>
     </details>
 
     <details class="site-options" th:open="${form?.options?.rateLimit != null or form?.options?.connLimit != null}">

@@ -237,6 +237,41 @@ class ImageModuleOptionsTest {
         assertThat(status("php.local", "-u", "kim:correct-pass-1", "http://127.0.0.1/index.php")).isIn("404", "502");
     }
 
+    @Test
+    @DisplayName("외부 인증(018): 인증 서버가 401이면 로그인 주소로 보내고, 통과하면 내용을 준다")
+    void externalAuthRedirectsToSignInAndPassesWhenAllowed() throws Exception {
+        // 인증 서버 대신 Basic 인증이 걸린 사이트를 8085 포트에 둔다(이 포트의 유일한 서버라 Host와 관계없이 받는다)
+        createStatic("authsrv.local", "/etc/nginx/html", Map.of("listenHttpPort", "8085",
+                "options.authUsers", "kim:correct-pass-1"));
+        createStatic("secure.local", "/etc/nginx/html", Map.of(
+                "options.authRequestUrl", "http://127.0.0.1:8085/",
+                "options.authSignInUrl", "https://login.example.com/start"));
+        apply("external auth");
+
+        awaitStatus("secure.local", "302");
+        assertThat(status("secure.local", "-w", "%{http_code} %{redirect_url}"))
+                .isEqualTo("302 https://login.example.com/start?rd=http://secure.local/");
+        // 요청 헤더(Authorization)는 인증 서버에도 넘어간다
+        assertThat(status("secure.local", "-u", "kim:correct-pass-1", "http://127.0.0.1/")).isEqualTo("200");
+    }
+
+    @Test
+    @DisplayName("gRPC 프록시(018): 실제 nginx가 grpc_pass와 h2c를 받아들인다")
+    void grpcProxyIsAcceptedByNginx() throws Exception {
+        // 평문 gRPC(h2c)는 nginx가 그 포트의 기본 서버 설정으로 HTTP/2를 고르므로 전용 포트에 둔다
+        create("grpc.local", "PROXY", Map.of("proxyTarget", "grpc://127.0.0.1:50051", "listenHttpPort", "8086"));
+        apply("grpc");
+
+        // 백엔드가 없어 502. HTTP/2(사전 지식)로 받는지 본다
+        String url = "http://127.0.0.1:8086/helloworld.Greeter/SayHello";
+        String result = "";
+        for (int i = 0; i < 30 && !result.equals("502 2"); i++) {
+            Thread.sleep(1000);
+            result = status("grpc.local", "--http2-prior-knowledge", "-w", "%{http_code} %{http_version}", url);
+        }
+        assertThat(result).isEqualTo("502 2");
+    }
+
     private static void createStatic(String domain, String root, Map<String, String> fields) throws Exception {
         Map<String, String> all = new LinkedHashMap<>(Map.of("staticRoot", root));
         all.putAll(fields);
