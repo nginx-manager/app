@@ -24,6 +24,7 @@
             <label><span th:text="#{audit.list.filter.from}">시작일</span> <input type="date" name="from" th:value="${filter.from}"></label>
             <label><span th:text="#{audit.list.filter.to}">종료일</span> <input type="date" name="to" th:value="${filter.to}"></label>
             <button type="submit" th:text="#{audit.list.filter.search}">검색</button>
+            <a class="button secondary" th:href="@{/audit/export(username=${filter.username},action=${filter.action},result=${filter.result},from=${filter.from},to=${filter.to})}" th:title="#{audit.list.export.hint}" th:text="#{audit.list.export}">CSV 내려받기</a>
         </form>
         <p class="hint" th:text="#{audit.list.filter.hint}">사용자는 아이디가 정확히 같아야 찾습니다. 비워 둔 조건은 적용하지 않으며, 날짜는 시작일과 종료일을 모두 포함합니다.</p>
     </section>

@@ -19,7 +19,7 @@ Specs and design documents are in `specs/001-nginx-web-manager/` of [nginx-manag
 - **History and rollback**: Every apply creates a version. Compare two versions or roll back to an earlier one (rollbacks go through the same validation). Files changed directly on the server (drift) are detected and reported. A site's **Change history** shows only the versions that changed that site, and members can see the history of their own sites. Identical file contents are stored once, so the database stays small as versions pile up.
 - **HTTPS**: Turn on HTTPS for a site and it issues a Let's Encrypt certificate, applies the config automatically, and renews it before it expires. If renewal fails, it keeps serving with the current certificate and alerts you by email and webhook. Upload wildcard and internal certificates. Imported raw config sites can be issued a certificate too, and get a 443 server block and an 80→443 redirect added.
 - **Dashboard and logs**: See nginx status, version and modules, recent applies and certificate warnings, and search or tail per-site access/error logs (including imported raw sites and rotated logs).
-- **Users and audit log**: Admin and member roles. Members can only view, edit and apply the sites assigned to them; admins assign members to each site. Every change is recorded in the audit log. Users can turn on two-step verification with an authenticator app (TOTP) and recovery codes.
+- **Users and audit log**: Admin and member roles. Members can only view, edit and apply the sites assigned to them; admins assign members to each site. Every change is recorded in the audit log, and filtered records can be downloaded as CSV. Users can turn on two-step verification with an authenticator app (TOTP) and recovery codes.
 
 ## Running
 
