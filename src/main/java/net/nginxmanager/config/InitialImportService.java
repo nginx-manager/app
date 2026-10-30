@@ -11,7 +11,9 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 처음 실행할 때 설정 루트의 *.conf 파일을 그대로 가져온다. 파일 구조는 건드리지 않고,
@@ -26,9 +28,11 @@ public class InitialImportService implements ApplicationRunner {
     private final ConfigVersionRepository versionRepository;
     private final SiteRepository siteRepository;
     private final ConfigFileStore store;
+    private final VersionContents versionContents;
 
     public InitialImportService(ConfigFileRepository configFileRepository, ConfigVersionRepository versionRepository,
-                                SiteRepository siteRepository, ConfigFileStore store) {
+                                SiteRepository siteRepository, ConfigFileStore store, VersionContents versionContents) {
+        this.versionContents = versionContents;
         this.configFileRepository = configFileRepository;
         this.versionRepository = versionRepository;
         this.siteRepository = siteRepository;
@@ -52,12 +56,13 @@ public class InitialImportService implements ApplicationRunner {
         }
         ConfigVersion version = new ConfigVersion(null, "기존 설정 가져오기", VersionSource.INITIAL_IMPORT,
                 VersionResult.SUCCESS, null);
+        Map<String, String> contents = new LinkedHashMap<>();
         for (String path : paths) {
             String content = store.read(path);
             ConfigFile file = new ConfigFile(path, false);
             file.markImported(ConfigFileStore.hash(content));
             configFileRepository.save(file);
-            version.addFile(path, content);
+            contents.put(path, content);
             String domain = SitePaths.domainOf(path);
             if (domain != null && !siteRepository.existsByPrimaryDomain(domain)) {
                 Site site = new Site(domain, SiteType.RAW, file);
@@ -68,6 +73,7 @@ public class InitialImportService implements ApplicationRunner {
                 siteRepository.save(site);
             }
         }
+        versionContents.attach(version, contents);
         versionRepository.save(version);
         log.info("Imported {} nginx config files from {}", paths.size(), store.root());
         return true;

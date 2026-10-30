@@ -79,7 +79,8 @@ public class ConfigVersion extends BaseEntity {
         return rolledBackToId;
     }
 
-    public void addFile(String path, String content) {
+    /** 내용은 {@link VersionContents#attach}로 담는다. */
+    void addFile(String path, ConfigContent content) {
         files.add(new ConfigVersionFile(this, path, content));
     }
 

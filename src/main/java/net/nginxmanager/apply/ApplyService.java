@@ -288,7 +288,7 @@ public class ApplyService {
                 // 성공한 버전은 되돌리기에 쓰도록 관리 중인 모든 파일의 내용을 남긴다
                 sync.snapshot(version);
             } else {
-                changes.forEach(c -> version.addFile(c.path(), c.content()));
+                sync.attempted(version, changes);
             }
             return versionRepository.save(version).getId();
         });

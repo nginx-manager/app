@@ -21,14 +21,15 @@ public class ConfigVersionFile extends BaseEntity {
     @Column(nullable = false)
     private String path;
 
-    /** 이 버전에서 파일이 지워졌으면 null. */
-    @Column(columnDefinition = "TEXT")
-    private String content;
+    /** 이 버전에서 파일이 지워졌으면 null. 같은 내용은 여러 버전이 함께 가리킨다(011). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "content_id")
+    private ConfigContent content;
 
     protected ConfigVersionFile() {
     }
 
-    ConfigVersionFile(ConfigVersion configVersion, String path, String content) {
+    ConfigVersionFile(ConfigVersion configVersion, String path, ConfigContent content) {
         this.configVersion = configVersion;
         this.path = path;
         this.content = content;
@@ -39,6 +40,6 @@ public class ConfigVersionFile extends BaseEntity {
     }
 
     public String getContent() {
-        return content;
+        return content == null ? null : content.getContent();
     }
 }

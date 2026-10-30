@@ -11,7 +11,6 @@ import net.nginxmanager.common.NotFoundException;
 import net.nginxmanager.config.ConfigFile;
 import net.nginxmanager.config.ConfigFileRepository;
 import net.nginxmanager.config.ConfigFileStore;
-import net.nginxmanager.config.ConfigVersionRepository;
 import net.nginxmanager.config.VersionSource;
 import net.nginxmanager.notify.NotificationService;
 import net.nginxmanager.site.Site;
@@ -60,7 +59,6 @@ public class CertificateService {
     private final TlsCertificateRepository certificateRepository;
     private final SiteRepository siteRepository;
     private final ConfigFileRepository configFileRepository;
-    private final ConfigVersionRepository configVersionRepository;
     private final ConfigFileStore store;
     private final SiteRendering rendering;
     private final SiteConfigRenderer renderer;
@@ -75,7 +73,7 @@ public class CertificateService {
 
     public CertificateService(TlsCertificateRepository certificateRepository, SiteRepository siteRepository,
                               ConfigFileRepository configFileRepository,
-                              ConfigVersionRepository configVersionRepository, ConfigFileStore store,
+                              ConfigFileStore store,
                               SiteRendering rendering, SiteConfigRenderer renderer, CertificateFiles certificateFiles,
                               AcmeClient acme, ApplyService applyService, TransactionTemplate tx,
                               NotificationService notifications, ApplicationEventPublisher events,
@@ -83,7 +81,6 @@ public class CertificateService {
         this.certificateRepository = certificateRepository;
         this.siteRepository = siteRepository;
         this.configFileRepository = configFileRepository;
-        this.configVersionRepository = configVersionRepository;
         this.store = store;
         this.rendering = rendering;
         this.renderer = renderer;
@@ -293,7 +290,10 @@ public class CertificateService {
                 .toList();
     }
 
-    /** 인증서 디렉터리를 지금 디스크의 설정, 초안, 되돌릴 수 있는 버전 중 어디서든 쓰는지. */
+    /**
+     * 인증서 디렉터리를 지금 디스크의 설정이나 초안이 쓰는지. 버전은 보지 않는다(011): 버전은 지우지 않으므로 보면 옛 키가
+     * 영원히 남는다. 옛 디렉터리를 가리키는 버전으로 되돌리면 같은 인증서의 지금 파일로 바꿔 쓴다.
+     */
     boolean referenced(String directory) {
         return Boolean.TRUE.equals(tx.execute(status -> {
             for (ConfigFile file : configFileRepository.findAllByOrderByPathAsc()) {
@@ -302,8 +302,7 @@ public class CertificateService {
                     return true;
                 }
             }
-            return configFileRepository.existsByDraftContentContaining(directory)
-                    || configVersionRepository.existsByFilesContentContaining(directory);
+            return configFileRepository.existsByDraftContentContaining(directory);
         }));
     }
 

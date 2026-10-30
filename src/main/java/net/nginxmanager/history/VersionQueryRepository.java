@@ -48,6 +48,7 @@ public class VersionQueryRepository {
         return Optional.ofNullable(queryFactory
                 .selectFrom(configVersion)
                 .leftJoin(configVersion.files, configVersionFile).fetchJoin()
+                .leftJoin(configVersionFile.content).fetchJoin()
                 .where(configVersion.id.eq(id))
                 .fetchOne());
     }
