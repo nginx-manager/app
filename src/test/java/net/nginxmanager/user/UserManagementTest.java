@@ -33,29 +33,29 @@ class UserManagementTest extends ConfigRootTest {
 
     @Test
     void inviteCreatesUserWithRoleAndAudits() {
-        User viewer = userService.invite(new UserForms.Invite("viewer", "viewer-password", Role.VIEWER), "admin");
+        User viewer = userService.invite(new UserForms.Invite("viewer", "viewer-password", Role.MEMBER), "admin");
 
-        assertThat(viewer.getRole()).isEqualTo(Role.VIEWER);
+        assertThat(viewer.getRole()).isEqualTo(Role.MEMBER);
         assertThat(passwordEncoder.matches("viewer-password", viewer.getPasswordHash())).isTrue();
         assertThat(auditLogRepository.findAll()).anySatisfy(log -> {
             assertThat(log.getAction()).isEqualTo(AuditAction.USER_CREATE);
             assertThat(log.getTarget()).contains("viewer");
         });
-        assertThatThrownBy(() -> userService.invite(new UserForms.Invite("viewer", "other-password", Role.EDITOR), "admin"))
+        assertThatThrownBy(() -> userService.invite(new UserForms.Invite("viewer", "other-password", Role.MEMBER), "admin"))
                 .isInstanceOf(DuplicateUsernameException.class);
     }
 
     @Test
     void lastEnabledAdminCannotBeDemotedOrDisabled() {
-        assertThatThrownBy(() -> userService.changeRole(admin.getId(), Role.EDITOR, admin.getVersion(), "admin"))
+        assertThatThrownBy(() -> userService.changeRole(admin.getId(), Role.MEMBER, admin.getVersion(), "admin"))
                 .isInstanceOf(LastAdminException.class);
         assertThatThrownBy(() -> userService.setEnabled(admin.getId(), false, admin.getVersion(), "admin"))
                 .isInstanceOf(LastAdminException.class);
 
         User second = userService.invite(new UserForms.Invite("second", "second-password", Role.ADMIN), "admin");
-        userService.changeRole(admin.getId(), Role.EDITOR, admin.getVersion(), "second");
+        userService.changeRole(admin.getId(), Role.MEMBER, admin.getVersion(), "second");
 
-        assertThat(reload(admin).getRole()).isEqualTo(Role.EDITOR);
+        assertThat(reload(admin).getRole()).isEqualTo(Role.MEMBER);
         User secondNow = reload(second);
         assertThatThrownBy(() -> userService.setEnabled(secondNow.getId(), false, secondNow.getVersion(), "second"))
                 .isInstanceOf(LastAdminException.class);
@@ -67,13 +67,13 @@ class UserManagementTest extends ConfigRootTest {
         userService.setEnabled(second.getId(), false, reload(second).getVersion(), "admin");
 
         User adminNow = reload(admin);
-        assertThatThrownBy(() -> userService.changeRole(adminNow.getId(), Role.VIEWER, adminNow.getVersion(), "admin"))
+        assertThatThrownBy(() -> userService.changeRole(adminNow.getId(), Role.MEMBER, adminNow.getVersion(), "admin"))
                 .isInstanceOf(LastAdminException.class);
     }
 
     @Test
     void passwordResetUnlocksAccount() {
-        User editor = userService.invite(new UserForms.Invite("editor", "editor-password", Role.EDITOR), "admin");
+        User editor = userService.invite(new UserForms.Invite("editor", "editor-password", Role.MEMBER), "admin");
         for (int i = 0; i < 5; i++) {
             editor = reload(editor);
             editor.recordLoginFailure(5, Duration.ofMinutes(10), Instant.now());

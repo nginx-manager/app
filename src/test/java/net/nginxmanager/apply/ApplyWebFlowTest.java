@@ -37,7 +37,7 @@ class ApplyWebFlowTest extends ConfigRootTest {
 
     @Test
     void editorCreatesSiteThenAppliesIt() throws Exception {
-        mvc.perform(post("/sites/new").with(csrf()).with(user("ed").roles("EDITOR"))
+        mvc.perform(post("/sites/new").with(csrf()).with(user("ed").roles("ADMIN"))
                         .param("primaryDomain", "app.local")
                         .param("extraDomains", "")
                         .param("type", "STATIC")
@@ -45,11 +45,11 @@ class ApplyWebFlowTest extends ConfigRootTest {
                         .param("staticRoot", "/srv/www/app"))
                 .andExpect(redirectedUrlPattern("/sites/*?saved"));
 
-        mvc.perform(get("/apply").with(user("ed").roles("EDITOR")))
+        mvc.perform(get("/apply").with(user("ed").roles("ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("conf.d/sites/app.local.conf")));
 
-        mvc.perform(post("/apply").with(csrf()).with(user("ed").roles("EDITOR")).header("HX-Request", "true"))
+        mvc.perform(post("/apply").with(csrf()).with(user("ed").roles("ADMIN")).header("HX-Request", "true"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("모두 통과했습니다")));
 
@@ -59,25 +59,13 @@ class ApplyWebFlowTest extends ConfigRootTest {
     }
 
     @Test
-    void viewerCannotCreateOrApply() throws Exception {
-        mvc.perform(post("/sites/new").with(csrf()).with(user("vi").roles("VIEWER"))
-                        .param("primaryDomain", "app.local").param("type", "STATIC")
-                        .param("listenHttpPort", "80").param("staticRoot", "/srv"))
-                .andExpect(status().isForbidden());
-        mvc.perform(post("/apply").with(csrf()).with(user("vi").roles("VIEWER")))
-                .andExpect(status().isForbidden());
-        mvc.perform(get("/sites").with(user("vi").roles("VIEWER")))
-                .andExpect(status().isOk());
-    }
-
-    @Test
     void validationErrorShowsWhereAndWhetherThisDraftCausedIt() throws Exception {
         createStaticSite("mine.local");
 
         // 이번 초안이 아닌 다른 사이트 파일 때문에 실패하면 그 사실을 표시한다
         nginx.validation = () -> FakeNginxRuntime.invalid(CONFIG_ROOT.resolve("conf.d/sites/other.local.conf").toString(),
                 4, "unknown directive \"proxy_pas\"");
-        mvc.perform(post("/apply").with(csrf()).with(user("ed").roles("EDITOR")).header("HX-Request", "true"))
+        mvc.perform(post("/apply").with(csrf()).with(user("ed").roles("ADMIN")).header("HX-Request", "true"))
                 .andExpect(content().string(containsString("문법 검증에 실패해 반영하지 않았습니다")))
                 .andExpect(content().string(containsString("other.local.conf:4")))
                 .andExpect(content().string(containsString("이번 초안이 바꾸지 않은 파일")));
@@ -85,13 +73,13 @@ class ApplyWebFlowTest extends ConfigRootTest {
 
         nginx.validation = () -> FakeNginxRuntime.invalid(CONFIG_ROOT.resolve("conf.d/sites/mine.local.conf").toString(),
                 7, "unknown directive \"rooot\"");
-        mvc.perform(post("/apply").with(csrf()).with(user("ed").roles("EDITOR")).header("HX-Request", "true"))
+        mvc.perform(post("/apply").with(csrf()).with(user("ed").roles("ADMIN")).header("HX-Request", "true"))
                 .andExpect(content().string(containsString("mine.local.conf:7")))
                 .andExpect(content().string(not(containsString("이번 초안이 바꾸지 않은 파일"))));
     }
 
     private void createStaticSite(String domain) throws Exception {
-        mvc.perform(post("/sites/new").with(csrf()).with(user("ed").roles("EDITOR"))
+        mvc.perform(post("/sites/new").with(csrf()).with(user("ed").roles("ADMIN"))
                         .param("primaryDomain", domain)
                         .param("extraDomains", "")
                         .param("type", "STATIC")

@@ -44,7 +44,7 @@ class GuideWebTest extends ConfigRootTest {
 
     @Test
     void indexShowsTableOfContentsAndFirstChapterLink() throws Exception {
-        mvc.perform(get("/guide").with(user("v").roles("VIEWER")))
+        mvc.perform(get("/guide").with(user("v").roles("MEMBER")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("<h1 id=\"nginx-manager-사용-설명서\">nginx manager 사용 설명서</h1>")))
                 .andExpect(content().string(containsString("class=\"nav-manual active\" href=\"/guide\"")))
@@ -57,7 +57,7 @@ class GuideWebTest extends ConfigRootTest {
 
     @Test
     void chapterShowsBodySectionsAndNeighbours() throws Exception {
-        mvc.perform(get("/guide/04-sites").with(user("v").roles("VIEWER")))
+        mvc.perform(get("/guide/04-sites").with(user("v").roles("MEMBER")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("<title>4. 사이트 · 사용 설명서 · nginx manager</title>")))
                 .andExpect(content().string(containsString("href=\"/guide/04-sites\" aria-current=\"page\" class=\"active\">4. 사이트</a>")))
@@ -69,7 +69,7 @@ class GuideWebTest extends ConfigRootTest {
 
     @Test
     void otherLanguagesShowKoreanTextWithNotice() throws Exception {
-        mvc.perform(get("/guide/01-install").param("lang", "en").with(user("v").roles("VIEWER")))
+        mvc.perform(get("/guide/01-install").param("lang", "en").with(user("v").roles("MEMBER")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("The manual text is available in Korean only.")))
                 .andExpect(content().string(containsString(">Contents</summary>")))
@@ -78,7 +78,7 @@ class GuideWebTest extends ConfigRootTest {
 
     @Test
     void unknownChapterIsNotFound() throws Exception {
-        mvc.perform(get("/guide/99-nothing").with(user("v").roles("VIEWER")))
+        mvc.perform(get("/guide/99-nothing").with(user("v").roles("MEMBER")))
                 .andExpect(status().isNotFound());
     }
 
@@ -98,7 +98,7 @@ class GuideWebTest extends ConfigRootTest {
         assertThat(book.chapters()).hasSize(13);
         List<String> broken = new ArrayList<>();
         for (Guide.Chapter chapter : all) {
-            mvc.perform(get(guide.url(chapter.slug())).with(user("v").roles("VIEWER"))).andExpect(status().isOk());
+            mvc.perform(get(guide.url(chapter.slug())).with(user("v").roles("MEMBER"))).andExpect(status().isOk());
             Matcher link = HREF.matcher(chapter.html());
             while (link.find()) {
                 String href = link.group(1);

@@ -12,6 +12,8 @@ import net.nginxmanager.config.ConfigFileRepository;
 import net.nginxmanager.config.ConfigFileStore;
 import net.nginxmanager.config.NewFilePath;
 import net.nginxmanager.config.RawEditedEvent;
+import net.nginxmanager.user.User;
+import net.nginxmanager.user.UserRepository;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -38,11 +40,14 @@ public class SiteService {
     private final List<OtherTcpPorts> otherTcpPorts;
     private final SiteReconciler reconciler;
     private final SiteImporter importer;
+    private final UserRepository userRepository;
 
     public SiteService(SiteRepository siteRepository, ConfigFileRepository configFileRepository,
                        ConfigFileStore store, SiteRendering rendering, CertificateRegistry certificateRegistry,
                        ApplicationEventPublisher events, ApplyLock applyLock, TransactionTemplate tx,
-                       List<OtherTcpPorts> otherTcpPorts, SiteReconciler reconciler, SiteImporter importer) {
+                       List<OtherTcpPorts> otherTcpPorts, SiteReconciler reconciler, SiteImporter importer,
+                       UserRepository userRepository) {
+        this.userRepository = userRepository;
         this.siteRepository = siteRepository;
         this.configFileRepository = configFileRepository;
         this.store = store;
@@ -61,10 +66,15 @@ public class SiteService {
     }
 
     public Site create(SiteForm form, String actor) {
-        return locked(() -> doCreate(form, actor));
+        return create(form, actor, null);
     }
 
-    private Site doCreate(SiteForm form, String actor) {
+    /** @param ownerId 담당 사용자. null이면 담당자 없이(관리자만 보는 사이트로) 만든다 */
+    public Site create(SiteForm form, String actor, Long ownerId) {
+        return locked(() -> doCreate(form, actor, ownerId));
+    }
+
+    private Site doCreate(SiteForm form, String actor, Long ownerId) {
         String domain = form.primaryDomain().toLowerCase(Locale.ROOT);
         String path = SitePaths.of(domain, true);
         if (siteRepository.existsByPrimaryDomain(domain) || configFileRepository.findByPath(path).isPresent()) {
@@ -74,6 +84,7 @@ public class SiteService {
         requireFreePort(form.listenHttpPort());
         ConfigFile file = configFileRepository.save(new ConfigFile(path, true));
         Site site = new Site(domain, form.type(), file);
+        site.assignOwner(ownerId);
         site.applyForm(form);
         site.linkCertificate(certificateFor(domain, form));
         stageHtpasswd(site, form);
@@ -103,6 +114,33 @@ public class SiteService {
         site.getConfigFile().stageContent(rendering.render(site.getPrimaryDomain(), form, site.getCertificateId()));
         events.publishEvent(AuditEvent.success(actor, AuditAction.SITE_SAVE, "site:" + site.getPrimaryDomain()));
         return site;
+    }
+
+    /** 담당자를 바꾼다. 설정 파일과 초안은 그대로이고, 초안은 사이트를 따라 새 담당자에게 넘어간다. */
+    public Site assignOwner(long siteId, Long ownerId, long expectedVersion, String actor) {
+        return locked(() -> doAssignOwner(siteId, ownerId, expectedVersion, actor));
+    }
+
+    private Site doAssignOwner(long siteId, Long ownerId, long expectedVersion, String actor) {
+        Site site = load(siteId);
+        requireVersion(site.getVersion(), expectedVersion, "site " + site.getPrimaryDomain());
+        String before = ownerName(site.getOwnerId());
+        String after = ownerName(ownerId);
+        if (ownerId != null && after == null) {
+            throw new NotFoundException("user " + ownerId);
+        }
+        if (java.util.Objects.equals(site.getOwnerId(), ownerId)) {
+            return site;
+        }
+        site.assignOwner(ownerId);
+        events.publishEvent(AuditEvent.success(actor, AuditAction.SITE_ASSIGN,
+                "site:" + site.getPrimaryDomain() + " owner:" + (before == null ? "-" : before) + "->"
+                        + (after == null ? "-" : after)));
+        return site;
+    }
+
+    private String ownerName(Long userId) {
+        return userId == null ? null : userRepository.findById(userId).map(User::getUsername).orElse(null);
     }
 
     /** 활성/비활성은 파일을 conf.d/sites 와 sites-disabled 사이로 옮기는 초안이다. */
@@ -179,7 +217,7 @@ public class SiteService {
             if (!analysis.formPossible()) {
                 throw new SiteImportException("import.error.formNotPossible", null);
             }
-            site = doCreate(analysis.form(), actor);
+            site = doCreate(analysis.form(), actor, null);
         } else {
             String path = SitePaths.of(domain, true);
             if (siteRepository.existsByPrimaryDomain(domain) || configFileRepository.findByPath(path).isPresent()

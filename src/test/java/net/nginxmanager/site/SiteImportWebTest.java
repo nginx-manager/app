@@ -87,15 +87,15 @@ class SiteImportWebTest extends ConfigRootTest {
     void importsAFileInTheConfigRootAsAFormSiteAndMovesIt() throws Exception {
         writeFile("conf.d/app.conf", PROXY);
 
-        mvc.perform(get("/sites/import").param("pattern", "conf.d/*.conf").with(user("ed").roles("EDITOR")))
+        mvc.perform(get("/sites/import").param("pattern", "conf.d/*.conf").with(user("ed").roles("ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("conf.d/app.conf")))
                 .andExpect(content().string(not(containsString("nginx.conf</code>"))));
-        mvc.perform(get("/sites/import/file").param("path", "conf.d/app.conf").with(user("ed").roles("EDITOR")))
+        mvc.perform(get("/sites/import/file").param("path", "conf.d/app.conf").with(user("ed").roles("ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("proxy_pass http://127.0.0.1:3000;")));
 
-        mvc.perform(post("/sites/import").with(csrf()).with(user("ed").roles("EDITOR"))
+        mvc.perform(post("/sites/import").with(csrf()).with(user("ed").roles("ADMIN"))
                         .param("path", "conf.d/app.conf").param("contentHash", ConfigFileStore.hash(PROXY))
                         .param("primaryDomain", "app.example.com").param("mode", "FORM")
                         .param("removeSource", "true"))
@@ -124,12 +124,12 @@ class SiteImportWebTest extends ConfigRootTest {
     @Test
     void discardingEitherDraftDiscardsBoth() throws Exception {
         writeFile("conf.d/app.conf", PROXY);
-        mvc.perform(post("/sites/import").with(csrf()).with(user("ed").roles("EDITOR"))
+        mvc.perform(post("/sites/import").with(csrf()).with(user("ed").roles("ADMIN"))
                 .param("path", "conf.d/app.conf").param("contentHash", ConfigFileStore.hash(PROXY))
                 .param("mode", "FORM").param("removeSource", "true"));
         ConfigFile source = configFileRepository.findByPath("conf.d/app.conf").orElseThrow();
 
-        mvc.perform(post("/apply/discard/{id}", source.getId()).with(csrf()).with(user("ed").roles("EDITOR")));
+        mvc.perform(post("/apply/discard/{id}", source.getId()).with(csrf()).with(user("ed").roles("ADMIN")));
 
         assertThat(siteRepository.findByPrimaryDomain("app.example.com")).isEmpty();
         assertThat(configFileRepository.findAll()).noneMatch(ConfigFile::hasPendingChange);
@@ -144,10 +144,10 @@ class SiteImportWebTest extends ConfigRootTest {
         writeHome("bob/nginx/notes.txt", "not nginx");
         writeHome("carol/nginx/upstreams.conf", "upstream a { server 10.0.0.1; }\n");
 
-        mvc.perform(post("/sites/import/sources").with(csrf()).with(user("ed").roles("EDITOR"))
+        mvc.perform(post("/sites/import/sources").with(csrf()).with(user("ed").roles("ADMIN"))
                         .param("pattern", HOME + "/*/nginx/*.conf"))
                 .andExpect(redirectedUrlPattern("/sites/import?scan"));
-        mvc.perform(get("/sites/import").param("scan", "").with(user("ed").roles("EDITOR")))
+        mvc.perform(get("/sites/import").param("scan", "").with(user("ed").roles("ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("alice/nginx/app.conf")))
                 .andExpect(content().string(containsString("bob/nginx/shop.conf")))
@@ -155,7 +155,7 @@ class SiteImportWebTest extends ConfigRootTest {
                 .andExpect(content().string(not(containsString("notes.txt"))));
 
         String home = HOME.toRealPath().toString();
-        mvc.perform(post("/sites/import/bulk").with(csrf()).with(user("ed").roles("EDITOR"))
+        mvc.perform(post("/sites/import/bulk").with(csrf()).with(user("ed").roles("ADMIN"))
                         .param("paths", home + "/alice/nginx/app.conf", home + "/bob/nginx/shop.conf",
                                 home + "/carol/nginx/upstreams.conf")
                         .param("removeSource", "true"))
@@ -173,7 +173,7 @@ class SiteImportWebTest extends ConfigRootTest {
         assertThat(Files.readString(HOME.resolve("bob/nginx/shop.conf"))).isEqualTo(RAW);
         assertThat(siteRepository.count()).isEqualTo(2);
 
-        mvc.perform(get("/sites/import").param("scan", "").with(user("ed").roles("EDITOR")))
+        mvc.perform(get("/sites/import").param("scan", "").with(user("ed").roles("ADMIN")))
                 .andExpect(content().string(containsString("등록됨")));
     }
 
@@ -181,16 +181,16 @@ class SiteImportWebTest extends ConfigRootTest {
     void aChangedSourceIsShownAndCanBeImportedAgain() throws Exception {
         writeHome("alice/nginx/app.conf", PROXY);
         String path = HOME.toRealPath().resolve("alice/nginx/app.conf").toString();
-        mvc.perform(post("/sites/import").with(csrf()).with(user("ed").roles("EDITOR"))
+        mvc.perform(post("/sites/import").with(csrf()).with(user("ed").roles("ADMIN"))
                 .param("path", path).param("contentHash", ConfigFileStore.hash(PROXY)).param("mode", "FORM"));
         assertThat(applyService.applyPending("ed", "import").succeeded()).isTrue();
         Site site = siteRepository.findByPrimaryDomain("app.example.com").orElseThrow();
 
         writeHome("alice/nginx/app.conf", PROXY.replace("3000", "4000"));
-        mvc.perform(get("/sites/{id}", site.getId()).with(user("ed").roles("EDITOR")))
+        mvc.perform(get("/sites/{id}", site.getId()).with(user("ed").roles("ADMIN")))
                 .andExpect(content().string(containsString("/reimport")));
 
-        mvc.perform(post("/sites/{id}/reimport", site.getId()).with(csrf()).with(user("ed").roles("EDITOR"))
+        mvc.perform(post("/sites/{id}/reimport", site.getId()).with(csrf()).with(user("ed").roles("ADMIN"))
                         .param("version", String.valueOf(site.getVersion())))
                 .andExpect(redirectedUrlPattern("/sites/*?saved"));
 
@@ -199,18 +199,18 @@ class SiteImportWebTest extends ConfigRootTest {
         assertThat(after.getProxyTarget()).isEqualTo("http://127.0.0.1:4000");
         assertThat(configFileRepository.findByPath("conf.d/sites/app.example.com.conf").orElseThrow().getDraftContent())
                 .contains("proxy_pass http://127.0.0.1:4000;");
-        mvc.perform(get("/sites/{id}", site.getId()).with(user("ed").roles("EDITOR")))
+        mvc.perform(get("/sites/{id}", site.getId()).with(user("ed").roles("ADMIN")))
                 .andExpect(content().string(not(containsString("/reimport"))));
     }
 
     @Test
     void uploadedFilesArePreviewedAndRegistered() throws Exception {
         mvc.perform(multipart("/sites/import/upload").file(new MockMultipartFile("file", "shop.conf",
-                        "text/plain", RAW.getBytes())).with(csrf()).with(user("ed").roles("EDITOR")))
+                        "text/plain", RAW.getBytes())).with(csrf()).with(user("ed").roles("ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("location /static/")));
 
-        mvc.perform(post("/sites/import").with(csrf()).with(user("ed").roles("EDITOR"))
+        mvc.perform(post("/sites/import").with(csrf()).with(user("ed").roles("ADMIN"))
                         .param("upload", RAW).param("uploadName", "shop.conf")
                         .param("contentHash", ConfigFileStore.hash(RAW)).param("mode", "RAW"))
                 .andExpect(redirectedUrlPattern("/sites/*?imported"));
@@ -224,27 +224,27 @@ class SiteImportWebTest extends ConfigRootTest {
     void refusesConflictsAndFilesOutsideTheAllowedDirectories() throws Exception {
         writeFile("conf.d/app.conf", PROXY);
         writeFile("conf.d/app2.conf", PROXY);
-        mvc.perform(post("/sites/import").with(csrf()).with(user("ed").roles("EDITOR"))
+        mvc.perform(post("/sites/import").with(csrf()).with(user("ed").roles("ADMIN"))
                 .param("path", "conf.d/app.conf").param("contentHash", ConfigFileStore.hash(PROXY)).param("mode", "FORM"));
 
         // 같은 도메인은 두 번 등록하지 않는다
-        mvc.perform(post("/sites/import").with(csrf()).with(user("ed").roles("EDITOR"))
+        mvc.perform(post("/sites/import").with(csrf()).with(user("ed").roles("ADMIN"))
                         .param("path", "conf.d/app2.conf").param("contentHash", ConfigFileStore.hash(PROXY))
                         .param("mode", "RAW"))
                 .andExpect(status().isOk());
         assertThat(siteRepository.count()).isEqualTo(1);
 
         // 허용한 디렉터리 밖은 찾지도 읽지도 않는다
-        mvc.perform(get("/sites/import").param("pattern", "/etc/*").with(user("ed").roles("EDITOR")))
+        mvc.perform(get("/sites/import").param("pattern", "/etc/*").with(user("ed").roles("ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(not(containsString("/etc/passwd"))));
-        mvc.perform(get("/sites/import/file").param("path", "../../../etc/passwd").with(user("ed").roles("EDITOR")))
+        mvc.perform(get("/sites/import/file").param("path", "../../../etc/passwd").with(user("ed").roles("ADMIN")))
                 .andExpect(status().isNotFound());
-        mvc.perform(get("/sites/import/file").param("path", "nginx.conf").with(user("ed").roles("EDITOR")))
+        mvc.perform(get("/sites/import/file").param("path", "nginx.conf").with(user("ed").roles("ADMIN")))
                 .andExpect(status().isNotFound());
 
         // 조회자는 가져오기 화면을 쓸 수 없다(파일 내용을 보여 주므로)
-        mvc.perform(get("/sites/import").with(user("viewer").roles("VIEWER")))
+        mvc.perform(get("/sites/import").with(user("viewer").roles("MEMBER")))
                 .andExpect(status().isForbidden());
     }
 

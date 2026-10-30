@@ -35,7 +35,7 @@ class ProxyOptionsWebTest extends ConfigRootTest {
 
     @Test
     void savesAndShowsProxyOptions() throws Exception {
-        mvc.perform(post("/sites/new").with(csrf()).with(user("ed").roles("EDITOR"))
+        mvc.perform(post("/sites/new").with(csrf()).with(user("ed").roles("ADMIN"))
                         .param("primaryDomain", "ws.local").param("extraDomains", "").param("type", "PROXY")
                         .param("listenHttpPort", "80").param("staticRoot", "")
                         .param("proxyTarget", "http://10.0.0.1:3000\r\nhttp://10.0.0.2:3000")
@@ -54,7 +54,7 @@ class ProxyOptionsWebTest extends ConfigRootTest {
                 "proxy_pass http://backend_ws_local;", "proxy_read_timeout 3600s;",
                 "proxy_set_header Connection $connection_upgrade_ws_local;");
 
-        mvc.perform(get("/sites/" + site.getId()).with(user("ed").roles("EDITOR")))
+        mvc.perform(get("/sites/" + site.getId()).with(user("ed").roles("ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("http://10.0.0.1:3000\nhttp://10.0.0.2:3000</textarea>")))
                 .andExpect(content().string(containsString("value=\"IP_HASH\" selected")))
@@ -63,7 +63,7 @@ class ProxyOptionsWebTest extends ConfigRootTest {
 
     @Test
     void mixedSchemesShowAnErrorAndSaveNothing() throws Exception {
-        mvc.perform(post("/sites/new").with(csrf()).with(user("ed").roles("EDITOR"))
+        mvc.perform(post("/sites/new").with(csrf()).with(user("ed").roles("ADMIN"))
                         .param("primaryDomain", "mix.local").param("type", "PROXY").param("listenHttpPort", "80")
                         .param("proxyTarget", "http://a:1 https://b:1"))
                 .andExpect(status().isOk())

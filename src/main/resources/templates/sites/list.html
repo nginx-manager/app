@@ -6,14 +6,25 @@
 <main class="page">
     <div class="title-row">
         <h1 th:text="#{sites.list.title}">사이트</h1>
-        <a class="button secondary" th:if="${currentUser.canEdit()}" th:href="@{/sites/import}" th:text="#{import.title}">설정 파일 가져오기</a>
+        <a class="button secondary" th:if="${currentUser.isAdmin()}" th:href="@{/sites/import}" th:text="#{import.title}">설정 파일 가져오기</a>
         <a class="button" th:if="${currentUser.canEdit()}" th:href="@{/sites/new}" th:text="#{sites.list.add}">사이트 추가</a>
     </div>
+    <p class="hint" th:unless="${currentUser.isAdmin()}" th:text="#{sites.list.memberHint}">내가 담당한 사이트만 보입니다.</p>
+    <form class="row-form card" th:if="${currentUser.isAdmin()}" th:action="@{/sites}" method="get">
+        <label><span th:text="#{sites.owner.filter}">담당자</span>
+            <select name="owner">
+                <option value="" th:text="#{sites.owner.all}">전체</option>
+                <option value="none" th:selected="${ownerFilter == 'none'}" th:text="#{sites.owner.none}">담당자 없음</option>
+                <option th:each="u : ${users}" th:value="${u.id}" th:selected="${ownerFilter == #strings.toString(u.id)}" th:text="${u.username}">alice</option>
+            </select>
+        </label>
+        <button type="submit" class="secondary" th:text="#{sites.owner.apply}">거르기</button>
+    </form>
     <section class="card">
         <p th:if="${#lists.isEmpty(sites)}" class="muted" th:text="#{sites.list.empty}">등록된 사이트가 없습니다.</p>
         <table th:unless="${#lists.isEmpty(sites)}">
             <thead>
-            <tr><th th:text="#{sites.list.col.domain}">도메인</th><th th:text="#{sites.list.col.type}">유형</th><th th:text="#{sites.list.col.target}">대상</th><th th:text="#{sites.list.col.port}">포트</th><th th:text="#{sites.list.col.status}">상태</th></tr>
+            <tr><th th:text="#{sites.list.col.domain}">도메인</th><th th:text="#{sites.list.col.type}">유형</th><th th:text="#{sites.list.col.target}">대상</th><th th:text="#{sites.list.col.port}">포트</th><th th:text="#{sites.list.col.status}">상태</th><th th:if="${currentUser.isAdmin()}" th:text="#{sites.owner.label}">담당자</th></tr>
             </thead>
             <tbody>
             <tr th:each="s : ${sites}">
@@ -38,6 +49,11 @@
                     <span th:if="${s.enabled}" class="badge ok" th:text="#{sites.status.enabled}">활성</span>
                     <span th:unless="${s.enabled}" class="badge" th:text="#{sites.status.disabled}">비활성</span>
                     <span th:if="${s.pending}" class="badge warn" th:text="#{sites.status.pending}">적용 대기</span>
+                </td>
+                <td th:if="${currentUser.isAdmin()}">
+                    <span th:if="${s.ownerName}" th:text="${s.ownerName}">alice</span>
+                    <span th:if="${s.ownerName != null and !s.ownerEnabled}" class="muted small" th:text="#{sites.owner.disabled}">(비활성)</span>
+                    <span th:unless="${s.ownerName}" class="muted" th:text="#{sites.owner.none}">담당자 없음</span>
                 </td>
             </tr>
             </tbody>

@@ -14,7 +14,7 @@
     <section class="card">
         <table>
             <thead>
-            <tr><th th:text="#{users.list.col.username}">아이디</th><th th:text="#{users.list.col.role}">역할</th><th th:text="#{users.list.col.status}">상태</th><th th:text="#{users.list.col.created}">만든 날</th><th th:text="#{users.list.col.passwordReset}">비밀번호 재설정</th></tr>
+            <tr><th th:text="#{users.list.col.username}">아이디</th><th th:text="#{users.list.col.role}">역할</th><th th:text="#{users.list.col.sites}">담당 사이트</th><th th:text="#{users.list.col.status}">상태</th><th th:text="#{users.list.col.created}">만든 날</th><th th:text="#{users.list.col.passwordReset}">비밀번호 재설정</th></tr>
             </thead>
             <tbody>
             <tr th:each="u : ${users}">
@@ -30,6 +30,10 @@
                         </select>
                         <noscript><button type="submit" class="link" th:text="#{users.list.change}">변경</button></noscript>
                     </form>
+                </td>
+                <td th:with="count=${siteCounts.get(u.id)}">
+                    <span th:if="${u.role.name() == 'ADMIN'}" class="muted" th:text="#{users.list.sitesAll}">전체</span>
+                    <a th:unless="${u.role.name() == 'ADMIN'}" th:href="@{/sites(owner=${u.id})}" th:text="${count} ?: 0">2</a>
                 </td>
                 <td>
                     <span class="badge" th:classappend="${u.enabled ? 'ok' : 'bad'}" th:text="${u.enabled} ? #{users.list.active} : #{users.list.inactive}">활성</span>
@@ -65,16 +69,14 @@
             <p class="error" th:if="${#fields.hasErrors('password')}" th:errors="*{password}"></p>
             <label><span th:text="#{users.list.add.role}">역할</span>
                 <select th:field="*{role}">
-                    <option value="VIEWER" th:text="#{users.list.add.roleViewer}">VIEWER: 보기만</option>
-                    <option value="EDITOR" th:text="#{users.list.add.roleEditor}">EDITOR: 편집과 적용</option>
+                    <option value="MEMBER" th:text="#{users.list.add.roleMember}">MEMBER: 담당 사이트만</option>
                     <option value="ADMIN" th:text="#{users.list.add.roleAdmin}">ADMIN: 사용자·설정 관리까지</option>
                 </select>
             </label>
             <button type="submit" th:text="#{users.list.add.submit}">추가</button>
         </form>
         <dl class="hint">
-            <dt th:text="#{users.role.VIEWER}">보기 전용</dt><dd th:text="#{users.list.roleHelp.VIEWER}">…</dd>
-            <dt th:text="#{users.role.EDITOR}">편집자</dt><dd th:text="#{users.list.roleHelp.EDITOR}">…</dd>
+            <dt th:text="#{users.role.MEMBER}">멤버</dt><dd th:text="#{users.list.roleHelp.MEMBER}">…</dd>
             <dt th:text="#{users.role.ADMIN}">관리자</dt><dd th:text="#{users.list.roleHelp.ADMIN}">…</dd>
         </dl>
     </section>

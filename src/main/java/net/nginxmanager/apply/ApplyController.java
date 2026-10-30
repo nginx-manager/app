@@ -6,6 +6,8 @@ import net.nginxmanager.config.ConfigFileStore;
 import net.nginxmanager.config.UnifiedDiff;
 import net.nginxmanager.runtime.NginxCommandException;
 import net.nginxmanager.runtime.RuntimeCompatibility;
+import net.nginxmanager.common.NotFoundException;
+import net.nginxmanager.site.SiteAccess;
 import net.nginxmanager.site.SiteService;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
+import java.util.function.Predicate;
 
 @Controller
 @RequestMapping("/apply")
@@ -41,9 +44,12 @@ public class ApplyController {
     private final ConfigFileStore store;
     private final SiteService siteService;
     private final RuntimeCompatibility compatibility;
+    private final SiteAccess access;
 
     public ApplyController(ApplyService applyService, ConfigFileRepository configFileRepository,
-                           ConfigFileStore store, SiteService siteService, RuntimeCompatibility compatibility) {
+                           ConfigFileStore store, SiteService siteService, RuntimeCompatibility compatibility,
+                           SiteAccess access) {
+        this.access = access;
         this.applyService = applyService;
         this.configFileRepository = configFileRepository;
         this.store = store;
@@ -52,8 +58,8 @@ public class ApplyController {
     }
 
     @GetMapping
-    public String pending(Model model) {
-        model.addAttribute("pending", pendingFiles());
+    public String pending(Authentication authentication, Model model) {
+        model.addAttribute("pending", pendingFiles(authentication));
         model.addAttribute("applyBlocked", applyBlocked());
         return "apply/pending";
     }
@@ -63,18 +69,26 @@ public class ApplyController {
                         @RequestHeader(value = "HX-Request", required = false) String htmx, Model model) {
         try {
             model.addAttribute("result",
-                    applyService.applyPending(authentication.getName(), message.isBlank() ? null : message));
+                    applyService.applyPending(authentication.getName(), message.isBlank() ? null : message,
+                            access.files(authentication)));
         } catch (NginxCommandException e) {
             // 에이전트에 연결할 수 없거나 명령이 실패했다. 파일은 되돌렸고 초안은 그대로다
             model.addAttribute("failure", e.getMessage());
         }
-        model.addAttribute("pending", pendingFiles());
+        model.addAttribute("pending", pendingFiles(authentication));
         model.addAttribute("applyBlocked", applyBlocked());
         return htmx != null ? "apply/pending :: result" : "apply/pending";
     }
 
     @PostMapping("/discard/{fileId}")
     public String discard(@PathVariable long fileId, Authentication authentication) {
+        // 멤버는 담당 사이트의 초안만 버린다. 짝 파일(켜기/끄기, 비밀번호, 가져오기 원본)도 같은 사이트의 것이다
+        boolean mine = configFileRepository.findById(fileId)
+                .map(f -> access.files(authentication).test(f.getPath()))
+                .orElse(false);
+        if (!mine) {
+            throw new NotFoundException("config file " + fileId);
+        }
         siteService.discard(fileId, authentication.getName());
         return "redirect:/apply";
     }
@@ -84,9 +98,11 @@ public class ApplyController {
         return compatibility.current().map(w -> w.kind() != RuntimeCompatibility.Kind.VERSION).orElse(false);
     }
 
-    private List<PendingFile> pendingFiles() {
+    private List<PendingFile> pendingFiles(Authentication authentication) {
+        Predicate<String> visible = access.files(authentication);
         return configFileRepository.findAllByOrderByPathAsc().stream()
                 .filter(ConfigFile::hasPendingChange)
+                .filter(f -> visible.test(f.getPath()))
                 .map(f -> new PendingFile(f.getId(), f.getPath(), f.isDraftDelete(),
                         UnifiedDiff.of(f.getPath(), store.read(f.getPath()), f.isDraftDelete() ? null : f.getDraftContent())))
                 .toList();

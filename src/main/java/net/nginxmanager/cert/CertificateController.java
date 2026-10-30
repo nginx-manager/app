@@ -4,6 +4,7 @@ import net.nginxmanager.common.Messages;
 import net.nginxmanager.common.NotFoundException;
 import net.nginxmanager.site.Site;
 import net.nginxmanager.site.SiteRepository;
+import net.nginxmanager.site.SiteAccess;
 import net.nginxmanager.site.SiteService;
 import net.nginxmanager.site.SiteType;
 import net.nginxmanager.site.RawSiteLetsEncryptException;
@@ -37,10 +38,12 @@ public class CertificateController {
     private final SiteService siteService;
     private final Clock clock;
     private final Messages messages;
+    private final SiteAccess access;
 
     public CertificateController(TlsCertificateRepository certificateRepository, SiteRepository siteRepository,
                                  CertificateService certificateService, CertificateUploadService uploadService,
-                                 SiteService siteService, Clock clock, Messages messages) {
+                                 SiteService siteService, Clock clock, Messages messages, SiteAccess access) {
+        this.access = access;
         this.messages = messages;
         this.certificateRepository = certificateRepository;
         this.siteRepository = siteRepository;
@@ -76,9 +79,16 @@ public class CertificateController {
      */
     @PostMapping("/certs/{id}/renew")
     public String renew(@PathVariable long id, @RequestParam(required = false) Long siteId,
-                        RedirectAttributes redirect) {
+                        Authentication authentication, RedirectAttributes redirect) {
         if (!certificateRepository.existsById(id)) {
             throw new NotFoundException("certificate " + id);
+        }
+        if (!SiteAccess.isAdmin(authentication)) {
+            // 멤버는 담당 사이트 화면에서, 그 사이트에 연결된 인증서만 갱신한다
+            Site site = siteId == null ? null : access.require(siteId, authentication);
+            if (site == null || !Long.valueOf(id).equals(site.getCertificateId())) {
+                throw new NotFoundException("certificate " + id);
+            }
         }
         certificateService.submit(id);
         redirect.addFlashAttribute("notice", messages.get("msg.cert.renewStarted"));
@@ -94,7 +104,9 @@ public class CertificateController {
     @PostMapping("/certs/letsencrypt")
     public String letsEncrypt(@RequestParam long siteId, @RequestParam(required = false) String from,
                               Authentication authentication, RedirectAttributes redirect) {
-        String back = "certs".equals(from) ? "redirect:/certs" : "redirect:/sites/" + siteId + "#https";
+        access.require(siteId, authentication);
+        String back = "certs".equals(from) && SiteAccess.isAdmin(authentication) ? "redirect:/certs"
+                : "redirect:/sites/" + siteId + "#https";
         SiteService.LetsEncryptRequest request;
         try {
             request = siteService.enableLetsEncrypt(siteId, authentication.getName());

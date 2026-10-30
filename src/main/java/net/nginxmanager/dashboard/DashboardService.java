@@ -8,6 +8,7 @@ import net.nginxmanager.runtime.AgentInfo;
 import net.nginxmanager.runtime.NginxProcessWatcher;
 import net.nginxmanager.runtime.NginxRuntime;
 import net.nginxmanager.runtime.RuntimeStatus;
+import net.nginxmanager.site.Site;
 import net.nginxmanager.site.SiteRepository;
 import net.nginxmanager.startup.StartupCheck;
 import net.nginxmanager.startup.StartupCheckService;
@@ -19,6 +20,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /** 대시보드에 보이는 값(FR-014, FR-013, FR-023). */
 @Service
@@ -64,8 +68,21 @@ public class DashboardService {
 
     @Transactional(readOnly = true)
     public Dashboard load() {
+        return load(null);
+    }
+
+    /**
+     * @param memberId 멤버면 그 사용자 id. 사이트 수와 인증서 경고를 담당 사이트로 거르고, 관리자에게만 보이는 값
+     *                 (최근 적용, DB 크기)은 비운다(007). null이면 관리자
+     */
+    @Transactional(readOnly = true)
+    public Dashboard load(Long memberId) {
         Instant now = clock.instant();
+        Set<Long> memberCertificates = memberId == null ? null
+                : siteRepository.findByOwnerId(memberId).stream()
+                        .map(Site::getCertificateId).filter(Objects::nonNull).collect(Collectors.toSet());
         List<CertificateWarning> warnings = certificateRepository.findAllByOrderByNameAsc().stream()
+                .filter(c -> memberCertificates == null || memberCertificates.contains(c.getId()))
                 .filter(c -> c.isFailing() || (c.getStatus() == CertificateStatus.ACTIVE && c.isExpiringSoon(now)))
                 .map(c -> warning(c, now))
                 .toList();
@@ -74,6 +91,12 @@ public class DashboardService {
         StartupCheck failed = startupCheckService.check()
                 .filter(check -> !check.ok() && status.state() == RuntimeStatus.State.STOPPED)
                 .orElse(null);
+        if (memberId != null) {
+            return new Dashboard(status, siteRepository.countByOwnerId(memberId),
+                    siteRepository.countByOwnerIdAndEnabledTrue(memberId), List.of(), warnings, 0, failed,
+                    startupCheckService.versionChange().orElse(null), startupCheckService.appVersion(),
+                    processWatcher.lastEvent().orElse(null), runtime.agent());
+        }
         return new Dashboard(status, siteRepository.count(), siteRepository.countByEnabledTrue(),
                 versionQueryRepository.findPage(0, RECENT_VERSIONS), warnings, databaseBytes(), failed,
                 startupCheckService.versionChange().orElse(null), startupCheckService.appVersion(),

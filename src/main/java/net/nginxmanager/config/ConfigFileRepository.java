@@ -19,6 +19,8 @@ public interface ConfigFileRepository extends JpaRepository<ConfigFile, Long> {
 
     boolean existsByDraftContentContaining(String text);
 
+    List<ConfigFile> findByDraftContentIsNotNullOrDraftDeleteTrue();
+
     default long countPending() {
         return countByDraftContentIsNotNullOrDraftDeleteTrue();
     }

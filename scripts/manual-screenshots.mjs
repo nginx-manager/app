@@ -183,12 +183,20 @@ await shot('logs');
 
 // 12장: 사용자, 알림, 감사 로그
 await go('/users');
-for (const [name, role] of [['kim.editor', 'EDITOR'], ['lee.viewer', 'VIEWER']]) {
+for (const [name, role] of [['kim.dev', 'MEMBER'], ['lee.ops', 'MEMBER']]) {
     await page.fill('form[action$="/users"] input[name=username]', name);
     await page.fill('form[action$="/users"] input[name=password]', 'welcome-2026-nm');
     await page.selectOption('form[action$="/users"] select[name=role]', role);
     await submit('form[action$="/users"] button[type=submit]');
 }
+// 4장: 사이트 담당자. docs.example.com을 멤버 kim.dev에게 맡긴다
+await go('/sites');
+await page.locator('a', { hasText: 'docs.example.com' }).first().click();
+await page.waitForLoadState('networkidle');
+await page.selectOption('form[action$="/owner"] select[name=owner]', { label: 'kim.dev' });
+await submit('form[action$="/owner"] button[type=submit]');
+await shot('site-owner', { selector: 'form[action$="/owner"]' });
+await go('/users');
 await shot('users');
 await go('/settings/notifications');
 await page.selectOption('select[name=type]', 'WEBHOOK');
@@ -229,6 +237,18 @@ await page.screenshot({ path: join(outDir, 'footer.png'), clip: { x: footerBox.x
 // 2장: 관리도구 안의 사용 설명서
 await go('/guide/04-sites');
 await shot('guide');
+
+// 4장: 멤버가 보는 사이트 목록(담당 사이트만)
+const member = await browser.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2, locale: 'ko-KR' });
+await member.goto(base + '/login');
+await member.fill('input[name=username]', 'kim.dev');
+await member.fill('input[name=password]', 'welcome-2026-nm');
+await Promise.all([member.waitForNavigation(), member.click('button[type=submit]')]);
+await member.goto(base + '/sites');
+await member.waitForLoadState('networkidle');
+await member.screenshot({ path: join(outDir, 'member-sites.png') });
+console.log('saved', join(outDir, 'member-sites.png'));
+await member.close();
 
 // 휴대폰 폭(390px): 메뉴 버튼으로 연 메뉴
 await page.setViewportSize({ width: 390, height: 844 });

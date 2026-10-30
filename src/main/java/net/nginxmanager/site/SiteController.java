@@ -7,6 +7,7 @@ import net.nginxmanager.cert.CertificateSource;
 import net.nginxmanager.cert.TlsCertificate;
 import net.nginxmanager.cert.TlsCertificateRepository;
 import net.nginxmanager.config.ConfigFileStore;
+import net.nginxmanager.user.UserRepository;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -31,11 +32,15 @@ public class SiteController {
     private final TlsCertificateRepository certificateRepository;
     private final CertificateService certificateService;
     private final ImportFiles importFiles;
+    private final SiteAccess access;
+    private final UserRepository userRepository;
 
     public SiteController(SiteService siteService, SiteQueryRepository siteQueryRepository,
                           SiteRendering rendering, ConfigFileStore store,
                           TlsCertificateRepository certificateRepository, CertificateService certificateService,
-                          ImportFiles importFiles) {
+                          ImportFiles importFiles, SiteAccess access, UserRepository userRepository) {
+        this.access = access;
+        this.userRepository = userRepository;
         this.importFiles = importFiles;
         this.certificateService = certificateService;
         this.siteService = siteService;
@@ -65,10 +70,36 @@ public class SiteController {
         });
     }
 
+    /**
+     * 사이트 목록. 멤버는 담당 사이트만, 관리자는 전체를 담당자로 걸러 본다.
+     *
+     * @param owner 관리자의 담당자 거르기: 비우면 전체, none이면 담당자 없음, 숫자면 그 사용자
+     */
     @GetMapping
-    public String list(Model model) {
-        model.addAttribute("sites", siteQueryRepository.findAllRows());
+    public String list(@RequestParam(required = false) String owner, Authentication authentication, Model model) {
+        SiteQueryRepository.OwnerFilter filter = access.memberId(authentication)
+                .<SiteQueryRepository.OwnerFilter>map(SiteQueryRepository.OwnerFilter.Owner::new)
+                .orElseGet(() -> adminFilter(owner));
+        model.addAttribute("sites", siteQueryRepository.findRows(filter));
+        if (SiteAccess.isAdmin(authentication)) {
+            model.addAttribute("users", userRepository.findAllByOrderByUsernameAsc());
+            model.addAttribute("ownerFilter", owner == null ? "" : owner);
+        }
         return "sites/list";
+    }
+
+    private static SiteQueryRepository.OwnerFilter adminFilter(String owner) {
+        if (owner == null || owner.isBlank()) {
+            return SiteQueryRepository.OwnerFilter.ALL;
+        }
+        if (owner.equals("none")) {
+            return SiteQueryRepository.OwnerFilter.NONE;
+        }
+        try {
+            return new SiteQueryRepository.OwnerFilter.Owner(Long.parseLong(owner));
+        } catch (NumberFormatException e) {
+            return SiteQueryRepository.OwnerFilter.ALL;
+        }
     }
 
     @GetMapping("/new")
@@ -84,7 +115,8 @@ public class SiteController {
             return "sites/form";
         }
         try {
-            Site site = siteService.create(form, authentication.getName());
+            // 멤버가 만든 사이트는 그 멤버가 담당한다. 관리자가 만든 사이트는 담당자 없이 시작한다
+            Site site = siteService.create(form, authentication.getName(), access.ownerOfNewSite(authentication));
             return "redirect:/sites/" + site.getId() + "?saved";
         } catch (DuplicateSiteException e) {
             bindingResult.rejectValue("primaryDomain", "msg.site.domainTaken", new Object[] {e.getDomain()}, duplicateMessage(e));
@@ -99,19 +131,21 @@ public class SiteController {
     }
 
     @GetMapping("/{id}")
-    public String detail(@PathVariable long id, Model model) {
+    public String detail(@PathVariable long id, Authentication authentication, Model model) {
         Site site = siteQueryRepository.findWithFile(id).orElseThrow(() -> new NotFoundException("site " + id));
+        access.check(site, authentication);
         model.addAttribute("form", rendering.formOf(site));
-        addDetail(site, model);
+        addDetail(site, authentication, model);
         return "sites/detail";
     }
 
     @PostMapping("/{id}")
     public String update(@PathVariable long id, @Valid @ModelAttribute("form") SiteForm form,
                          BindingResult bindingResult, Authentication authentication, Model model) {
+        access.require(id, authentication);
         if (bindingResult.hasErrors()) {
             Site site = siteQueryRepository.findWithFile(id).orElseThrow(() -> new NotFoundException("site " + id));
-            addDetail(site, model);
+            addDetail(site, authentication, model);
             return "sites/detail";
         }
         try {
@@ -119,12 +153,12 @@ public class SiteController {
         } catch (DuplicateSiteException e) {
             bindingResult.rejectValue("extraDomains", "msg.site.domainTaken", new Object[] {e.getDomain()}, duplicateMessage(e));
             Site site = siteQueryRepository.findWithFile(id).orElseThrow(() -> new NotFoundException("site " + id));
-            addDetail(site, model);
+            addDetail(site, authentication, model);
             return "sites/detail";
         } catch (PortInUseException e) {
             rejectPort(bindingResult, e);
             Site site = siteQueryRepository.findWithFile(id).orElseThrow(() -> new NotFoundException("site " + id));
-            addDetail(site, model);
+            addDetail(site, authentication, model);
             return "sites/detail";
         } catch (RawSiteFormException e) {
             // 폼을 연 사이 원문 편집기로 고쳐졌다. 폼 값으로 덮어쓰지 않는다
@@ -132,7 +166,7 @@ public class SiteController {
         } catch (MissingPasswordException e) {
             rejectMissingPassword(bindingResult, e);
             Site site = siteQueryRepository.findWithFile(id).orElseThrow(() -> new NotFoundException("site " + id));
-            addDetail(site, model);
+            addDetail(site, authentication, model);
             return "sites/detail";
         }
         return "redirect:/sites/" + id + "?saved";
@@ -155,8 +189,17 @@ public class SiteController {
     @PostMapping("/{id}/enabled")
     public String setEnabled(@PathVariable long id, @RequestParam boolean enabled, @RequestParam long version,
                              Authentication authentication) {
+        access.require(id, authentication);
         siteService.setEnabled(id, enabled, version, authentication.getName());
         return "redirect:/sites/" + id + "?saved";
+    }
+
+    /** 관리자가 담당자를 지정·변경·해제한다(SecurityConfig에서 관리자 전용). 설정 파일은 바뀌지 않는다. */
+    @PostMapping("/{id}/owner")
+    public String assignOwner(@PathVariable long id, @RequestParam(required = false) Long owner,
+                              @RequestParam long version, Authentication authentication) {
+        siteService.assignOwner(id, owner, version, authentication.getName());
+        return "redirect:/sites/" + id + "?assigned";
     }
 
     /** 폼 값으로 만들 설정을 저장 전에 미리 본다(htmx). */
@@ -172,7 +215,10 @@ public class SiteController {
      * 상세 화면의 사이트·설정 원문·인증서 상태. siteLive는 nginx가 지금 이 사이트를 서비스하는지(적용했고 켜져 있는지)로,
      * 서비스 중이어야 Let's Encrypt가 도메인을 확인할 수 있어 바로 발급할 수 있다.
      */
-    private void addDetail(Site site, Model model) {
+    private void addDetail(Site site, Authentication authentication, Model model) {
+        if (SiteAccess.isAdmin(authentication)) {
+            model.addAttribute("users", userRepository.findAllByOrderByUsernameAsc());
+        }
         TlsCertificate certificate = certificateOf(site);
         model.addAttribute("site", site);
         model.addAttribute("content", currentContent(site));

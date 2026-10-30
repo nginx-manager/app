@@ -155,7 +155,7 @@ class CertificateUploadTest extends ConfigRootTest {
     @Test
     void uploadThroughWebAndPagesRender() throws Exception {
         TestCertificates.Issued cert = TestCertificates.selfSigned("web.example.com");
-        mvc.perform(multipart("/certs/upload").with(csrf()).with(user("ed").roles("EDITOR"))
+        mvc.perform(multipart("/certs/upload").with(csrf()).with(user("ed").roles("ADMIN"))
                         .file(new MockMultipartFile("certificate", "fullchain.pem", "application/x-pem-file",
                                 cert.certPem().getBytes(StandardCharsets.US_ASCII)))
                         .file(new MockMultipartFile("privateKey", "privkey.pem", "application/x-pem-file",
@@ -164,13 +164,15 @@ class CertificateUploadTest extends ConfigRootTest {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(flash().attributeExists("notice"));
 
-        mvc.perform(get("/certs").with(user("v").roles("VIEWER")))
+        mvc.perform(get("/certs").with(user("ad").roles("ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("web.example.com")))
-                .andExpect(content().string(containsString("업로드")))
-                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("인증서 업로드</h2>"))));
+                .andExpect(content().string(containsString("업로드")));
+        // 인증서 화면은 관리자만 본다(007)
+        mvc.perform(get("/certs").with(user("v").roles("MEMBER")))
+                .andExpect(status().isForbidden());
 
-        mvc.perform(multipart("/certs/upload").with(csrf()).with(user("ed").roles("EDITOR"))
+        mvc.perform(multipart("/certs/upload").with(csrf()).with(user("ed").roles("ADMIN"))
                         .file(new MockMultipartFile("certificate", "x", "text/plain", "garbage".getBytes(StandardCharsets.UTF_8)))
                         .file(new MockMultipartFile("privateKey", "y", "text/plain", "garbage".getBytes(StandardCharsets.UTF_8)))
                         .param("name", "bad"))
@@ -178,11 +180,11 @@ class CertificateUploadTest extends ConfigRootTest {
 
         Site site = siteService.create(new SiteForm("web.example.com", "", SiteType.STATIC, 80, "/srv/www", null,
                 null, true, true, certificateRepository.findByName("web").orElseThrow().getId()), "ed");
-        mvc.perform(get("/sites/" + site.getId()).with(user("ed").roles("EDITOR")))
+        mvc.perform(get("/sites/" + site.getId()).with(user("ed").roles("ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("HTTPS 인증서")))
                 .andExpect(content().string(containsString("web (업로드)")));
-        mvc.perform(get("/sites/new").with(user("ed").roles("EDITOR")))
+        mvc.perform(get("/sites/new").with(user("ed").roles("ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Encrypt 인증서 발급 (무료, 자동 갱신)")));
         mvc.perform(get("/settings/acme").with(user("admin").roles("ADMIN")))

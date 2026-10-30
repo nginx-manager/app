@@ -21,7 +21,7 @@ class VersionListQueryCountTest extends ConfigRootTest {
 
     @Test
     void versionListQueryCountDoesNotGrowWithVersions() {
-        User author = userRepository.save(new User("editor", "{noop}x", Role.EDITOR));
+        User author = userRepository.save(new User("editor", "{noop}x", Role.MEMBER));
         queryCounter.assertConstantQueries(
                 n -> {
                     for (int i = 0; i < n; i++) {
