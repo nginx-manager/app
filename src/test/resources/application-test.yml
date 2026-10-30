@@ -30,6 +30,9 @@ nginx-manager:
     initial-delay: PT24H
   process-watch:
     interval: PT24H
+  # 예약 변경 감지는 적용 잠금을 잡으므로, 다른 테스트의 적용과 겹치지 않게 돌리지 않는다
+  drift:
+    interval: PT24H
 
 logging:
   level:

@@ -114,6 +114,18 @@
                 <th:block th:if="${currentUser.isAdmin()}">
                     <dt th:text="#{dashboard.facts.dbSize}">DB 크기</dt>
                     <dd th:text="${#numbers.formatDecimal(dashboard.databaseBytes / 1048576.0, 1, 1)} + ' MB'">1.2 MB</dd>
+                    <dt th:text="#{dashboard.facts.backup}">마지막 백업</dt>
+                    <dd id="last-backup">
+                        <span th:if="${backupWarning}" class="badge bad" th:text="${backup.recorded() and !backup.ok()} ? #{dashboard.backup.failed} : #{dashboard.backup.stale}">확인 필요</span>
+                        <th:block th:if="${backup.recorded()}">
+                            <span th:text="${#temporals.format(backup.at(), 'yyyy-MM-dd HH:mm')}">2026-10-30 03:30</span>
+                            <span class="small muted" th:if="${backup.ok()}"
+                                  th:text="'(' + (${backup.auto()} ? #{dashboard.backup.auto} : (${backup.label()} ?: #{dashboard.backup.manual})) + ', ' + ${#numbers.formatDecimal(backup.bytes() / 1048576.0, 1, 1)} + ' MB)'">(자동, 1.2 MB)</span>
+                            <div class="small muted" th:if="${!backup.ok() and backup.reason() != null}" th:text="#{|dashboard.backup.reason.${backup.reason()}|}">디스크 공간이 모자랍니다</div>
+                        </th:block>
+                        <span th:unless="${backup.recorded()}" class="muted" th:text="#{dashboard.backup.none}">아직 없음</span>
+                        <div class="small muted" th:text="${backup.schedule()} != null ? #{dashboard.backup.schedule(${backup.schedule()})} : #{dashboard.backup.off}">매일 03:30 자동 백업</div>
+                    </dd>
                 </th:block>
             </dl>
         </section>

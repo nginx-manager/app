@@ -61,6 +61,7 @@ ssh -L 9000:127.0.0.1:9000 <서버>
 | `NGINX_HTTP_PORT`, `NGINX_HTTPS_PORT` | `80`, `443` | 앞단에 다른 프록시가 있어 80/443을 못 쓸 때 |
 | `NGINX_BIND_ADDRESS` | `0.0.0.0` | nginx를 특정 IP에만 열 때 |
 | `NGINX_MANAGER_BACKUP_KEEP` | `14` | `nm backup`이 남길 백업 수 |
+| `NGINX_MANAGER_BACKUP_AT` | `03:30` | 매일 자동 백업 시각(HH:MM). `off`면 끕니다. 바꾼 뒤 `sudo nm backup-schedule` |
 | `TZ` | `Asia/Seoul` | 서버 시간대가 다를 때 |
 | `NGINX_MANAGER_IMPORT_ROOTS` | (비움) | `/etc/nginx` 밖의 설정 파일이나 그 설정이 쓰는 파일(예: `/home`, `/etc/letsencrypt`). 쉼표로 여럿. 고친 뒤 `nm up`(또는 `nm import-root add`) |
 | `SPRING_MAIL_*` | (비움) | 메일 알림을 보낼 때 SMTP 서버 |
@@ -137,6 +138,7 @@ services:
 | `NGINX_MANAGER_IMPORT_ROOTS` | 호스트의 다른 디렉터리(예: `/home`)에서 [설정 파일을 가져올](05-import.md#호스트의-다른-디렉터리-붙이기) 때. `nm import-root add`가 적고 두 컨테이너에 같은 경로로 붙입니다 |
 | `SPRING_MAIL_HOST`, `SPRING_MAIL_PORT`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD` | [메일 알림](12-admin.md#알림-설정)을 보낼 SMTP 서버 |
 | `NGINX_MANAGER_BACKUP_KEEP` | `nm backup`이 남길 백업 수(기본 14) |
+| `NGINX_MANAGER_BACKUP_AT` | 매일 자동 백업 시각(기본 03:30, `off`면 끔). 바꾼 뒤 `sudo nm backup-schedule` |
 | `TZ` | 시간대(기본 `Asia/Seoul`) |
 
 그 밖에 `compose.override.yml`의 manager `environment`로 줄 수 있는 값: `NGINX_MANAGER_ACME_DIRECTORY_URL`(다른 ACME 서버), `NGINX_MANAGER_CERT_CHECK_INTERVAL`(갱신 확인 주기, 기본 `PT6H`), `NGINX_RUNTIME_AGENT_TOKEN`(에이전트 토큰을 직접 정할 때. nginx의 `NGINX_AGENT_TOKEN`과 같게).
@@ -199,11 +201,13 @@ sudo /opt/nginx-manager/nm restore backups/<파일>
 - 복원은 지금 데이터를 먼저 `backups/…-before-restore`로 남긴 뒤 바꿉니다. nginx가 몇 초 다시 시작합니다. 백업보다 낮은 manager 버전으로는 복원하지 않습니다(DB를 낮은 버전으로 되돌릴 수 없습니다). 백업 당시의 `.env`는 `.env.restored`에 둡니다.
 - 새 서버로 옮길 때는 같은 버전을 설치하고 백업 파일을 복사해 `nm restore`합니다.
 
-매일 새벽 정기 백업 예(cron):
+### 자동 백업
 
-```bash
-echo '30 3 * * * root /opt/nginx-manager/nm backup >/dev/null' | sudo tee /etc/cron.d/nginx-manager-backup
-```
+설치와 `nm upgrade`가 매일 03:30(서버 시간)에 `nm backup --label auto`를 돌리는 스케줄을 깝니다(`/etc/cron.d/nginx-manager-backup`, cron이 없으면 systemd timer `nginx-manager-backup.timer`). 자동 백업도 `NGINX_MANAGER_BACKUP_KEEP` 개수에 같이 셉니다.
+
+- 시각을 바꾸려면 `.env`의 `NGINX_MANAGER_BACKUP_AT`(예: `04:15`)을 고치고 `sudo /opt/nginx-manager/nm backup-schedule`을 실행합니다. `off`로 두고 실행하면 끕니다.
+- 스케줄은 호스트의 `/etc`에 쓰므로 root(`sudo`)로 실행해야 합니다.
+- 마지막 백업의 시각·크기와 실패 여부는 [대시보드](03-dashboard.md)에 보입니다.
 
 ## v1.1 이전 설치 옮기기
 

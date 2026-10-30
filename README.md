@@ -50,6 +50,7 @@ curl -fsSL https://github.com/nginx-manager/app/releases/latest/download/install
 | `NGINX_HTTP_PORT`, `NGINX_HTTPS_PORT` | `80`, `443` | 앞단에 다른 프록시가 있어 80/443을 못 쓸 때 |
 | `NGINX_BIND_ADDRESS` | `0.0.0.0` | nginx를 특정 IP에만 열 때 |
 | `NGINX_MANAGER_BACKUP_KEEP` | `14` | `nm backup`이 남길 백업 수 |
+| `NGINX_MANAGER_BACKUP_AT` | `03:30` | 매일 자동 백업(`nm backup --label auto`) 시각. `off`면 끕니다. 바꾼 뒤 `sudo nm backup-schedule` |
 | `TZ` | `Asia/Seoul` | 서버 시간대가 다를 때 |
 | `NGINX_MANAGER_IMPORT_ROOTS` | (비움) | `/etc/nginx` 밖의 설정 파일이나 그 설정이 쓰는 파일(예: `/home`, `/etc/letsencrypt`). 쉼표로 여럿. 고친 뒤 `nm up` |
 | `SPRING_MAIL_*` | (비움) | 메일 알림을 보낼 때 SMTP 서버 |

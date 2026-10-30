@@ -12,6 +12,9 @@ here="$(cd "$(dirname "$0")/.." && pwd)"
 work="$(mktemp -d)"
 dir="$work/nm"
 export NM_SKIP_PULL=1 NM_WAIT_TIMEOUT="${NM_WAIT_TIMEOUT:-120}"
+# 자동 백업 스케줄(015)은 호스트의 /etc 대신 여기에 쓴다
+export NM_CRON_DIR="$work/cron"
+mkdir -p "$NM_CRON_DIR"
 HTTP=18080
 failures=0
 
@@ -44,6 +47,7 @@ check ".env에 버전과 포트" sh -c "grep -q '^MANAGER_VERSION=$OLD\$' '$dir/
 check ".env는 다른 사용자가 읽지 못한다" sh -c "[ \"\$(stat -c %a '$dir/.env')\" = 600 ]"
 check "관리 화면은 127.0.0.1에만" sh -c "cd '$dir' && docker compose port manager 9000 | grep -q '^127.0.0.1:19000\$'"
 check "nginx가 응답" sh -c "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:$HTTP/ | grep -qv '^000\$'"
+check "매일 03:30 자동 백업 스케줄" grep -q "^30 3 \* \* \* root $dir/nm backup --label auto" "$NM_CRON_DIR/nginx-manager-backup"
 
 step "다시 설치하면 덮어쓰지 않는다"
 echo "# keep" >> "$dir/.env"
@@ -155,6 +159,7 @@ docker run --rm -v "$dir/data/conf:/c" alpine:3.20 sh -c 'mkdir -p /c/conf.d/sit
 backup="$(ls -1t "$dir"/backups/nginx-manager-*.tar.gz | head -n1)"
 check "백업 파일 권한 600" [ "$(stat -c %a "$backup")" = 600 ]
 check "보관 수 3" [ "$(ls -1 "$dir"/backups/nginx-manager-*.tar.gz | wc -l)" -le 3 ]
+check "백업 상태를 관리 화면에 남김" sh -c "grep -qx 'result=ok' '$dir/data/manager/backup-status' && grep -qx \"file=\$(basename '$backup')\" '$dir/data/manager/backup-status'"
 docker run --rm -v "$dir/data/conf:/c" alpine:3.20 rm -f /c/conf.d/sites/zz-marker.conf
 "$dir/nm" restore "$backup" -y
 check "복원한 파일이 돌아옴" [ -f "$dir/data/conf/conf.d/sites/zz-marker.conf" ]

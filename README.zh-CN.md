@@ -50,6 +50,7 @@ curl -fsSL https://github.com/nginx-manager/app/releases/latest/download/install
 | `NGINX_HTTP_PORT`, `NGINX_HTTPS_PORT` | `80`, `443` | 前端已有其他代理、无法使用 80/443 时 |
 | `NGINX_BIND_ADDRESS` | `0.0.0.0` | 只在特定 IP 上开放 nginx 时 |
 | `NGINX_MANAGER_BACKUP_KEEP` | `14` | `nm backup` 保留的备份数量 |
+| `NGINX_MANAGER_BACKUP_AT` | `03:30` | 每日自动备份（`nm backup --label auto`）的时间。`off` 表示关闭。修改后运行 `sudo nm backup-schedule` |
 | `TZ` | `Asia/Seoul` | 服务器时区不同时 |
 | `NGINX_MANAGER_IMPORT_ROOTS` | （空） | 需要导入 `/etc/nginx` 之外的配置文件时。不要手动修改，使用 `nm import-root add /home` |
 | `SPRING_MAIL_*` | （空） | 发送邮件通知时的 SMTP 服务器 |

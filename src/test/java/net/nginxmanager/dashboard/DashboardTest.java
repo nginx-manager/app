@@ -3,6 +3,7 @@ package net.nginxmanager.dashboard;
 import net.nginxmanager.apply.ApplyService;
 import net.nginxmanager.audit.AuditAction;
 import net.nginxmanager.audit.AuditResult;
+import net.nginxmanager.backup.BackupStatusReader;
 import net.nginxmanager.cert.CertificateUploadService;
 import net.nginxmanager.site.SiteForm;
 import net.nginxmanager.site.SiteService;
@@ -19,6 +20,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 
@@ -49,6 +52,8 @@ class DashboardTest extends ConfigRootTest {
     CertificateUploadService uploadService;
     @Autowired
     QueryCounter queryCounter;
+    @Autowired
+    BackupStatusReader backups;
 
     @BeforeEach
     void completeSetup() {
@@ -151,5 +156,28 @@ class DashboardTest extends ConfigRootTest {
                 .andExpect(content().string(not(containsString("<footer"))))
                 .andExpect(content().string(containsString("href=\"https://github.com/nginx-manager/app\"")))
                 .andExpect(content().string(containsString("<span>GitHub</span></a>")));
+    }
+
+    @Test
+    void adminsSeeTheLastBackupAndAFailure() throws Exception {
+        Path status = backups.statusFile();
+        Files.createDirectories(status.getParent());
+        try {
+            Files.writeString(status, "time=2026-10-30T03:30:05+0900\nresult=ok\nfile=b.tar.gz\nbytes=2097152\nlabel=auto\nreason=\n");
+            mvc.perform(get("/").with(user("admin").roles("ADMIN")))
+                    .andExpect(content().string(containsString("마지막 백업")))
+                    .andExpect(content().string(containsString("(자동, 2.0 MB)")));
+
+            Files.writeString(status, "time=2026-10-30T03:30:05+0900\nresult=failed\nfile=\nbytes=0\nlabel=auto\nreason=no-space\n");
+            mvc.perform(get("/").with(user("admin").roles("ADMIN")))
+                    .andExpect(content().string(containsString("백업 실패")))
+                    .andExpect(content().string(containsString("디스크 공간이 모자랍니다")));
+
+            userRepository.save(new User("member", "{noop}unused-password", Role.MEMBER));
+            mvc.perform(get("/").with(user("member").roles("MEMBER")))
+                    .andExpect(content().string(not(containsString("마지막 백업"))));
+        } finally {
+            Files.deleteIfExists(status);
+        }
     }
 }

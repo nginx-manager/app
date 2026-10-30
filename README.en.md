@@ -50,6 +50,7 @@ The `.env` in the install directory (contains the values you passed as install o
 | `NGINX_HTTP_PORT`, `NGINX_HTTPS_PORT` | `80`, `443` | When another proxy in front takes 80/443 |
 | `NGINX_BIND_ADDRESS` | `0.0.0.0` | To expose nginx only on a specific IP |
 | `NGINX_MANAGER_BACKUP_KEEP` | `14` | Number of backups `nm backup` keeps |
+| `NGINX_MANAGER_BACKUP_AT` | `03:30` | Time of the daily automatic backup (`nm backup --label auto`). `off` turns it off. Run `sudo nm backup-schedule` after changing it |
 | `TZ` | `Asia/Seoul` | When the server is in a different time zone |
 | `NGINX_MANAGER_IMPORT_ROOTS` | (empty) | To import config files outside `/etc/nginx`. Don't edit by hand; use `nm import-root add /home` |
 | `SPRING_MAIL_*` | (empty) | SMTP server for email alerts |

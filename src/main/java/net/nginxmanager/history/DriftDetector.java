@@ -65,7 +65,8 @@ public class DriftDetector {
         this.clock = clock;
     }
 
-    @Scheduled(initialDelayString = "PT1M", fixedDelayString = "PT1M")
+    @Scheduled(initialDelayString = "${nginx-manager.drift.interval:PT1M}",
+            fixedDelayString = "${nginx-manager.drift.interval:PT1M}")
     public void scheduledScan() {
         refresh();
     }
