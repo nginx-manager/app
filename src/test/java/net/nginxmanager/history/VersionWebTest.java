@@ -52,9 +52,10 @@ class VersionWebTest extends ConfigRootTest {
     }
 
     @Test
-    void memberCannotSeeHistoryOrRollBack() throws Exception {
+    void memberCannotSeeWholeHistoryOrRollBack() throws Exception {
+        // 멤버는 담당 사이트의 이력만 본다(014). 도메인 없이는 404
         mvc.perform(get("/versions").with(user("vi").roles("MEMBER")))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isNotFound());
         mvc.perform(post("/versions/" + first + "/rollback").with(csrf()).with(user("vi").roles("MEMBER")))
                 .andExpect(status().isForbidden());
     }

@@ -29,8 +29,10 @@ public class SecurityConfig {
                         .requestMatchers("/setup", "/login", "/css/**", "/js/**", "/webjars/**", "/favicon.ico", "/favicon.svg", "/favicon-32.png", "/apple-touch-icon.png", "/actuator/health", "/actuator/health/liveness", "/actuator/health/readiness", "/error").permitAll()
                         // 여러 사이트에 걸치거나 서버 전체에 영향을 주는 기능은 관리자만 쓴다(007)
                         .requestMatchers("/users/**", "/audit/**", "/settings/**", "/runtime/**", "/files/**",
-                                "/streams/**", "/versions/**", "/drift/**", "/sites/import", "/sites/import/**",
+                                "/streams/**", "/drift/**", "/sites/import", "/sites/import/**",
                                 "/sites/*/owner", "/sites/*/reimport", "/logs/*/per-site").hasRole("ADMIN")
+                        // 이력 보기는 멤버도(담당 사이트 파일만, 014). 되돌리기는 서버 전체를 바꾸므로 관리자만
+                        .requestMatchers(HttpMethod.POST, "/versions/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/certs").hasRole("ADMIN")
                         .requestMatchers("/certs/upload", "/certs/*/delete").hasRole("ADMIN")
                         // 나머지(사이트, 적용, 로그, 사이트 화면의 인증서 발급·갱신)는 멤버부터. 사이트 단위 권한은 SiteAccess가 본다

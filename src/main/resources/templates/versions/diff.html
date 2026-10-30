@@ -5,10 +5,12 @@
 <nav th:replace="~{fragments/layout :: nav}"></nav>
 <main class="page">
     <h1>
-        <a th:href="@{/versions/{id}(id=${from.id})}" th:text="'#' + ${from.id}">#1</a>
+        <a th:href="${domain} ? @{/versions/{id}(id=${from.id},domain=${domain})} : @{/versions/{id}(id=${from.id})}" th:text="'#' + ${from.id}">#1</a>
         →
-        <a th:href="@{/versions/{id}(id=${to.id})}" th:text="'#' + ${to.id}">#3</a>
+        <a th:href="${domain} ? @{/versions/{id}(id=${to.id},domain=${domain})} : @{/versions/{id}(id=${to.id})}" th:text="'#' + ${to.id}">#3</a>
     </h1>
+    <p class="hint" th:if="${domain}"><th:block th:text="#{versions.site.filesOnly(${domain})}">app.local 사이트의 파일만 보입니다.</th:block>
+        <a th:href="@{/versions(domain=${domain})}" th:text="#{versions.site.back(${domain})}">app.local 이력으로</a></p>
     <p class="hint" th:text="#{versions.diff.help}">왼쪽 버전에서 오른쪽 버전으로 바뀐 내용입니다. - 줄은 빠진 내용, + 줄은 더해진 내용입니다.</p>
     <p class="muted" th:if="${!from.snapshot or !to.snapshot}" th:text="#{versions.diff.partial}">
         실패한 버전은 적용하려던 파일만 담고 있어, 그 파일들만 비교합니다.
