@@ -87,6 +87,42 @@
         }
     }
 
+    // htmx 요청이 실패하면(4xx·5xx, 연결 끊김) 아무 반응 없이 끝나지 않도록 보낸 폼 옆에 이유를 보인다
+    function showRequestError(event) {
+        const form = event.detail.elt.closest('form') || event.detail.elt;
+        const xhr = event.detail.xhr;
+        const template = document.getElementById('request-failed-text');
+        const text = (template ? template.textContent : 'Request failed (HTTP {status})')
+            .replace('{status}', xhr && xhr.status ? String(xhr.status) : '-');
+        let box = form.querySelector('.request-error');
+        if (!box) {
+            box = document.createElement('p');
+            box.className = 'warning request-error';
+            box.setAttribute('role', 'alert');
+            form.appendChild(box);
+        }
+        box.textContent = text;
+    }
+
+    document.addEventListener('htmx:responseError', showRequestError);
+    document.addEventListener('htmx:sendError', showRequestError);
+    document.addEventListener('htmx:beforeRequest', function (event) {
+        const form = event.detail.elt.closest('form');
+        const box = form && form.querySelector('.request-error');
+        if (box) {
+            box.remove();
+        }
+    });
+    // 결과는 화면 위쪽에 바뀌어 들어간다. 아래의 버튼을 누른 사람이 결과를 보도록 그리로 옮긴다
+    document.addEventListener('htmx:afterSettle', function (event) {
+        const result = event.detail.target && event.detail.target.id === 'result'
+            ? document.getElementById('result') : null;
+        if (result && result.children.length > 0) {
+            result.querySelectorAll('pre.diff').forEach(colorDiff);
+            result.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    });
+
     document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('.auth .field').forEach(function (field) {
             if (field.querySelector('input[type=password]')) {
