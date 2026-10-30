@@ -62,6 +62,8 @@ TRAFFIC_URL=http://localhost IMPORT_PATTERN='/home/*/nginx/*.conf' \
 docker compose -f docker/docker-compose.yml -f /tmp/nm-override.yml -p nm-manual down -v
 ```
 
+서버에 Docker가 없으면 GitHub Actions의 **Manual screenshots** 워크플로([manual-screenshots.yml](../.github/workflows/manual-screenshots.yml))를 실행합니다. 같은 절차로 찍어 `screenshots/<실행 번호>` 브랜치에 올리므로, 그 브랜치의 `src/main/resources/static/guide/images/`를 작업 브랜치로 가져와 PR에 넣습니다.
+
 스크립트에는 [playwright](https://playwright.dev) 패키지(`npm i -g playwright`, 전역 설치면 `NODE_PATH` 지정)와 `openssl`이 필요합니다. 그림은 2배 해상도로 찍히고, 설명서에서는 `width`로 1배 크기에 맞춰 보여 줍니다. 그림을 바꾸면 이미지를 다시 빌드해야 관리 화면에 보입니다.
 
 ## 릴리스할 때
