@@ -226,6 +226,9 @@ public class SiteController {
         model.addAttribute("certificateRunning", certificate != null && certificateService.isRunning(certificate.getId()));
         model.addAttribute("siteLive", site.isEnabled() && store.read(site.getConfigFile().getPath()) != null);
         model.addAttribute("importChanged", importChanged(site));
+        // 원문 사이트: 원문(초안 포함)에 HTTPS server 블록이 있는지. 없으면 발급된 인증서로 더하는 버튼을 보인다
+        String content = currentContent(site);
+        model.addAttribute("rawHasHttps", site.getType() == SiteType.RAW && content != null && RawHttps.hasHttps(content));
     }
 
     /** 가져온 원본이 가져온 뒤 바뀌었는지. 원본을 볼 수 없으면(지웠거나 마운트가 빠짐) false. */

@@ -7,7 +7,6 @@ import net.nginxmanager.site.SiteRepository;
 import net.nginxmanager.site.SiteAccess;
 import net.nginxmanager.site.SiteService;
 import net.nginxmanager.site.SiteType;
-import net.nginxmanager.site.RawSiteLetsEncryptException;
 import net.nginxmanager.site.WildcardLetsEncryptException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
@@ -66,7 +65,7 @@ public class CertificateController {
         model.addAttribute("now", clock.instant());
         // 인증서 없이 만든 폼 사이트: 여기서도 Let's Encrypt 인증서를 받을 수 있다
         model.addAttribute("sitesWithoutHttps", siteRepository.findAll().stream()
-                .filter(s -> s.getType() != SiteType.RAW && !s.isHttpsEnabled())
+                .filter(s -> !s.isHttpsEnabled())
                 .sorted(Comparator.comparing(Site::getPrimaryDomain))
                 .toList());
         return "certs/list";
@@ -104,7 +103,12 @@ public class CertificateController {
     @PostMapping("/certs/letsencrypt")
     public String letsEncrypt(@RequestParam long siteId, @RequestParam(required = false) String from,
                               Authentication authentication, RedirectAttributes redirect) {
-        access.require(siteId, authentication);
+        Site site = access.require(siteId, authentication);
+        boolean raw = site.getType() == SiteType.RAW;
+        if (raw && !SiteAccess.isAdmin(authentication)) {
+            // 원문 사이트의 설정은 관리자만 고친다
+            throw new NotFoundException("site " + siteId);
+        }
         String back = "certs".equals(from) && SiteAccess.isAdmin(authentication) ? "redirect:/certs"
                 : "redirect:/sites/" + siteId + "#https";
         SiteService.LetsEncryptRequest request;
@@ -113,17 +117,36 @@ public class CertificateController {
         } catch (WildcardLetsEncryptException e) {
             redirect.addFlashAttribute("error", messages.get("msg.validation.wildcardLetsEncrypt"));
             return back;
-        } catch (RawSiteLetsEncryptException e) {
-            redirect.addFlashAttribute("error", messages.get("msg.validation.rawLetsEncrypt"));
-            return back;
         }
         if (request.issueNow()) {
             certificateService.submit(request.certificateId());
             redirect.addFlashAttribute("notice", messages.get("msg.cert.issueStarted"));
         } else {
-            redirect.addFlashAttribute("notice", messages.get("msg.cert.issueAfterApply"));
+            redirect.addFlashAttribute("notice",
+                    messages.get(raw ? "msg.cert.rawIssueAfterApply" : "msg.cert.issueAfterApply"));
         }
         return back;
+    }
+
+    /** 원문 사이트에 발급된 인증서로 443 server 블록을 더한 초안을 만든다. 관리자만. */
+    @PostMapping("/certs/letsencrypt/raw-https")
+    public String rawHttps(@RequestParam long siteId, @RequestParam(defaultValue = "false") boolean redirectHttp,
+                           Authentication authentication, RedirectAttributes redirect) {
+        Site site = access.require(siteId, authentication);
+        if (site.getType() != SiteType.RAW || !SiteAccess.isAdmin(authentication) || site.getCertificateId() == null) {
+            throw new NotFoundException("site " + siteId);
+        }
+        CertificatePaths paths = certificateRepository.findById(site.getCertificateId())
+                .map(TlsCertificate::paths).orElse(null);
+        if (paths == null) {
+            redirect.addFlashAttribute("error", messages.get("msg.cert.rawHttpsNotIssued"));
+        } else if (siteService.addRawHttpsBlock(siteId, paths.certPath(), paths.keyPath(), redirectHttp,
+                authentication.getName())) {
+            redirect.addFlashAttribute("notice", messages.get("msg.cert.rawHttpsDrafted"));
+        } else {
+            redirect.addFlashAttribute("notice", messages.get("msg.cert.rawHttpsExists"));
+        }
+        return "redirect:/sites/" + siteId + "#https";
     }
 
     @PostMapping("/certs/upload")

@@ -124,6 +124,17 @@ sudo /opt/nginx-manager/nm import-root grant /home/alice/nginx /home/alice/www
 
 HTTPS server가 들어 있는 파일은 원문 사이트로 들어옵니다. 폼 사이트로 옮겨 HTTPS를 쓰려면 HTTP server만 가져온 뒤 관리도구에서 [HTTPS](04-sites.md#https)를 켭니다.
 
+## 원문 사이트에 HTTPS 켜기
+
+원문 사이트도 관리도구에서 Let's Encrypt 인증서를 받을 수 있습니다(관리자만).
+
+1. 사이트 화면의 **HTTPS 인증서**에서 **Let's Encrypt 인증서 발급받기**를 누릅니다. 80 server 블록에 인증 경로(`/.well-known/acme-challenge/`)를 더한 초안이 생깁니다. 이미 있으면 바로 발급합니다.
+2. [적용](07-apply.md)하면 발급을 시작합니다. 인증서는 server_name의 도메인(와일드카드 제외)으로 받습니다.
+3. 발급되면 같은 칸에 인증서 경로와 **443 server 블록 초안에 더하기**가 보입니다. 누르면 80 server 블록을 본떠 `listen 443 ssl`과 인증서 경로를 넣은 블록을 더한 초안이 생깁니다.
+4. **HTTP(80) 요청을 HTTPS로 넘기기**(기본 켬)를 켜 두면 80 server 블록은 listen·server_name·인증 경로와 `return 301 https://$host$request_uri;`만 남깁니다. 원래 내용은 443 블록으로 옮겨지고, 인증 경로는 넘기지 않아 갱신이 계속 됩니다. 80도 그대로 서비스하려면 끄고 더합니다.
+5. 원문을 확인하고 [적용](07-apply.md)합니다. 이미 HTTPS server 블록이 있으면 버튼이 보이지 않습니다.
+6. 인증서는 만료 전에 저절로 갱신되고, 원문의 인증서 경로도 새 경로로 바뀝니다.
+
 ## 원본이 바뀌었을 때
 
 가져온 뒤 원본 파일이 바뀌면 검사 결과에 **원본 바뀜**이 보이고, 사이트 화면에 **원본에서 다시 가져오기**가 나타납니다. 누르면 바뀐 내용으로 새 초안을 만듭니다. HTTPS처럼 관리도구에서만 정한 설정은 그대로 둡니다.
