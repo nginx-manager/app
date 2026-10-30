@@ -31,6 +31,7 @@ import java.util.regex.Pattern;
  * @param authRequestUrl 요청마다 먼저 물어볼 인증 서버 주소(auth_request, 018). 2xx면 통과, 401·403이면 거절.
  *                       oauth2-proxy, Authelia, Authentik 같은 SSO 앞단에 쓴다
  * @param authSignInUrl 인증 서버가 401을 주면 보낼 로그인 주소. 원래 주소를 rd 파라미터로 붙인다. 비우면 401을 그대로 준다
+ * @param pathRoutes 경로별 라우팅(019). 줄마다 "경로 대상". 대상은 프록시 주소나 디렉터리. 리버스 프록시·정적 사이트에서만 쓴다
  */
 public record SiteOptions(
         Boolean gzip,
@@ -55,10 +56,11 @@ public record SiteOptions(
         Integer cacheMinutes,
         Boolean autoindex,
         String authRequestUrl,
-        String authSignInUrl) {
+        String authSignInUrl,
+        String pathRoutes) {
 
     public static final SiteOptions DEFAULTS = new SiteOptions(false, false, false, false, null, null, null, null,
-            false, null, null, null, null, null, null, false, null, null);
+            false, null, null, null, null, null, null, false, null, null, null);
 
     /** 인증 서버 주소. nginx 변수($)·따옴표·공백이 들어가지 않게 쓸 수 있는 문자를 좁힌다. */
     private static final Pattern AUTH_REQUEST_URL = Pattern.compile(
@@ -89,6 +91,17 @@ public record SiteOptions(
         authRequestUrl = authRequestUrl == null || authRequestUrl.isBlank() ? null : authRequestUrl.strip();
         authSignInUrl = authRequestUrl == null || authSignInUrl == null || authSignInUrl.isBlank()
                 ? null : authSignInUrl.strip();
+        pathRoutes = pathRoutes == null || pathRoutes.isBlank() ? null : pathRoutes;
+    }
+
+    /** 경로별 라우팅(019). 적은 순서대로. */
+    public List<PathRoute> pathRouteList() {
+        return PathRoute.parse(pathRoutes);
+    }
+
+    @AssertTrue(message = "{msg.validation.pathRoutes}")
+    public boolean isPathRoutesValid() {
+        return PathRoute.valid(pathRoutes);
     }
 
     /** 외부 인증 서버(auth_request)를 쓰는지(018). */
@@ -153,7 +166,7 @@ public record SiteOptions(
         return new SiteOptions(gzip, securityHeaders, hsts, http3, maxBodySizeMb, normalized(allowFrom),
                 normalized(denyFrom), names.isEmpty() ? null : String.join("\n", names), satisfyAny, rateLimit,
                 rateLimit == null ? null : rateBurst, connLimit, normalized(realIpFrom), realIpHeader, cacheMinutes,
-                autoindex, authRequestUrl, authSignInUrl);
+                autoindex, authRequestUrl, authSignInUrl, PathRoute.normalized(pathRoutes));
     }
 
     /** 사이트 유형에서 쓰지 않는 설정은 버린다(유형을 바꿨을 때 남은 값이 설정에 섞이지 않게). */
@@ -161,7 +174,7 @@ public record SiteOptions(
         return new SiteOptions(gzip, securityHeaders, hsts, http3, maxBodySizeMb, allowFrom, denyFrom, authUsers,
                 satisfyAny, rateLimit, rateBurst, connLimit, realIpFrom, realIpHeader,
                 type == SiteType.PROXY ? cacheMinutes : null, type == SiteType.STATIC && autoindex, authRequestUrl,
-                authSignInUrl);
+                authSignInUrl, type == SiteType.PROXY || type == SiteType.STATIC ? pathRoutes : null);
     }
 
     @AssertTrue(message = "{msg.validation.addresses}")
@@ -278,6 +291,7 @@ public record SiteOptions(
         put(values, prefix + "autoindex", autoindex);
         put(values, prefix + "authRequestUrl", authRequestUrl);
         put(values, prefix + "authSignInUrl", authSignInUrl);
+        put(values, prefix + "pathRoutes", pathRoutes);
     }
 
     static SiteOptions load(Properties values, String prefix) {
@@ -290,7 +304,8 @@ public record SiteOptions(
                 integer(values, prefix + "rateBurst"), integer(values, prefix + "connLimit"),
                 values.getProperty(prefix + "realIpFrom"), header == null ? null : RealIpHeader.valueOf(header),
                 integer(values, prefix + "cacheMinutes"), bool(values, prefix + "autoindex"),
-                values.getProperty(prefix + "authRequestUrl"), values.getProperty(prefix + "authSignInUrl"));
+                values.getProperty(prefix + "authRequestUrl"), values.getProperty(prefix + "authSignInUrl"),
+                values.getProperty(prefix + "pathRoutes"));
     }
 
     private static void put(Properties values, String key, Object value) {

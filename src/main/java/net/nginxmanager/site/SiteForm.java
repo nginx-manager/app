@@ -210,6 +210,12 @@ public record SiteForm(
                 && ProxyBackend.parse(proxyTargets().getFirst()).isGrpc();
     }
 
+    /** gRPC 사이트는 경로별 라우팅을 쓸 수 없다(019). location이 grpc_pass와 proxy_pass로 섞인다. */
+    @AssertTrue(message = "{msg.validation.pathRoutesGrpc}")
+    public boolean isPathRoutesAllowed() {
+        return options.pathRoutes() == null || !grpc();
+    }
+
     @AssertTrue(message = "{msg.validation.fastcgiTarget}")
     public boolean isFastcgiTargetValid() {
         if (type != SiteType.PHP) {

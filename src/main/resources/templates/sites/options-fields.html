@@ -23,6 +23,16 @@
 
 <!-- 유형과 관계없이 켜는 모듈 설정(접근 제한, 속도 제한, 성능·보안) -->
 <th:block th:fragment="options(editable)">
+    <details class="site-options type-fields type-proxy-static" th:open="${form?.options?.pathRoutes != null}">
+        <summary th:text="#{sites.opt.routes.title}">경로별 라우팅 (location)</summary>
+        <label><th:block th:text="#{sites.opt.pathRoutes}">경로와 대상</th:block>
+            <span class="hint" th:text="#{sites.opt.pathRoutes.hint}">설명</span>
+            <textarea th:field="*{options.pathRoutes}" rows="3" placeholder="/api/ http://127.0.0.1:8080/&#10;/files/ /srv/uploads" spellcheck="false" th:disabled="${!editable}"></textarea>
+            <span class="error" th:errors="*{options.pathRoutesValid}"></span>
+            <span class="error" th:errors="*{pathRoutesAllowed}"></span>
+        </label>
+    </details>
+
     <details class="site-options" th:open="${form?.options?.accessRestricted() == true or form?.options?.authEnabled() == true or form?.options?.authRequestEnabled() == true}">
         <summary th:text="#{sites.opt.access.title}">접근 제한 (IP, 비밀번호)</summary>
         <p class="hint" th:text="#{sites.opt.access.intro}">설명</p>

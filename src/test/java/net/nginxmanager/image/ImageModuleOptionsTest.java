@@ -272,6 +272,23 @@ class ImageModuleOptionsTest {
         assertThat(result).isEqualTo("502 2");
     }
 
+    @Test
+    @DisplayName("경로별 라우팅(019): /api/는 다른 백엔드로, /files/는 디렉터리로, 나머지는 사이트 내용으로")
+    void pathRoutesSendPathsToOtherTargets() throws Exception {
+        // 백엔드 대신 Basic 인증이 걸린 사이트를 8087 포트에 둔다. 401이 오면 그 백엔드로 넘어간 것이다
+        createStatic("routes-backend.local", "/etc/nginx/html", Map.of("listenHttpPort", "8087",
+                "options.authUsers", "kim:correct-pass-1"));
+        createStatic("routes.local", "/etc/nginx/html", Map.of(
+                "options.pathRoutes", "/api/ http://127.0.0.1:8087/\n/files/ /etc/nginx/html"));
+        apply("path routes");
+
+        awaitStatus("routes.local", "200");
+        assertThat(status("routes.local", "http://127.0.0.1/api/")).isEqualTo("401");
+        assertThat(status("routes.local", "-u", "kim:correct-pass-1", "http://127.0.0.1/api/")).isEqualTo("200");
+        assertThat(status("routes.local", "http://127.0.0.1/files/index.html")).isEqualTo("200");
+        assertThat(status("routes.local", "http://127.0.0.1/files/missing.html")).isEqualTo("404");
+    }
+
     private static void createStatic(String domain, String root, Map<String, String> fields) throws Exception {
         Map<String, String> all = new LinkedHashMap<>(Map.of("staticRoot", root));
         all.putAll(fields);

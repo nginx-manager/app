@@ -164,7 +164,8 @@ form:has(input[name=type]:checked):not(:has(input[name=type][value=STATIC]:check
 form:has(input[name=type]:checked):not(:has(input[name=type][value=REDIRECT]:checked)) .type-redirect,
 form:has(input[name=type]:checked):not(:has(input[name=type][value=PHP]:checked)) .type-php,
 form:has(input[name=type]:checked):not(:has(input[name=type][value=PROXY]:checked)):not(:has(input[name=type][value=PHP]:checked)) .type-proxy-php,
-form:has(input[name=type]:checked):not(:has(input[name=type][value=STATIC]:checked)):not(:has(input[name=type][value=PHP]:checked)) .type-static-php { display: none; }
+form:has(input[name=type]:checked):not(:has(input[name=type][value=STATIC]:checked)):not(:has(input[name=type][value=PHP]:checked)) .type-static-php,
+form:has(input[name=type]:checked):not(:has(input[name=type][value=PROXY]:checked)):not(:has(input[name=type][value=STATIC]:checked)) .type-proxy-static { display: none; }
 /* 폼과 나란히 두는 미리보기는 긴 폼을 내려도 화면에 남는다 */
 .columns > .card.sticky { position: sticky; top: 1rem; }
 .columns > .card.sticky pre.code { max-height: calc(100vh - 8rem); overflow: auto; }

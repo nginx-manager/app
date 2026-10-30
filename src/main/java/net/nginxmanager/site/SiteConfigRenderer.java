@@ -82,6 +82,7 @@ public class SiteConfigRenderer {
 
     private static void content(StringBuilder out, String primaryDomain, SiteForm form, boolean https) {
         authRequestLocations(out, form.options());
+        pathRouteLocations(out, primaryDomain, form, https);
         switch (form.type()) {
             case PROXY -> proxyLocation(out, primaryDomain, form, https);
             case STATIC -> {
@@ -105,6 +106,46 @@ public class SiteConfigRenderer {
             }
             case PHP -> phpLocations(out, primaryDomain, form, https);
             case RAW -> throw new IllegalArgumentException("raw sites are not rendered");
+        }
+    }
+
+    /**
+     * 경로별 라우팅(019): 경로마다 location ^~ 를 두고 프록시 주소나 디렉터리로 보낸다.
+     * 기본 location과 같은 접근·속도·헤더 옵션을 걸어 경로로 빠져나가는 구멍이 없게 한다.
+     */
+    private static void pathRouteLocations(StringBuilder out, String primaryDomain, SiteForm form, boolean https) {
+        if (form.type() != SiteType.PROXY && form.type() != SiteType.STATIC || form.grpc()) {
+            return;
+        }
+        for (PathRoute route : form.options().pathRouteList()) {
+            out.append("    location ^~ ").append(route.locationPath()).append(" {\n");
+            locationOptions(out, primaryDomain, form, https);
+            if (!route.proxy()) {
+                out.append("        alias ").append(route.aliasDirectory()).append(";\n")
+                        .append("    }\n\n");
+                continue;
+            }
+            out.append("        proxy_pass ").append(route.target()).append(";\n")
+                    .append("        proxy_http_version 1.1;\n")
+                    .append("        proxy_set_header Host $host;\n")
+                    .append("        proxy_set_header X-Real-IP $remote_addr;\n")
+                    .append("        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n")
+                    .append("        proxy_set_header X-Forwarded-Proto $scheme;\n");
+            if (route.target().startsWith("https://")) {
+                out.append("        proxy_ssl_server_name on;\n");
+            }
+            if (form.type() == SiteType.PROXY && form.proxyWebsocket()) {
+                out.append("        proxy_set_header Upgrade $http_upgrade;\n")
+                        .append("        proxy_set_header Connection ").append(connectionVariable(primaryDomain)).append(";\n");
+            }
+            if (form.type() == SiteType.PROXY && form.proxyConnectTimeout() != null) {
+                out.append("        proxy_connect_timeout ").append(form.proxyConnectTimeout()).append("s;\n");
+            }
+            if (form.type() == SiteType.PROXY && form.proxyReadTimeout() != null) {
+                out.append("        proxy_read_timeout ").append(form.proxyReadTimeout()).append("s;\n")
+                        .append("        proxy_send_timeout ").append(form.proxyReadTimeout()).append("s;\n");
+            }
+            out.append("    }\n\n");
         }
     }
 
