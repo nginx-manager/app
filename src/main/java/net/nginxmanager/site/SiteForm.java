@@ -210,6 +210,33 @@ public record SiteForm(
                 && ProxyBackend.parse(proxyTargets().getFirst()).isGrpc();
     }
 
+    /** 백업 업스트림(020): 주 업스트림과 같은 형식·스킴·경로. upstream 하나로 묶이기 때문이다. */
+    @AssertTrue(message = "{msg.validation.backupTargets}")
+    public boolean isBackupTargetsValid() {
+        List<String> backups = options.backupTargetList();
+        if (type != SiteType.PROXY || backups.isEmpty() || !isProxyTargetValid()) {
+            return true;
+        }
+        if (backups.size() > MAX_BACKENDS || !backups.stream().allMatch(t -> t.matches(PROXY_TARGET))) {
+            return false;
+        }
+        ProxyBackend first = ProxyBackend.parse(proxyTargets().getFirst());
+        return backups.stream().map(ProxyBackend::parse).allMatch(b -> b.port() >= 1 && b.port() <= 65535
+                && !b.isManager() && b.scheme().equals(first.scheme()) && b.path().equals(first.path()));
+    }
+
+    /** nginx는 ip_hash upstream에 backup 서버를 받지 않는다. */
+    @AssertTrue(message = "{msg.validation.backupIpHash}")
+    public boolean isBackupWithoutIpHash() {
+        return type != SiteType.PROXY || options.backupTargets() == null
+                || proxyLoadBalancing != LoadBalancing.IP_HASH;
+    }
+
+    /** upstream 블록으로 묶는지: 업스트림이 여럿이거나 백업·장애 판정·keepalive를 쓸 때(020). */
+    public boolean usesUpstream() {
+        return type == SiteType.PROXY && (proxyTargets().size() > 1 || options.upstreamTuned());
+    }
+
     /** gRPC 사이트는 경로별 라우팅을 쓸 수 없다(019). location이 grpc_pass와 proxy_pass로 섞인다. */
     @AssertTrue(message = "{msg.validation.pathRoutesGrpc}")
     public boolean isPathRoutesAllowed() {

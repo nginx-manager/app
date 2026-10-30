@@ -289,6 +289,20 @@ class ImageModuleOptionsTest {
         assertThat(status("routes.local", "http://127.0.0.1/files/missing.html")).isEqualTo("404");
     }
 
+    @Test
+    @DisplayName("백업 업스트림(020): 주 업스트림이 죽어 있으면 백업이 답하고, keepalive 설정도 nginx가 받아들인다")
+    void backupUpstreamAnswersWhenThePrimaryIsDown() throws Exception {
+        // 백업 대신 8088 포트의 정적 사이트를 둔다. 주 업스트림(8099)에는 아무것도 없다
+        createStatic("backup-origin.local", "/etc/nginx/html", Map.of("listenHttpPort", "8088"));
+        create("failover.local", "PROXY", Map.of("proxyTarget", "http://127.0.0.1:8099",
+                "options.backupTargets", "http://127.0.0.1:8088", "options.upstreamMaxFails", "1",
+                "options.upstreamFailTimeout", "30", "options.upstreamKeepalive", "8"));
+        apply("backup upstream");
+
+        awaitStatus("failover.local", "200");
+        assertThat(status("failover.local")).isEqualTo("200");
+    }
+
     private static void createStatic(String domain, String root, Map<String, String> fields) throws Exception {
         Map<String, String> all = new LinkedHashMap<>(Map.of("staticRoot", root));
         all.putAll(fields);

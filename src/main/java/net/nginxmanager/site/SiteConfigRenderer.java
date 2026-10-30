@@ -349,22 +349,34 @@ public class SiteConfigRenderer {
      */
     private static void proxyPrelude(StringBuilder out, String primaryDomain, SiteForm form) {
         List<String> targets = form.proxyTargets();
-        if (targets.size() > 1) {
+        SiteOptions options = form.options();
+        if (form.usesUpstream()) {
             out.append("upstream ").append(upstreamName(primaryDomain)).append(" {\n");
             String directive = form.proxyLoadBalancing().directive();
             if (directive != null) {
                 out.append("    ").append(directive).append(";\n");
             }
+            String failure = (options.upstreamMaxFails() == null ? "" : " max_fails=" + options.upstreamMaxFails())
+                    + (options.upstreamFailTimeout() == null ? "" : " fail_timeout=" + options.upstreamFailTimeout() + "s");
             for (String target : targets) {
-                out.append("    server ").append(ProxyBackend.parse(target).server()).append(";\n");
+                out.append("    server ").append(ProxyBackend.parse(target).server()).append(failure).append(";\n");
+            }
+            for (String target : options.backupTargetList()) {
+                out.append("    server ").append(ProxyBackend.parse(target).server()).append(failure)
+                        .append(" backup;\n");
+            }
+            if (options.upstreamKeepalive() != null) {
+                // 분산 방식(least_conn 등) 뒤에 와야 한다
+                out.append("    keepalive ").append(options.upstreamKeepalive()).append(";\n");
             }
             out.append("}\n\n");
         }
         if (form.proxyWebsocket() && !form.grpc()) {
-            // 업그레이드 요청만 Connection: upgrade로 넘기고, 나머지는 보통 요청처럼 close로 넘긴다
+            // 업그레이드 요청만 Connection: upgrade로 넘기고, 나머지는 보통 요청처럼 close로 넘긴다.
+            // keepalive를 쓰면 연결을 다시 쓰도록 빈 값으로 넘긴다(020)
             out.append("map $http_upgrade ").append(connectionVariable(primaryDomain)).append(" {\n")
                     .append("    default upgrade;\n")
-                    .append("    ''      close;\n")
+                    .append(options.upstreamKeepalive() == null ? "    ''      close;\n" : "    ''      \"\";\n")
                     .append("}\n\n");
         }
     }
@@ -372,7 +384,7 @@ public class SiteConfigRenderer {
     private static void proxyLocation(StringBuilder out, String primaryDomain, SiteForm form, boolean https) {
         List<String> targets = form.proxyTargets();
         String pass;
-        if (targets.size() > 1) {
+        if (form.usesUpstream()) {
             ProxyBackend first = ProxyBackend.parse(targets.getFirst());
             pass = first.scheme() + "://" + upstreamName(primaryDomain) + first.path();
         } else {
@@ -394,13 +406,16 @@ public class SiteConfigRenderer {
             // https 백엔드에 SNI를 보낸다(가상 호스트·CDN 백엔드는 SNI가 없으면 핸드셰이크를 거절한다).
             // upstream으로 묶으면 보낼 이름이 upstream 이름이 되므로 첫 백엔드의 호스트 이름을 쓴다
             out.append("        proxy_ssl_server_name on;\n");
-            if (targets.size() > 1) {
+            if (form.usesUpstream()) {
                 out.append("        proxy_ssl_name ").append(ProxyBackend.parse(targets.getFirst()).host()).append(";\n");
             }
         }
         if (form.proxyWebsocket()) {
             out.append("        proxy_set_header Upgrade $http_upgrade;\n")
                     .append("        proxy_set_header Connection ").append(connectionVariable(primaryDomain)).append(";\n");
+        } else if (form.options().upstreamKeepalive() != null) {
+            // keepalive 연결을 다시 쓰려면 Connection: close를 보내지 않아야 한다(020)
+            out.append("        proxy_set_header Connection \"\";\n");
         }
         if (form.proxyConnectTimeout() != null) {
             out.append("        proxy_connect_timeout ").append(form.proxyConnectTimeout()).append("s;\n");
@@ -424,7 +439,7 @@ public class SiteConfigRenderer {
                 .append("        grpc_set_header X-Forwarded-Proto $scheme;\n");
         if (pass.startsWith("grpcs://")) {
             out.append("        grpc_ssl_server_name on;\n");
-            if (targets.size() > 1) {
+            if (form.usesUpstream()) {
                 out.append("        grpc_ssl_name ").append(ProxyBackend.parse(targets.getFirst()).host()).append(";\n");
             }
         }

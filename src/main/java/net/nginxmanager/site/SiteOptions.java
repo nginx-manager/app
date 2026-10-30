@@ -32,6 +32,10 @@ import java.util.regex.Pattern;
  *                       oauth2-proxy, Authelia, Authentik 같은 SSO 앞단에 쓴다
  * @param authSignInUrl 인증 서버가 401을 주면 보낼 로그인 주소. 원래 주소를 rd 파라미터로 붙인다. 비우면 401을 그대로 준다
  * @param pathRoutes 경로별 라우팅(019). 줄마다 "경로 대상". 대상은 프록시 주소나 디렉터리. 리버스 프록시·정적 사이트에서만 쓴다
+ * @param backupTargets 주 업스트림이 모두 실패할 때만 받는 백업 업스트림(020, upstream의 backup). 리버스 프록시에서만 쓴다
+ * @param upstreamMaxFails 이 횟수만큼 실패하면 업스트림을 잠시 뺀다(max_fails). null이면 nginx 기본값 1
+ * @param upstreamFailTimeout 실패를 세는 시간이자 빼 두는 시간(초, fail_timeout). null이면 nginx 기본값 10초
+ * @param upstreamKeepalive 업스트림 연결을 재사용할 유휴 연결 수(keepalive). null이면 요청마다 새로 연결한다
  */
 public record SiteOptions(
         Boolean gzip,
@@ -57,10 +61,17 @@ public record SiteOptions(
         Boolean autoindex,
         String authRequestUrl,
         String authSignInUrl,
-        String pathRoutes) {
+        String pathRoutes,
+        String backupTargets,
+        @Min(value = 1, message = "{msg.validation.upstreamMaxFails}") @Max(value = 100, message = "{msg.validation.upstreamMaxFails}")
+        Integer upstreamMaxFails,
+        @Min(value = 1, message = "{msg.validation.upstreamFailTimeout}") @Max(value = 3600, message = "{msg.validation.upstreamFailTimeout}")
+        Integer upstreamFailTimeout,
+        @Min(value = 1, message = "{msg.validation.upstreamKeepalive}") @Max(value = 1024, message = "{msg.validation.upstreamKeepalive}")
+        Integer upstreamKeepalive) {
 
     public static final SiteOptions DEFAULTS = new SiteOptions(false, false, false, false, null, null, null, null,
-            false, null, null, null, null, null, null, false, null, null, null);
+            false, null, null, null, null, null, null, false, null, null, null, null, null, null, null);
 
     /** 인증 서버 주소. nginx 변수($)·따옴표·공백이 들어가지 않게 쓸 수 있는 문자를 좁힌다. */
     private static final Pattern AUTH_REQUEST_URL = Pattern.compile(
@@ -92,6 +103,18 @@ public record SiteOptions(
         authSignInUrl = authRequestUrl == null || authSignInUrl == null || authSignInUrl.isBlank()
                 ? null : authSignInUrl.strip();
         pathRoutes = pathRoutes == null || pathRoutes.isBlank() ? null : pathRoutes;
+        backupTargets = backupTargets == null || backupTargets.isBlank() ? null : backupTargets;
+    }
+
+    /** 백업 업스트림 주소 목록(020, 중복 제거, 순서 유지). */
+    public List<String> backupTargetList() {
+        return addresses(backupTargets);
+    }
+
+    /** upstream 블록이 있어야 쓸 수 있는 설정(백업, 장애 판정, keepalive)을 하나라도 쓰는지(020). */
+    public boolean upstreamTuned() {
+        return backupTargets != null || upstreamMaxFails != null || upstreamFailTimeout != null
+                || upstreamKeepalive != null;
     }
 
     /** 경로별 라우팅(019). 적은 순서대로. */
@@ -166,7 +189,8 @@ public record SiteOptions(
         return new SiteOptions(gzip, securityHeaders, hsts, http3, maxBodySizeMb, normalized(allowFrom),
                 normalized(denyFrom), names.isEmpty() ? null : String.join("\n", names), satisfyAny, rateLimit,
                 rateLimit == null ? null : rateBurst, connLimit, normalized(realIpFrom), realIpHeader, cacheMinutes,
-                autoindex, authRequestUrl, authSignInUrl, PathRoute.normalized(pathRoutes));
+                autoindex, authRequestUrl, authSignInUrl, PathRoute.normalized(pathRoutes), normalized(backupTargets),
+                upstreamMaxFails, upstreamFailTimeout, upstreamKeepalive);
     }
 
     /** 사이트 유형에서 쓰지 않는 설정은 버린다(유형을 바꿨을 때 남은 값이 설정에 섞이지 않게). */
@@ -174,7 +198,9 @@ public record SiteOptions(
         return new SiteOptions(gzip, securityHeaders, hsts, http3, maxBodySizeMb, allowFrom, denyFrom, authUsers,
                 satisfyAny, rateLimit, rateBurst, connLimit, realIpFrom, realIpHeader,
                 type == SiteType.PROXY ? cacheMinutes : null, type == SiteType.STATIC && autoindex, authRequestUrl,
-                authSignInUrl, type == SiteType.PROXY || type == SiteType.STATIC ? pathRoutes : null);
+                authSignInUrl, type == SiteType.PROXY || type == SiteType.STATIC ? pathRoutes : null,
+                type == SiteType.PROXY ? backupTargets : null, type == SiteType.PROXY ? upstreamMaxFails : null,
+                type == SiteType.PROXY ? upstreamFailTimeout : null, type == SiteType.PROXY ? upstreamKeepalive : null);
     }
 
     @AssertTrue(message = "{msg.validation.addresses}")
@@ -292,6 +318,10 @@ public record SiteOptions(
         put(values, prefix + "authRequestUrl", authRequestUrl);
         put(values, prefix + "authSignInUrl", authSignInUrl);
         put(values, prefix + "pathRoutes", pathRoutes);
+        put(values, prefix + "backupTargets", backupTargets);
+        put(values, prefix + "upstreamMaxFails", upstreamMaxFails);
+        put(values, prefix + "upstreamFailTimeout", upstreamFailTimeout);
+        put(values, prefix + "upstreamKeepalive", upstreamKeepalive);
     }
 
     static SiteOptions load(Properties values, String prefix) {
@@ -305,7 +335,9 @@ public record SiteOptions(
                 values.getProperty(prefix + "realIpFrom"), header == null ? null : RealIpHeader.valueOf(header),
                 integer(values, prefix + "cacheMinutes"), bool(values, prefix + "autoindex"),
                 values.getProperty(prefix + "authRequestUrl"), values.getProperty(prefix + "authSignInUrl"),
-                values.getProperty(prefix + "pathRoutes"));
+                values.getProperty(prefix + "pathRoutes"), values.getProperty(prefix + "backupTargets"),
+                integer(values, prefix + "upstreamMaxFails"), integer(values, prefix + "upstreamFailTimeout"),
+                integer(values, prefix + "upstreamKeepalive"));
     }
 
     private static void put(Properties values, String key, Object value) {

@@ -35,7 +35,7 @@ class PhpSiteTest {
     @Test
     void passwordAndAddressRulesAlsoProtectPhpFiles() {
         SiteOptions options = new SiteOptions(false, false, false, false, null, "10.0.0.0/8", null, "alice", false,
-                null, null, null, null, null, null, false, null, null, null);
+                null, null, null, null, null, null, false, null, null, null, null, null, null, null);
         SiteForm form = php("/srv/www/blog", "unix:/run/php/php8.3-fpm.sock").withOptions(options);
 
         String conf = renderer.render("blog.local", form);
