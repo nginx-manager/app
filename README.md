@@ -1,5 +1,7 @@
 # nginx manager
 
+**한국어** · [English](README.en.md) · [日本語](README.ja.md) · [简体中文](README.zh-CN.md)
+
 브라우저에서 nginx를 관리하는 도구입니다. nginx(오픈소스, 전체 모듈 빌드)와 관리 화면(Spring Boot)이 서로 다른 컨테이너에서 돌기 때문에, 관리 화면을 업데이트하거나 다시 띄워도 nginx는 트래픽을 계속 받습니다.
 
 **사용법은 관리 화면 안의 사용 설명서(`/guide`)에 있습니다.** 왼쪽 메뉴와 아래(footer)의 **사용 설명서**를 누르면 열립니다. 원문은 [src/main/resources/guide/ko](src/main/resources/guide/ko/README.md)에 있어 저장소에서도 읽을 수 있습니다.
@@ -32,6 +34,7 @@ curl -fsSL https://github.com/nginx-manager/app/releases/latest/download/install
 - 포트·도메인·버전은 설치 디렉터리의 `.env`에서 바꿉니다. 데이터는 `data/` 아래에 있습니다.
 - 이미 깐 서버에서 설치 명령을 다시 실행하면 `.env`와 `data/`를 건드리지 않고 끝납니다. 새 버전은 `nm upgrade`로 올리며, `.env`는 그대로 두고 새로 생긴 키만 기본값으로 더합니다.
 - 운영은 `nm` 명령으로 합니다: `nm status`, `nm upgrade`(manager만 올려 nginx는 끊기지 않음), `nm upgrade --nginx`, `nm backup`, `nm restore`, `nm migrate`(v1.1 이전 설치 옮기기), `nm import-root`(가져올 호스트 디렉터리를 같은 경로로 붙이고 읽기 권한 확인).
+- 서버에 이미 있는 설정(예: `/home/*/nginx/*.conf`)을 가져오려면 설치할 때 `--import-root /home`을 붙입니다. 설치한 뒤에는 `nm import-root add /home`으로 붙이고, `nm import-root check`로 관리도구(UID 10101)가 읽을 수 있는지 확인합니다. 읽을 수 없으면 `nm import-root grant`가 ACL로 읽기 권한만 줍니다. 가져오기 화면도 권한이 없는 디렉터리를 만나면 멈추지 않고, 못 연 곳과 grant 명령을 보여 줍니다.
 - 자세한 내용은 사용 설명서 [1. 설치와 실행](src/main/resources/guide/ko/01-install.md)에 있습니다. 묶음의 원본은 [deploy/](deploy/)입니다.
 
 설치 디렉터리의 `.env`(설치 옵션으로 준 값이 들어갑니다). 바꾼 뒤에는 `nm restart`, nginx 포트를 바꿨으면 `nm restart nginx`.
@@ -54,7 +57,7 @@ curl -fsSL https://github.com/nginx-manager/app/releases/latest/download/install
 개발·시험에는 저장소의 [docker/docker-compose.yml](docker/docker-compose.yml)을 씁니다(이름 붙은 볼륨, 관리 화면을 모든 주소에 엶).
 
 ```bash
-NGINX_MANAGER_VERSION=1.1.0 docker compose -f docker/docker-compose.yml up -d
+NGINX_MANAGER_VERSION=1.2.0 docker compose -f docker/docker-compose.yml up -d
 ```
 
 | 컨테이너 | 이미지 | 하는 일 |
