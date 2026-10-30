@@ -301,7 +301,16 @@ public class SiteService {
                 doUpdate(siteId, merged, actor);
             } else {
                 requireUnusedDomains(site.getId(), analysis.domains());
-                site.getConfigFile().stageContent(normalizeNewlines(content));
+                ConfigFile file = site.getConfigFile();
+                String staged = normalizeNewlines(content);
+                if (site.getType() == SiteType.RAW && site.isHttpsEnabled()) {
+                    // 원본에는 관리도구가 더한 인증 경로와 443 블록이 없으므로 다시 입힌다
+                    String previous = file.getDraftContent() != null ? file.getDraftContent() : store.read(file.getPath());
+                    if (previous != null) {
+                        staged = RawHttps.reapply(previous, staged);
+                    }
+                }
+                file.stageContent(staged);
                 if (site.getType() != SiteType.RAW) {
                     site.switchToRaw();
                 }
