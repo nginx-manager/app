@@ -318,6 +318,12 @@ public class Site extends BaseEntity {
         this.certificateId = certificateId;
     }
 
+    /** 원문에서 HTTPS server 블록을 지웠다. 인증서를 더 쓰지 않으므로 갱신하지 않는다. */
+    void disableHttps() {
+        this.httpsEnabled = false;
+        this.certificateId = null;
+    }
+
     public void markImportedDisabled() {
         this.enabled = false;
     }
