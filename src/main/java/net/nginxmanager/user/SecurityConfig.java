@@ -32,7 +32,7 @@ public class SecurityConfig {
                                 "/streams/**", "/versions/**", "/drift/**", "/sites/import", "/sites/import/**",
                                 "/sites/*/owner", "/sites/*/reimport").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/certs").hasRole("ADMIN")
-                        .requestMatchers("/certs/upload").hasRole("ADMIN")
+                        .requestMatchers("/certs/upload", "/certs/*/delete").hasRole("ADMIN")
                         // 나머지(사이트, 적용, 로그, 사이트 화면의 인증서 발급·갱신)는 멤버부터. 사이트 단위 권한은 SiteAccess가 본다
                         .anyRequest().hasRole("MEMBER"))
                 .formLogin(form -> form

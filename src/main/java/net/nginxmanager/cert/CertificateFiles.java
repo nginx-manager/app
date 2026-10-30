@@ -88,6 +88,32 @@ public class CertificateFiles {
     }
 
     /**
+     * 지운 인증서의 디렉터리를 정리한다. 설정 파일·초안·되돌릴 수 있는 버전이 아직 가리키는 디렉터리는 남기고,
+     * 남은 것이 없으면 인증서 디렉터리도 지운다.
+     */
+    public void removeAll(String name, Predicate<String> referenced) {
+        Path base = root.resolve(safeName(name));
+        if (!Files.isDirectory(base)) {
+            return;
+        }
+        try (Stream<Path> dirs = Files.list(base)) {
+            dirs.filter(Files::isDirectory)
+                    .filter(dir -> !referenced.test(dir.toString() + "/"))
+                    .toList()
+                    .forEach(CertificateFiles::deleteTree);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        try (Stream<Path> left = Files.list(base)) {
+            if (left.findAny().isEmpty()) {
+                Files.delete(base);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
      * 이 인증서의 어느 디렉터리(이전 발급분 포함)를 가리키는 경로든 새 경로로 바꾼다. 되돌리기로 더 오래된 인증서를
      * 가리키게 된 설정도 갱신 때 함께 새 인증서로 옮겨 간다.
      */

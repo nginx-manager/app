@@ -123,6 +123,14 @@
         }
     });
 
+    // data-confirm이 붙은 폼은 보내기 전에 한 번 더 묻는다(되돌릴 수 없는 삭제 등)
+    document.addEventListener('submit', function (event) {
+        const form = event.target;
+        if (form.dataset && form.dataset.confirm && !window.confirm(form.dataset.confirm)) {
+            event.preventDefault();
+        }
+    });
+
     document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('.auth .field').forEach(function (field) {
             if (field.querySelector('input[type=password]')) {

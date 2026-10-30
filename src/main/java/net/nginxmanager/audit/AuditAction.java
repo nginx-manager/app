@@ -14,6 +14,7 @@ public enum AuditAction {
     CERT_ISSUE,
     CERT_RENEW,
     CERT_UPLOAD,
+    CERT_DELETE,
     RUNTIME_START,
     UPGRADE,
     NGINX_RESTART

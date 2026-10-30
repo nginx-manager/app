@@ -31,6 +31,9 @@ import java.util.stream.Collectors;
 @Controller
 public class CertificateController {
 
+    static final String ISSUED_TAB = "issued";
+    static final String PENDING_TAB = "pending";
+
     private final TlsCertificateRepository certificateRepository;
     private final SiteRepository siteRepository;
     private final CertificateService certificateService;
@@ -39,11 +42,14 @@ public class CertificateController {
     private final Clock clock;
     private final Messages messages;
     private final SiteAccess access;
+    private final CertificateDeletion deletion;
 
     public CertificateController(TlsCertificateRepository certificateRepository, SiteRepository siteRepository,
                                  CertificateService certificateService, CertificateUploadService uploadService,
-                                 SiteService siteService, Clock clock, Messages messages, SiteAccess access) {
+                                 SiteService siteService, Clock clock, Messages messages, SiteAccess access,
+                                 CertificateDeletion deletion) {
         this.access = access;
+        this.deletion = deletion;
         this.messages = messages;
         this.certificateRepository = certificateRepository;
         this.siteRepository = siteRepository;
@@ -53,12 +59,35 @@ public class CertificateController {
         this.clock = clock;
     }
 
+    /**
+     * 인증서 목록. 발급된 인증서와 발급을 기다리거나 실패한 인증서를 탭으로 나눠 보인다.
+     *
+     * @param tab "pending"이면 발급 대기·실패 탭. 비우면 발급된 인증서가 있을 때 그 탭
+     */
     @GetMapping("/certs")
-    public String list(Model model) {
+    public String list(@RequestParam(required = false) String tab, Model model) {
         Map<Long, List<String>> sitesByCert = siteRepository.findByCertificateIdIsNotNull().stream()
                 .collect(Collectors.groupingBy(Site::getCertificateId,
                         Collectors.mapping(Site::getPrimaryDomain, Collectors.toList())));
-        List<TlsCertificate> certificates = certificateRepository.findAllByOrderByNameAsc();
+        List<TlsCertificate> all = certificateRepository.findAllByOrderByNameAsc();
+        Map<Boolean, List<TlsCertificate>> byIssued = all.stream()
+                .collect(Collectors.partitioningBy(c -> c.getStatus() == CertificateStatus.ACTIVE));
+        List<TlsCertificate> issued = byIssued.get(true);
+        List<TlsCertificate> pending = byIssued.get(false);
+        boolean pendingTab = PENDING_TAB.equals(tab) || (tab == null && issued.isEmpty() && !pending.isEmpty());
+        List<TlsCertificate> certificates = pendingTab ? pending : issued;
+        model.addAttribute("tab", pendingTab ? PENDING_TAB : ISSUED_TAB);
+        model.addAttribute("issuedCount", issued.size());
+        model.addAttribute("pendingCount", pending.size());
+        model.addAttribute("hasAny", !all.isEmpty());
+        // 지울 수 없는 대기·실패 인증서와 그 이유
+        List<Site> sites = pendingTab ? siteRepository.findAll() : List.of();
+        Map<Long, String> deleteBlocked = new java.util.HashMap<>();
+        for (TlsCertificate c : pendingTab ? pending : List.<TlsCertificate>of()) {
+            deletion.blocker(c, sites).ifPresent(b -> deleteBlocked.put(c.getId(),
+                    blockedMessage(b, CertificateDeletion.usersOf(c, sites))));
+        }
+        model.addAttribute("deleteBlocked", deleteBlocked);
         model.addAttribute("certificates", certificates);
         model.addAttribute("sitesByCert", sitesByCert);
         model.addAttribute("running", certificates.stream()
@@ -79,6 +108,7 @@ public class CertificateController {
      */
     @PostMapping("/certs/{id}/renew")
     public String renew(@PathVariable long id, @RequestParam(required = false) Long siteId,
+                        @RequestParam(required = false) String tab,
                         Authentication authentication, RedirectAttributes redirect) {
         if (!certificateRepository.existsById(id)) {
             throw new NotFoundException("certificate " + id);
@@ -92,7 +122,10 @@ public class CertificateController {
         }
         certificateService.submit(id);
         redirect.addFlashAttribute("notice", messages.get("msg.cert.renewStarted"));
-        return siteId == null ? "redirect:/certs" : "redirect:/sites/" + siteId + "#https";
+        if (siteId != null) {
+            return "redirect:/sites/" + siteId + "#https";
+        }
+        return PENDING_TAB.equals(tab) ? "redirect:/certs?tab=" + PENDING_TAB : "redirect:/certs";
     }
 
     /**
@@ -144,5 +177,26 @@ public class CertificateController {
             redirect.addFlashAttribute("error", e.code() == null ? e.getMessage() : messages.get(e.code(), e.args()));
         }
         return "redirect:/certs";
+    }
+
+    /** 발급하지 못한(대기·실패) 인증서를 지운다. 관리자만. 확인은 화면에서 받는다. */
+    @PostMapping("/certs/{id}/delete")
+    public String delete(@PathVariable long id, Authentication authentication, RedirectAttributes redirect) {
+        try {
+            String name = deletion.delete(id, authentication.getName());
+            redirect.addFlashAttribute("notice", messages.get("msg.cert.deleted", name));
+        } catch (CertificateDeletion.BlockedException e) {
+            redirect.addFlashAttribute("error", blockedMessage(e.blocker(), e.sites()));
+        }
+        return "redirect:/certs?tab=" + PENDING_TAB;
+    }
+
+    private String blockedMessage(CertificateDeletion.Blocker blocker, List<String> sites) {
+        return switch (blocker) {
+            case ISSUED -> messages.get("msg.cert.delete.issued");
+            case RUNNING -> messages.get("msg.cert.delete.running");
+            case IN_USE -> messages.get("msg.cert.delete.inUse", String.join(", ", sites));
+            case ADMIN_DOMAIN -> messages.get("msg.cert.delete.adminDomain");
+        };
     }
 }
