@@ -22,12 +22,13 @@
                     <legend th:text="#{sites.field.type}">유형</legend>
                     <label class="inline"><input type="radio" th:field="*{type}" value="PROXY"> <th:block th:text="#{sites.field.type.PROXY}">리버스 프록시</th:block></label>
                     <label class="inline"><input type="radio" th:field="*{type}" value="STATIC"> <th:block th:text="#{sites.field.type.STATIC}">정적 파일</th:block></label>
+                    <label class="inline"><input type="radio" th:field="*{type}" value="PHP"> <th:block th:text="#{sites.field.type.PHP}">PHP</th:block></label>
                     <label class="inline"><input type="radio" th:field="*{type}" value="REDIRECT"> <th:block th:text="#{sites.field.type.REDIRECT}">리디렉션</th:block></label>
                     <p class="hint" th:text="#{sites.field.type.hint}">리버스 프록시는 요청을 애플리케이션 서버로 넘깁니다.</p>
                 </fieldset>
                 <th:block th:replace="~{sites/proxy-fields :: fields(true)}"></th:block>
                 <th:block th:replace="~{sites/options-fields :: redirect(true)}"></th:block>
-                <label class="type-fields type-static"><th:block th:text="#{sites.form.staticRoot}">문서 루트 (정적 파일)</th:block>
+                <label class="type-fields type-static-php"><th:block th:text="#{sites.form.staticRoot}">문서 루트 (정적 파일)</th:block>
                     <span class="hint" th:text="#{sites.field.staticRoot.hint}">내보낼 폴더의 절대 경로입니다.</span>
                     <input type="text" th:field="*{staticRoot}" placeholder="/srv/www/app">
                     <span class="error" th:errors="*{staticRootValid}"></span>

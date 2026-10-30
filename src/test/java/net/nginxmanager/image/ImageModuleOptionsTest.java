@@ -224,6 +224,19 @@ class ImageModuleOptionsTest {
                 "--resolve", domain + ":443:127.0.0.1", "https://" + domain + "/").getStdout();
     }
 
+    @Test
+    @DisplayName("PHP 사이트(016): 실제 nginx가 받아들이고, 비밀번호 보호는 .php 요청에도 걸린다")
+    void phpSiteProtectsPhpFiles() throws Exception {
+        create("php.local", "PHP", Map.of("staticRoot", "/etc/nginx/html", "proxyTarget", "127.0.0.1:9999",
+                "options.authUsers", "kim:correct-pass-1"));
+        apply("php site");
+
+        awaitStatus("php.local", "401");
+        assertThat(status("php.local", "http://127.0.0.1/index.php")).isEqualTo("401");
+        // 비밀번호가 맞으면 PHP-FPM으로 넘긴다(여기에는 PHP-FPM이 없어 파일이 없다는 404나 연결 실패 502)
+        assertThat(status("php.local", "-u", "kim:correct-pass-1", "http://127.0.0.1/index.php")).isIn("404", "502");
+    }
+
     private static void createStatic(String domain, String root, Map<String, String> fields) throws Exception {
         Map<String, String> all = new LinkedHashMap<>(Map.of("staticRoot", root));
         all.putAll(fields);

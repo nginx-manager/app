@@ -112,6 +112,7 @@ sudo /opt/nginx-manager/nm import-root grant /home/alice/nginx /home/alice/www
 - **해석 결과**: server 블록 수와 등록 방식
 - **폼으로 옮기면 바뀌는 점**: 예를 들어 로그는 사이트별 로그 파일(`/var/log/nginx/sites/`)에 남기고, IPv6 listen은 빠지며, 백엔드가 하나면 upstream 없이 바로 넘깁니다.
 - **폼으로 옮길 수 없는 설정**: 원문 사이트가 되는 이유(location 여럿, HTTPS server, 폼에 없는 지시어 등)
+- root와 `location ~ \.php$`의 `fastcgi_pass` 하나로 된 PHP 설정은 [PHP 폼 사이트](04-sites.md#php-php-fpm)로 가져옵니다(v1.4.0부터). `.php` location에 캐시 같은 다른 지시어가 있으면 원문 사이트가 됩니다.
 - **대표 도메인**과 **등록 방식**을 정합니다. 폼으로 옮길 수 없는 파일은 원문 사이트로만 등록됩니다.
 - **원본**과 **폼 사이트로 만들 설정**을 나란히 비교합니다.
 

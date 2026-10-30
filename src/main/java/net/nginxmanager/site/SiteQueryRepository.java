@@ -22,11 +22,12 @@ public class SiteQueryRepository {
                           String proxyTarget, String staticRoot, String redirectTarget,
                           Long ownerId, String ownerName, Boolean ownerEnabled, boolean deleting) {
 
-        /** 목록의 대상 칸. 프록시는 백엔드 주소들, 정적은 문서 루트, 리디렉션은 보낼 주소. 원문 편집 사이트는 비운다 */
+        /** 목록의 대상 칸. 프록시는 백엔드 주소들, 정적은 문서 루트, 리디렉션은 보낼 주소, PHP는 PHP-FPM 주소. 원문 편집 사이트는 비운다 */
         public List<String> targets() {
             String value = switch (type) {
                 case PROXY -> proxyTarget;
                 case STATIC -> staticRoot;
+                case PHP -> proxyTarget;
                 case REDIRECT -> redirectTarget;
                 default -> null;
             };

@@ -95,8 +95,36 @@ public class SiteConfigRenderer {
                         .append(form.redirectKeepPath() ? "$request_uri" : "").append(";\n")
                         .append("    }\n");
             }
+            case PHP -> phpLocations(out, primaryDomain, form, https);
             case RAW -> throw new IllegalArgumentException("raw sites are not rendered");
         }
+    }
+
+    /**
+     * PHP 사이트(016): 없는 경로는 index.php(프런트 컨트롤러)로, .php 요청은 PHP-FPM으로 넘긴다.
+     * nginx는 location마다 따로 고르므로 접근 제한·비밀번호 보호를 .php location에도 넣는다.
+     */
+    private static void phpLocations(StringBuilder out, String primaryDomain, SiteForm form, boolean https) {
+        out.append("    root ").append(form.staticRoot()).append(";\n")
+                .append("    index index.php index.html;\n\n")
+                .append("    location / {\n");
+        locationOptions(out, primaryDomain, form, https);
+        out.append("        try_files $uri $uri/ /index.php?$query_string;\n")
+                .append("    }\n\n")
+                .append("    location ~ \\.php$ {\n");
+        locationOptions(out, primaryDomain, form, https);
+        out.append("        try_files $uri =404;\n")
+                .append("        fastcgi_pass ").append(form.proxyTargets().getFirst()).append(";\n")
+                .append("        fastcgi_index index.php;\n")
+                .append("        include fastcgi_params;\n")
+                .append("        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;\n");
+        if (https) {
+            out.append("        fastcgi_param HTTPS on;\n");
+        }
+        if (form.proxyReadTimeout() != null) {
+            out.append("        fastcgi_read_timeout ").append(form.proxyReadTimeout()).append("s;\n");
+        }
+        out.append("    }\n");
     }
 
     /**
