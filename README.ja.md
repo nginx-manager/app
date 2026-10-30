@@ -33,7 +33,7 @@ curl -fsSL https://github.com/nginx-manager/app/releases/latest/download/install
 - 管理画面はデフォルトではサーバー内(`http://127.0.0.1:9000`)からのみ開けます。`--admin-domain`(または `.env` の `NGINX_MANAGER_ADMIN_DOMAIN`)を指定すると、同梱の nginx がそのドメインで Let's Encrypt 証明書を取得し、HTTPS でのみ管理画面を公開します(80 は 443 へリダイレクト)。
 - ポート・ドメイン・バージョンはインストールディレクトリの `.env` で変更します。データは `data/` 以下にあります。
 - インストール済みのサーバーでインストールコマンドを再実行すると、`.env` と `data/` には手を触れずに終了します。新しいバージョンへは `nm upgrade` で上げ、`.env` はそのままに新しく追加されたキーだけをデフォルト値で追記します。
-- 運用は `nm` コマンドで行います: `nm status`、`nm upgrade`(manager だけを上げるので nginx は途切れません)、`nm upgrade --nginx`、`nm backup`、`nm restore`、`nm migrate`(v1.1 より前のインストールの移行)、`nm import-root`(インポートするホストディレクトリを同じパスでマウントし、読み取り権限を確認)。
+- 運用は `nm` コマンドで行います: `nm status`、`nm upgrade`(manager だけを上げるので nginx は途切れません)、`nm upgrade --nginx`、`nm backup`、`nm restore`、`nm migrate`(v1.1 より前のインストールの移行)、`nm import-root`(インポートするホストディレクトリを同じパスでマウントし、読み取り権限を確認)、`nm check-domain`(管理ドメインが DNS にあり、このサーバーに届くかを確認)。
 - サーバーに既存の設定(例: `/home/*/nginx/*.conf`)をインポートするには、インストール時に `--import-root /home` を付けます。インストール後は `nm import-root add /home` でマウントし、`nm import-root check` で管理ツール(UID 10101)が読めるか確認します。読めない場合は `nm import-root grant` が ACL で読み取り権限だけを付与します。インポート画面も権限のないディレクトリに出会っても止まらず、開けなかった場所と grant コマンドを表示します。
 - 詳しくはユーザーガイド [1. インストールと実行](src/main/resources/guide/ko/01-install.md)(韓国語)にあります。バンドルの元ファイルは [deploy/](deploy/) です。
 

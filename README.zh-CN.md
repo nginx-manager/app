@@ -33,7 +33,7 @@ curl -fsSL https://github.com/nginx-manager/app/releases/latest/download/install
 - 管理界面默认只能在服务器内部（`http://127.0.0.1:9000`）访问。指定 `--admin-domain`（或 `.env` 中的 `NGINX_MANAGER_ADMIN_DOMAIN`）后，一同安装的 nginx 会为该域名申请 Let's Encrypt 证书，并仅通过 HTTPS 提供管理界面（80 跳转到 443）。
 - 端口、域名和版本在安装目录的 `.env` 中修改。数据位于 `data/` 下。
 - 在已安装的服务器上再次运行安装命令时，不会改动 `.env` 和 `data/`，直接结束。新版本通过 `nm upgrade` 升级，`.env` 保持不变，只会以默认值追加新增的键。
-- 运维使用 `nm` 命令：`nm status`、`nm upgrade`（只升级 manager，nginx 不中断）、`nm upgrade --nginx`、`nm backup`、`nm restore`、`nm migrate`（迁移 v1.1 之前的安装）、`nm import-root`（以相同路径挂载要导入的宿主机目录并检查读取权限）。
+- 运维使用 `nm` 命令：`nm status`、`nm upgrade`（只升级 manager，nginx 不中断）、`nm upgrade --nginx`、`nm backup`、`nm restore`、`nm migrate`（迁移 v1.1 之前的安装）、`nm import-root`（以相同路径挂载要导入的宿主机目录并检查读取权限）、`nm check-domain`（检查管理域名是否在 DNS 中并指向本服务器）。
 - 若要导入服务器上已有的配置（例如 `/home/*/nginx/*.conf`），安装时加上 `--import-root /home`。安装后用 `nm import-root add /home` 挂载，再用 `nm import-root check` 确认管理工具（UID 10101）能否读取。无法读取时，`nm import-root grant` 会通过 ACL 只授予读取权限。导入页面遇到没有权限的目录时也不会中止，而是列出无法打开的位置和 grant 命令。
 - 详细内容见用户手册 [1. 安装与运行](src/main/resources/guide/ko/01-install.md)（韩语）。安装包的源文件在 [deploy/](deploy/)。
 
