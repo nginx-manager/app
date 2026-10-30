@@ -16,7 +16,7 @@ import java.time.Duration;
 import java.util.List;
 
 /**
- * 메일(SMTP)과 웹훅으로 알림을 보낸다. 메일은 spring.mail.* 설정이 있을 때만 쓸 수 있다.
+ * 메일(SMTP)과 웹훅으로 알림을 보낸다. 채널마다 받을 종류를 고른다(028). 메일은 spring.mail.* 설정이 있을 때만 쓸 수 있다.
  * 한 채널의 실패가 다른 채널 발송을 막지 않는다.
  */
 @Service
@@ -41,8 +41,12 @@ public class NotificationService {
         this.mailSender = mailSender;
     }
 
+    /** 켜진 채널 가운데 이 알림 종류를 받는 채널에 보낸다(028). */
     public List<Delivery> sendToAll(Notice notice) {
-        return channelRepository.findByEnabledTrue().stream().map(channel -> send(channel, notice)).toList();
+        NotificationEvent kind = NotificationEvent.of(notice.event());
+        return channelRepository.findByEnabledTrue().stream()
+                .filter(channel -> channel.receives(kind))
+                .map(channel -> send(channel, notice)).toList();
     }
 
     public Delivery send(NotificationChannel channel, Notice notice) {

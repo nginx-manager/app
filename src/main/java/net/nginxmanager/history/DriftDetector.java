@@ -39,6 +39,8 @@ public class DriftDetector {
     }
 
     private volatile Scan last = new Scan(Instant.EPOCH, List.of());
+    /** 마지막으로 알린 변경 목록(028). */
+    private volatile Set<DriftItem> reported = Set.of();
 
     private final ApplyService applyService;
     private final ConfigSync sync;
@@ -68,7 +70,15 @@ public class DriftDetector {
     @Scheduled(initialDelayString = "${nginx-manager.drift.interval:PT1M}",
             fixedDelayString = "${nginx-manager.drift.interval:PT1M}")
     public void scheduledScan() {
-        refresh();
+        List<DriftItem> items = refresh();
+        // 같은 변경을 1분마다 알리지 않는다. 목록이 달라지면(새 파일, 가져오기·적용 뒤 다시 생김) 다시 알린다
+        Set<DriftItem> found = Set.copyOf(items);
+        if (!found.equals(reported)) {
+            reported = found;
+            if (!found.isEmpty()) {
+                events.publishEvent(new DriftFoundEvent(items));
+            }
+        }
     }
 
     /** 최근 확인 결과. 오래됐으면 다시 확인한다. */

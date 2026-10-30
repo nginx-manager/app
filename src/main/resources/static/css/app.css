@@ -178,6 +178,8 @@ form:has(input[name=type]:checked):not(:has(input[name=type][value=PROXY]:checke
 .bulk-bar > select { width: auto; min-width: 10rem; }
 .bulk-bar > .hint { flex: 1 1 260px; margin: 0; }
 th.select, td.select { width: 1%; padding-right: 0; }
+.event-kinds { display: flex; flex-wrap: wrap; align-items: center; gap: .2rem 0; min-width: 16rem; }
+.event-kinds label.inline { margin: 0 .9rem .2rem 0; font-size: .85rem; }
 button + .hint, button + p.hint { margin-top: .75rem; }
 details { margin: .25rem 0 1rem; padding: .75rem 1rem; border: 1px solid var(--line); border-radius: 8px; background: var(--subtle); }
 details[open] summary { margin-bottom: .9rem; }

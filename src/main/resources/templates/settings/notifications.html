@@ -11,7 +11,7 @@
     <section class="card">
         <p class="muted" th:if="${#lists.isEmpty(channels)}" th:text="#{settings.notifications.empty}">등록된 채널이 없습니다.</p>
         <table th:unless="${#lists.isEmpty(channels)}">
-            <thead><tr><th th:text="#{settings.notifications.col.type}">종류</th><th th:text="#{settings.notifications.col.target}">대상</th><th th:text="#{settings.notifications.col.status}">상태</th><th></th></tr></thead>
+            <thead><tr><th th:text="#{settings.notifications.col.type}">종류</th><th th:text="#{settings.notifications.col.target}">대상</th><th th:text="#{settings.notifications.col.status}">상태</th><th th:text="#{settings.notifications.col.events}">받을 알림</th><th></th></tr></thead>
             <tbody>
             <tr th:each="ch : ${channels}">
                 <td th:text="${ch.type.name() == 'EMAIL'} ? #{settings.notifications.type.email} : #{settings.notifications.type.webhook}">메일</td>
@@ -21,6 +21,12 @@
                     <form th:action="@{/settings/notifications/{id}/enabled(id=${ch.id})}" method="post" class="inline">
                         <input type="hidden" name="enabled" th:value="${!ch.enabled}">
                         <button type="submit" class="link" th:text="${ch.enabled} ? #{settings.notifications.disable} : #{settings.notifications.enable}">중지</button>
+                    </form>
+                </td>
+                <td>
+                    <form th:action="@{/settings/notifications/{id}/events(id=${ch.id})}" method="post" class="event-kinds">
+                        <label class="inline" th:each="k : ${kinds}"><input type="checkbox" name="events" th:value="${k}" th:checked="${ch.receives(k)}"> <span th:text="#{|notify.event.${k.name()}|}">적용 실패</span></label>
+                        <button type="submit" class="link" th:text="#{settings.notifications.events.save}">저장</button>
                     </form>
                 </td>
                 <td class="nowrap">

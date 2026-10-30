@@ -33,6 +33,9 @@ nginx-manager:
   # 예약 변경 감지는 적용 잠금을 잡으므로, 다른 테스트의 적용과 겹치지 않게 돌리지 않는다
   drift:
     interval: PT24H
+  # 백업 실패 확인은 필요한 테스트가 직접 부른다
+  notify:
+    backup-check: PT24H
 
 logging:
   level:
