@@ -20,6 +20,7 @@ nginx manager의 버전별 변경 내용입니다. 최신 버전이 위에 있�
 
 ## 릴리스 절차
 
+1. **README 고치기**: 이번 버전에서 바뀐 설치 방법, `.env` 설정, 기능, 화면을 이 저장소의 [README.md](../../README.md)와 조직 소개(nginx-manager/.github의 `profile/README.md`)에 반영합니다. 소개 페이지의 그림(`profile/images/`)도 새 화면으로 바꿉니다. 바뀐 것이 없어도 두 README를 읽어 보고 맞는지 확인합니다.
 1. **노트 쓰기**: [TEMPLATE.md](TEMPLATE.md)를 복사해 `vX.Y.Z.md`를 쓰고, 이 표 맨 위에 한 줄을 더합니다. 이번 버전의 기능이 [사용 설명서](../../src/main/resources/guide/ko/README.md)(관리 화면의 `/guide`)에 모두 들어갔는지 확인하고, 설명서 첫 화면의 기준 버전을 올립니다.
 2. **화면 찍기**: 릴리스할 커밋으로 두 이미지를 빌드해 빈 볼륨으로 띄우고 스크립트로 찍습니다. 그림은 2배 해상도로 찍히고, 노트에서는 `width`로 1배 크기에 맞춰 보여 줍니다.
    ```bash
