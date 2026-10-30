@@ -115,7 +115,7 @@
             <input type="hidden" name="from" value="certs">
             <label><span th:text="#{certs.list.issue.site}">사이트</span>
                 <select name="siteId" required>
-                    <option th:each="s : ${sitesWithoutHttps}" th:value="${s.id}" th:text="${s.primaryDomain}">app.example.com</option>
+                    <option th:each="s : ${sitesWithoutHttps}" th:value="${s.id}" th:text="${s.type.name() == 'RAW' ? s.primaryDomain + ' (' + #messages.msg('sites.list.type.RAW') + ')' : s.primaryDomain}">app.example.com</option>
                 </select>
                 <span class="hint" th:text="#{certs.list.issue.siteHint}">사이트의 대표·추가 도메인이 모두 인증서에 들어갑니다.</span></label>
             <button type="submit" th:text="#{certs.list.issue.submit}">발급받기</button>

@@ -24,18 +24,20 @@
 
     <section class="card">
         <p th:if="${#lists.isEmpty(versions)}" class="muted" th:text="#{versions.list.empty}">아직 기록된 버전이 없습니다.</p>
-        <form th:unless="${#lists.isEmpty(versions)}" th:action="@{/versions/compare}" method="get">
-            <p class="hint" th:text="#{versions.list.compare.hint}">비교 칸의 왼쪽 단추로 이전 버전을, 오른쪽 단추로 이후 버전을 고른 뒤 아래 비교 단추를 누르세요.</p>
+        <form th:unless="${#lists.isEmpty(versions)}" th:action="@{/versions/compare}" method="get" class="version-compare">
+            <p class="hint" th:text="#{versions.list.compare.hint}">변경 전 칸에서 기준이 될 버전을, 변경 후 칸에서 바뀐 뒤의 버전을 고른 뒤 아래 비교 단추를 누르세요.</p>
             <table>
                 <thead>
-                <tr><th th:text="#{versions.list.col.compare}">비교</th><th th:text="#{versions.list.col.version}">버전</th><th th:text="#{versions.list.col.time}">시각</th><th th:text="#{versions.list.col.author}">작성자</th><th th:text="#{versions.list.col.source}">종류</th><th th:text="#{versions.list.col.result}">결과</th><th th:text="#{versions.list.col.message}">메모</th><th th:text="#{versions.list.col.files}">파일</th></tr>
+                <tr><th class="nowrap" th:text="#{versions.list.col.before}">변경 전</th><th class="nowrap" th:text="#{versions.list.col.after}">변경 후</th><th th:text="#{versions.list.col.version}">버전</th><th th:text="#{versions.list.col.time}">시각</th><th th:text="#{versions.list.col.author}">작성자</th><th th:text="#{versions.list.col.source}">종류</th><th th:text="#{versions.list.col.result}">결과</th><th th:text="#{versions.list.col.message}">메모</th><th th:text="#{versions.list.col.files}">파일</th></tr>
                 </thead>
                 <tbody>
                 <tr th:each="v, stat : ${versions}">
-                    <td class="nowrap">
-                        <input type="radio" name="a" th:value="${v.id}" th:checked="${stat.index == 1}" aria-label="이전 버전" th:aria-label="#{versions.list.compare.older}">
-                        <input type="radio" name="b" th:value="${v.id}" th:checked="${stat.index == 0}" aria-label="이후 버전" th:aria-label="#{versions.list.compare.newer}">
-                    </td>
+                    <td><input type="radio" name="a" th:value="${v.id}" th:checked="${stat.index == 1}"
+                               aria-label="변경 전 버전으로 #3 고르기" th:aria-label="#{versions.list.compare.older(${'#' + v.id})}"
+                               title="변경 전 버전으로 고르기" th:title="#{versions.list.compare.older.title}"></td>
+                    <td><input type="radio" name="b" th:value="${v.id}" th:checked="${stat.index == 0}"
+                               aria-label="변경 후 버전으로 #3 고르기" th:aria-label="#{versions.list.compare.newer(${'#' + v.id})}"
+                               title="변경 후 버전으로 고르기" th:title="#{versions.list.compare.newer.title}"></td>
                     <td><a th:href="@{/versions/{id}(id=${v.id})}" th:text="'#' + ${v.id}">#3</a></td>
                     <td class="nowrap" th:text="${#temporals.format(v.createdAt, 'yyyy-MM-dd HH:mm:ss')}">2026-10-13 10:00</td>
                     <td th:text="${v.authorName ?: #messages.msg('versions.system')}">admin</td>

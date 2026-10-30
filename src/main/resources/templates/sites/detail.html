@@ -81,7 +81,7 @@
                 <button type="submit" th:if="${currentUser.canEdit()}" th:text="#{sites.field.saveDraft}">초안 저장</button>
             </form>
         </section>
-        <section class="card" id="https" th:if="${site.type.name() != 'RAW'}">
+        <section class="card" id="https" th:if="${site.type.name() != 'RAW' or currentUser.isAdmin()}">
             <h2 th:text="#{sites.detail.https.title}">HTTPS 인증서</h2>
             <th:block th:if="${certificate}">
                 <p>
@@ -104,15 +104,31 @@
                         <p class="muted small" th:if="${certificate.status.name() != 'ACTIVE'}" th:text="#{sites.detail.https.issueNote}">도메인이 이 서버를 가리키고 80 포트가 열려 있어야 합니다.</p>
                     </form>
                 </th:block>
+                <th:block th:if="${site.type.name() == 'RAW' and certificate.status.name() == 'ACTIVE'}">
+                    <p class="small"><th:block th:text="#{sites.detail.https.rawPaths}">인증서 경로</th:block>:
+                        <code th:text="${certificate.certPath}"></code>, <code th:text="${certificate.keyPath}"></code></p>
+                    <form th:unless="${rawHasHttps}" th:action="@{/certs/letsencrypt/raw-https}" method="post">
+                        <input type="hidden" name="siteId" th:value="${site.id}">
+                        <p><label class="inline"><input type="checkbox" name="redirectHttp" value="true" checked>
+                            <th:block th:text="#{sites.detail.https.rawRedirect}">HTTP(80) 요청을 HTTPS로 넘기기</th:block></label></p>
+                        <button type="submit" th:text="#{sites.detail.https.rawAddBlock}">443 server 블록 초안에 더하기</button>
+                        <p class="muted small" th:text="#{sites.detail.https.rawAddBlockNote}"></p>
+                    </form>
+                </th:block>
             </th:block>
             <th:block th:unless="${certificate}">
                 <p class="muted" th:text="#{sites.detail.https.none}">HTTPS를 쓰지 않습니다.</p>
                 <form th:if="${currentUser.canEdit()}" th:action="@{/certs/letsencrypt}" method="post">
                     <input type="hidden" name="siteId" th:value="${site.id}">
                     <button type="submit" th:text="#{sites.detail.https.enable}">Let's Encrypt 인증서 발급받기</button>
-                    <p class="muted small" th:if="${siteLive}" th:text="#{sites.detail.https.enableNote}">인증서를 받아 HTTPS 설정까지 자동으로 적용합니다.</p>
-                    <p class="muted small" th:unless="${siteLive}" th:text="#{sites.detail.https.enableNoteNotLive}">아직 nginx에 반영되지 않은 사이트입니다.</p>
-                    <p class="hint" th:text="#{sites.detail.https.uploadedHint}">업로드한 인증서를 쓰려면 설정의 HTTPS에서 고르세요.</p>
+                    <th:block th:if="${site.type.name() == 'RAW'}">
+                        <p class="muted small" th:text="#{sites.detail.https.rawEnableNote}"></p>
+                    </th:block>
+                    <th:block th:unless="${site.type.name() == 'RAW'}">
+                        <p class="muted small" th:if="${siteLive}" th:text="#{sites.detail.https.enableNote}">인증서를 받아 HTTPS 설정까지 자동으로 적용합니다.</p>
+                        <p class="muted small" th:unless="${siteLive}" th:text="#{sites.detail.https.enableNoteNotLive}">아직 nginx에 반영되지 않은 사이트입니다.</p>
+                        <p class="hint" th:text="#{sites.detail.https.uploadedHint}">업로드한 인증서를 쓰려면 설정의 HTTPS에서 고르세요.</p>
+                    </th:block>
                 </form>
             </th:block>
         </section>

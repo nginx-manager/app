@@ -509,7 +509,7 @@ public class SiteService {
     private LetsEncryptRequest doEnableLetsEncrypt(long siteId, String actor) {
         Site site = load(siteId);
         if (site.getType() == SiteType.RAW) {
-            throw new RawSiteLetsEncryptException();
+            return enableRawLetsEncrypt(site, actor);
         }
         SiteForm form = rendering.formOf(site);
         SiteForm https = form.withLetsEncrypt();
@@ -535,6 +535,64 @@ public class SiteService {
         }
         events.publishEvent(AuditEvent.success(actor, AuditAction.SITE_SAVE, "site:" + site.getPrimaryDomain() + " https"));
         return new LetsEncryptRequest(certificateId, live);
+    }
+
+    /**
+     * 원문 사이트: server_name의 도메인으로 인증서를 만들고, HTTP server 블록에 인증 경로가 없으면 더한 초안을 만든다.
+     * 그 초안을 적용하면 발급을 시작한다. 인증 경로가 이미 반영돼 있으면 바로 발급한다.
+     * 443 server 블록은 발급된 뒤 {@link #addRawHttpsBlock}으로 더한다.
+     */
+    private LetsEncryptRequest enableRawLetsEncrypt(Site site, String actor) {
+        ConfigFile file = site.getConfigFile();
+        String disk = store.read(file.getPath());
+        String current = file.getDraftContent() != null ? file.getDraftContent() : disk;
+        if (current == null) {
+            throw new NotFoundException("config file " + file.getPath());
+        }
+        List<String> names = RawHttps.domains(current);
+        String primary = site.getPrimaryDomain();
+        if (primary.contains("*")) {
+            throw new WildcardLetsEncryptException();
+        }
+        List<String> domains = new java.util.ArrayList<>(List.of(primary));
+        names.stream().filter(n -> !n.equals(primary)).forEach(domains::add);
+        long certificateId = certificateRegistry.letsEncryptFor(primary, List.copyOf(domains));
+        site.enableHttps(certificateId);
+        String withAcme = RawHttps.withAcmeChallenge(current);
+        if (!withAcme.equals(current)) {
+            file.stageContent(withAcme);
+            events.publishEvent(new RawEditedEvent(file.getPath()));
+        }
+        boolean live = site.isEnabled() && disk != null && disk.equals(withAcme);
+        events.publishEvent(AuditEvent.success(actor, AuditAction.SITE_SAVE, "site:" + primary + " https"));
+        return new LetsEncryptRequest(certificateId, live);
+    }
+
+    /**
+     * 원문 사이트에 발급된 인증서로 443 server 블록을 더한 초안을 만든다. 이미 HTTPS server 블록이 있으면 그대로 둔다.
+     *
+     * @param redirect 본뜬 80 server 블록을 HTTPS로 넘기는 블록으로 바꾼다(인증 경로는 남긴다)
+     */
+    public boolean addRawHttpsBlock(long siteId, String certPath, String keyPath, boolean redirect, String actor) {
+        return Boolean.TRUE.equals(locked(() -> {
+            Site site = load(siteId);
+            if (site.getType() != SiteType.RAW) {
+                throw new NotFoundException("raw site " + siteId);
+            }
+            ConfigFile file = site.getConfigFile();
+            String current = file.getDraftContent() != null ? file.getDraftContent() : store.read(file.getPath());
+            if (current == null) {
+                return false;
+            }
+            String updated = RawHttps.withHttps(current, certPath, keyPath, redirect);
+            if (updated.equals(current)) {
+                return false;
+            }
+            file.stageContent(updated);
+            events.publishEvent(new RawEditedEvent(file.getPath()));
+            events.publishEvent(AuditEvent.success(actor, AuditAction.SITE_SAVE, "site:" + site.getPrimaryDomain() + " https" + (redirect ? " redirect" : "")));
+            return true;
+        }));
     }
 
     private Long certificateFor(String domain, SiteForm form) {
