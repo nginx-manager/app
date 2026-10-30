@@ -5,6 +5,10 @@
 <nav th:replace="~{fragments/layout :: nav}"></nav>
 <main class="page">
     <h1 th:text="#{settings.notifications.title}">알림 설정</h1>
+    <nav class="tabs" th:attr="aria-label=#{nav.settings}">
+        <a th:href="@{/settings/notifications}" class="current" th:text="#{settings.notifications.title}">알림 설정</a>
+        <a th:href="@{/settings/api-tokens}" th:text="#{settings.apiTokens.title}">API 토큰</a>
+    </nav>
     <p class="muted" th:text="#{settings.notifications.intro}">인증서 발급·갱신에 실패하거나 만료가 가까워지면 아래 채널로 알립니다.</p>
     <p class="notice" th:if="${notice}" th:text="${notice}">완료</p>
     <p class="error" th:if="${error}" th:text="${error}">오류</p>

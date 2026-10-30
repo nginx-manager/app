@@ -154,6 +154,22 @@ class ImageModuleOptionsTest {
     }
 
     @Test
+    @DisplayName("관리자 추가 지시어는 server 블록에 들어가 동작하고, 메모는 설정 파일 주석으로 남는다(031, 032)")
+    void serverDirectivesAndNote() throws Exception {
+        createStatic("extra.local", "/etc/nginx/html", Map.of(
+                "options.serverDirectives", "location = /healthz {\n    default_type text/plain;\n    return 200 'healthy';\n}",
+                "options.note", "결제 팀 운영"));
+        apply("server directives");
+        awaitStatus("extra.local", "200");
+
+        String body = stack.nginxExec("curl", "--noproxy", "*", "-s", "-H", "Host: extra.local",
+                "http://127.0.0.1/healthz").getStdout();
+        assertThat(body).isEqualTo("healthy");
+        assertThat(stack.nginxExec("cat", "/etc/nginx/conf.d/sites/extra.local.conf").getStdout())
+                .contains("# 메모: 결제 팀 운영");
+    }
+
+    @Test
     @DisplayName("접근 제한·비밀번호·속도 제한을 모두 켜도 ACME 인증 경로는 열려 있다")
     void acmeChallengeStaysReachable() throws Exception {
         createStatic("locked.local", "/etc/nginx/html", Map.of("options.allowFrom", "10.0.0.0/8",

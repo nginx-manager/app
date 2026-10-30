@@ -333,6 +333,15 @@ public record SiteOptions(
         return load(values, "");
     }
 
+    /** 점검 모드만 바꾼 값(033, API). */
+    SiteOptions withMaintenance(boolean on) {
+        return new SiteOptions(gzip, securityHeaders, hsts, http3, maxBodySizeMb, allowFrom, denyFrom, authUsers,
+                satisfyAny, rateLimit, rateBurst, connLimit, realIpFrom, realIpHeader, cacheMinutes, autoindex,
+                authRequestUrl, authSignInUrl, pathRoutes, backupTargets, upstreamMaxFails, upstreamFailTimeout,
+                upstreamKeepalive, on, maintenanceMessage, maintenanceAllowFrom, responseHeaders,
+                requestHeaders, redirectToPrimary, backendErrorPage, backendErrorMessage, note, serverDirectives);
+    }
+
     /** 추가 지시어만 바꾼 값(032). 멤버가 보낸 값은 이것으로 기존 값으로 되돌린다. */
     SiteOptions withServerDirectives(String value) {
         return new SiteOptions(gzip, securityHeaders, hsts, http3, maxBodySizeMb, allowFrom, denyFrom, authUsers,

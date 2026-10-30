@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ko" th:lang="${#locale.toLanguageTag()}" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(#{settings.apiTokens.title})}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<main class="page">
+    <h1 th:text="#{settings.apiTokens.title}">API 토큰</h1>
+    <nav class="tabs" th:attr="aria-label=#{nav.settings}">
+        <a th:href="@{/settings/notifications}" th:text="#{settings.notifications.title}">알림 설정</a>
+        <a th:href="@{/settings/api-tokens}" class="current" th:text="#{settings.apiTokens.title}">API 토큰</a>
+    </nav>
+    <p class="muted" th:text="#{settings.apiTokens.intro}">배포 스크립트에서 점검 모드를 켜고 끄거나 적용할 때 쓰는 토큰입니다.</p>
+    <p class="notice" th:if="${notice}" th:text="${notice}">완료</p>
+    <p class="error" th:if="${error}" th:text="${error}">오류</p>
+    <section class="card" th:if="${createdValue}">
+        <h2 th:text="#{settings.apiTokens.created(${createdName})}">토큰을 만들었습니다</h2>
+        <p class="warning" th:text="#{settings.apiTokens.createdHint}">이 값은 지금 한 번만 보입니다.</p>
+        <pre class="code" id="token-value" th:text="${createdValue}">nmt_...</pre>
+    </section>
+    <section class="card">
+        <p class="muted" th:if="${#lists.isEmpty(tokens)}" th:text="#{settings.apiTokens.empty}">만든 토큰이 없습니다.</p>
+        <table th:unless="${#lists.isEmpty(tokens)}">
+            <thead><tr><th th:text="#{settings.apiTokens.col.name}">이름</th><th th:text="#{settings.apiTokens.col.hint}">토큰</th><th th:text="#{settings.apiTokens.col.createdBy}">만든 사람</th><th th:text="#{settings.apiTokens.col.createdAt}">만든 때</th><th th:text="#{settings.apiTokens.col.lastUsed}">마지막 사용</th><th></th></tr></thead>
+            <tbody>
+            <tr th:each="t : ${tokens}">
+                <td th:text="${t.name}">deploy</td>
+                <td><code th:text="|${t.tokenHint}…|">nmt_ab12…</code></td>
+                <td th:text="${t.createdBy}">admin</td>
+                <td class="nowrap" th:text="${#temporals.format(t.createdAt, 'yyyy-MM-dd HH:mm')}">2026-10-30 12:00</td>
+                <td class="nowrap" th:text="${t.lastUsedAt} ? ${#temporals.format(t.lastUsedAt, 'yyyy-MM-dd HH:mm')} : #{settings.apiTokens.neverUsed}">-</td>
+                <td>
+                    <form th:action="@{/settings/api-tokens/{id}/delete(id=${t.id})}" method="post" class="inline"
+                          th:attr="data-confirm=#{settings.apiTokens.deleteConfirm(${t.name})}">
+                        <button type="submit" class="link" th:text="#{settings.apiTokens.delete}">삭제</button>
+                    </form>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+    <section class="card">
+        <h2 th:text="#{settings.apiTokens.add.title}">토큰 만들기</h2>
+        <form th:action="@{/settings/api-tokens}" method="post" class="row-form">
+            <label><span th:text="#{settings.apiTokens.add.name}">이름</span>
+                <input type="text" name="name" required maxlength="40" pattern="[A-Za-z0-9._\-]+" placeholder="github-deploy">
+                <span class="hint" th:text="#{settings.apiTokens.add.nameHint}">영문, 숫자, . _ - 로 40자까지</span></label>
+            <button type="submit" th:text="#{settings.apiTokens.add.submit}">만들기</button>
+        </form>
+    </section>
+    <section class="card">
+        <h2 th:text="#{settings.apiTokens.usage.title}">사용 예</h2>
+        <p class="hint" th:text="#{settings.apiTokens.usage.hint}">토큰은 관리자 권한으로 동작하고 감사 로그에 token:이름으로 남습니다.</p>
+        <pre class="code">curl -H "Authorization: Bearer $NM_TOKEN" https://manager.example.com/api/v1/sites
+
+curl -X POST -H "Authorization: Bearer $NM_TOKEN" -H "Content-Type: application/json" \
+     -d '{"enabled": true, "apply": true}' \
+     https://manager.example.com/api/v1/sites/app.example.com/maintenance
+
+curl -X POST -H "Authorization: Bearer $NM_TOKEN" https://manager.example.com/api/v1/apply</pre>
+    </section>
+</main>
+</body>
+</html>
