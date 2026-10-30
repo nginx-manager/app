@@ -123,4 +123,27 @@ class RawHttpsTest {
         assertThat(https).contains("listen 9000;").contains("listen [::]:9000;");
         assertThat(https.indexOf("listen 443 ssl;")).isLessThan(https.indexOf("listen 9000;"));
     }
+
+    @Test
+    void reimportingKeepsTheChallengePathAndHttpsBlockTheManagerAdded() {
+        String previous = RawHttps.withHttps(RawHttps.withAcmeChallenge(MINIO),
+                "/etc/nginx/certs/storage/2/fullchain.pem", "/etc/nginx/certs/storage/2/privkey.pem", true);
+        String source = MINIO.replace("10.0.0.5:9000", "10.0.0.6:9000");
+
+        String again = RawHttps.reapply(previous, source);
+
+        assertThat(again).contains("upstream minio { server 10.0.0.6:9000; }");
+        assertThat(again).contains("ssl_certificate /etc/nginx/certs/storage/2/fullchain.pem;")
+                .contains("ssl_certificate_key /etc/nginx/certs/storage/2/privkey.pem;")
+                .contains("return 301 https://$host$request_uri;");
+        assertThat(RawHttps.hasHttps(again)).isTrue();
+        assertThat(again.split("acme-challenge", -1)).hasSize(2);
+        assertThat(RawHttps.reapply(previous, again)).isEqualTo(again);
+    }
+
+    @Test
+    void reimportingASiteWithoutManagedHttpsLeavesTheSourceAlone() {
+        assertThat(RawHttps.reapply(MINIO, MINIO.replace("10.0.0.5", "10.0.0.6")))
+                .isEqualTo(MINIO.replace("10.0.0.5", "10.0.0.6"));
+    }
 }

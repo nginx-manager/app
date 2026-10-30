@@ -301,7 +301,16 @@ public class SiteService {
                 doUpdate(siteId, merged, actor);
             } else {
                 requireUnusedDomains(site.getId(), analysis.domains());
-                site.getConfigFile().stageContent(normalizeNewlines(content));
+                ConfigFile file = site.getConfigFile();
+                String staged = normalizeNewlines(content);
+                if (site.getType() == SiteType.RAW && site.isHttpsEnabled()) {
+                    // 원본에는 관리도구가 더한 인증 경로와 443 블록이 없으므로 다시 입힌다
+                    String previous = file.getDraftContent() != null ? file.getDraftContent() : store.read(file.getPath());
+                    if (previous != null) {
+                        staged = RawHttps.reapply(previous, staged);
+                    }
+                }
+                file.stageContent(staged);
                 if (site.getType() != SiteType.RAW) {
                     site.switchToRaw();
                 }
@@ -324,11 +333,19 @@ public class SiteService {
         ConfigFile file = configFileRepository.findById(configFileId)
                 .orElseThrow(() -> new NotFoundException("config file " + configFileId));
         requireVersion(file.getVersion(), expectedVersion, "file " + file.getPath());
-        file.stageContent(normalizeNewlines(content));
+        String previous = file.getDraftContent() != null ? file.getDraftContent() : store.read(file.getPath());
+        String staged = normalizeNewlines(content);
+        file.stageContent(staged);
         events.publishEvent(new RawEditedEvent(file.getPath()));
-        siteRepository.findByConfigFileId(configFileId)
-                .filter(site -> site.getType() != SiteType.RAW)
-                .ifPresent(Site::switchToRaw);
+        siteRepository.findByConfigFileId(configFileId).ifPresent(site -> {
+            if (site.getType() != SiteType.RAW) {
+                site.switchToRaw();
+            } else if (site.isHttpsEnabled() && previous != null && RawHttps.hasHttps(previous)
+                    && !RawHttps.hasHttps(staged)) {
+                // 원문에서 HTTPS server 블록을 지웠으면 HTTPS 켬 표시와 인증서 갱신도 멈춘다
+                site.disableHttps();
+            }
+        });
         events.publishEvent(AuditEvent.success(actor, AuditAction.SITE_SAVE, "file:" + file.getPath()));
         return file;
     }
