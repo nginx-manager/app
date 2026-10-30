@@ -47,7 +47,7 @@ async function submit(locator) {
 async function applyPending(message) {
     await go('/apply');
     await page.fill('input[name=message]', message);
-    await page.click('button:has-text("검증 후 적용")');
+    await page.click('button:has-text("nginx -t 후 reload")');
     await page.waitForSelector('#result:has-text("기록했습니다")', { timeout: 60000 });
     await page.evaluate(() => window.scrollTo(0, 0));
 }
@@ -76,7 +76,7 @@ await go('/certs');
 await page.fill('input[name=name]', 'wildcard.example.com');
 await page.setInputFiles('input[name=certificate]', join(certDir, 'cert.pem'));
 await page.setInputFiles('input[name=privateKey]', join(certDir, 'key.pem'));
-await submit('button:has-text("올리기")');
+await submit('button:has-text("업로드")');
 
 // 4장: 사이트 만들기
 await go('/sites/new');
@@ -136,7 +136,7 @@ await applyPending('app 응답 타임아웃 120초');
 // 8장: 이력, 비교, 버전 화면
 await go('/versions');
 await shot('versions');
-await submit('button:has-text("비교")');
+await submit('button:has-text("diff 보기")');
 await shot('version-diff');
 await go('/versions');
 await page.locator('table a').nth(1).click();
@@ -218,7 +218,7 @@ if (importPattern) {
     await go('/sites/import');
     await page.fill('form[action$="/sites/import/sources"] input[name=pattern]', importPattern);
     await submit('button:has-text("위치 등록")');
-    await submit('button:has-text("등록한 위치 모두 검사")');
+    await submit('button:has-text("등록한 위치 모두 스캔")');
     await shot('import', { fullPage: true });
     const formRow = page.locator('tr', { has: page.locator('.badge:has-text("폼 사이트")') }).first();
     await go(await formRow.locator('a:has-text("미리 보기")').getAttribute('href'));
