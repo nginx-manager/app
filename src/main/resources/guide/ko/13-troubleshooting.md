@@ -55,6 +55,25 @@ sudo /opt/nginx-manager/nm restart
 
 새 관리 화면이 정해진 시간 안에 뜨지 않아 이전 버전과 업그레이드 전 DB로 롤백한 것입니다. nginx는 그대로 돌고 있습니다. 출력에 보인 로그 끝부분으로 이유를 확인하고, 느린 서버라면 `NM_WAIT_TIMEOUT=600 nm upgrade`처럼 기다리는 시간을 늘려 다시 합니다.
 
+## nm upgrade --nginx가 "host not found in upstream"으로 멈출 때
+
+`nginx: [emerg] host not found in upstream "minio1.internal:9000"`처럼 나오면, nginx가 업스트림의 `server` 이름을 풀지 못한 것입니다. nginx는 이 이름을 설정 검사와 시작 때 한 번 풀기 때문에, 이름이 하나라도 안 풀리면 설정 전체가 실패합니다. 이때 nginx 이미지는 바뀌지 않았고 지금 nginx가 그대로 트래픽을 받습니다.
+
+1. 지금 nginx에서 검사해 봅니다: `cd /opt/nginx-manager && sudo docker compose exec nginx nginx -t`
+2. **통과하면** 업그레이드 사전 검사만 그 이름을 못 본 것입니다. v1.9.1까지의 `nm`은 사전 검사를 compose 네트워크 밖에서 돌려 `compose.override.yml`의 `extra_hosts`를 보지 못했습니다. `sudo ./nm upgrade`로 새 `nm`(v1.9.2 이상)을 받은 뒤 `sudo ./nm upgrade --nginx`를 다시 실행합니다.
+3. **실패하면** 지금 nginx도 그 이름을 모릅니다. 다음 중 하나로 고칩니다.
+   - 사이트의 백엔드를 IP 주소로 바꿉니다.
+   - `compose.override.yml`의 nginx 서비스에 `extra_hosts`를 더하고 `sudo docker compose up -d nginx`로 다시 띄웁니다.
+
+     ```yaml
+     services:
+       nginx:
+         extra_hosts:
+           - "minio1.internal:10.0.0.12"
+     ```
+
+   - 급하면 그 사이트를 비활성화하고 적용합니다.
+
 ## 업그레이드 뒤 nginx가 뜨지 않을 때
 
 새 nginx가 지금 설정을 받아들이지 않으면 nginx를 띄우지 않고 대시보드에 문제의 파일과 줄을 보여 줍니다. 두 가지 방법 중 하나로 고칩니다.

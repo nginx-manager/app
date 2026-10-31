@@ -349,8 +349,15 @@ upgrade_nginx() { # image tag
     image="ghcr.io/nginx-manager/nginx:$tag"
     say "nginx 이미지 $old → $tag: 먼저 받아 두고 지금 설정을 새 nginx로 검사합니다"
     [ "${NM_SKIP_PULL:-0}" = 1 ] || docker pull -q "$image" >/dev/null
-    # nginx와 같은 사용자(UID 10101)로 검사해 로그 파일이 루트 것으로 생기지 않게 한다
-    if ! docker run --rm --user 10101:10101 --entrypoint nginx \
+    # nginx와 같은 사용자(UID 10101)로 검사해 로그 파일이 루트 것으로 생기지 않게 한다.
+    # 지금 nginx 컨테이너의 네트워크를 함께 써서 그 컨테이너와 똑같이 이름을 푼다:
+    # compose 네트워크의 서비스 이름, compose.override.yml의 extra_hosts·dns가 그대로 보인다.
+    # 따로 띄우면 upstream의 내부 이름(minio1.internal 등)을 못 찾아 멀쩡한 설정을 거부한다
+    net=""
+    running="$(dc ps -q nginx 2>/dev/null || true)"
+    [ -n "$running" ] && net="--network container:$running"
+    # shellcheck disable=SC2086
+    if ! docker run --rm $net --user 10101:10101 --entrypoint nginx \
             -v "$DIR/data/conf:/etc/nginx:ro" -v "$DIR/data/shared:/var/lib/nginx-manager:ro" \
             -v "$DIR/data/logs:/var/log/nginx" --tmpfs /run/nginx:uid=10101 "$image" -t; then
         die "새 nginx($tag)가 지금 설정을 받아들이지 않아 바꾸지 않았습니다. 위 오류의 파일을 고친 뒤 다시 하세요"
