@@ -150,15 +150,15 @@
             <p th:text="#{sites.detail.raw.body}">이 사이트는 원문으로만 관리합니다. 폼이 설정을 다시 덮어쓰지 않습니다.</p>
             <p class="hint" th:unless="${currentUser.isAdmin()}" th:text="#{sites.detail.raw.memberHint}">원문 편집은 관리자에게 요청하세요.</p>
         </section>
-
-        <section class="card">
-            <div class="title-row">
-                <h2 th:text="${site.configFile.path}">conf.d/sites/app.local.conf</h2>
-                <a th:if="${currentUser.isAdmin()}" th:href="@{/files/{id}(id=${site.configFile.id})}" th:text="#{sites.detail.editRaw}">Raw 편집</a>
-            </div>
-            <pre class="code" th:text="${content}"></pre>
-        </section>
     </div>
+    <!-- 설정 원문은 줄이 길어 두 칸 중 한 칸에 두면 잘린다. 아래에 화면 너비로 둔다 -->
+    <section class="card">
+        <div class="title-row">
+            <h2 th:text="${site.configFile.path}">conf.d/sites/app.local.conf</h2>
+            <a th:if="${currentUser.isAdmin()}" th:href="@{/files/{id}(id=${site.configFile.id})}" th:text="#{sites.detail.editRaw}">Raw 편집</a>
+        </div>
+        <pre class="code" th:text="${content}"></pre>
+    </section>
 </main>
 <footer th:replace="~{fragments/layout :: footer}"></footer>
 </body>
