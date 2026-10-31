@@ -17,7 +17,7 @@
                 <label><th:block th:text="#{streams.field.listenPort}">받을 포트</th:block>
                     <span class="hint" th:text="#{streams.field.listenPort.hint}">설명</span>
                     <!-- 새 스트림은 0 대신 빈 칸으로 시작한다 -->
-                    <input type="number" id="listenPort" name="listenPort" th:value="*{listenPort > 0} ? *{listenPort} : ''" min="1" max="65535" placeholder="5432" required>
+                    <input type="number" id="listenPort" name="listenPort" th:value="${form != null and form.listenPort > 0} ? ${form.listenPort} : ''" min="1" max="65535" placeholder="5432" required>
                     <span class="error" th:errors="*{listenPort}"></span>
                     <span class="error" th:errors="*{listenPortFree}"></span>
                 </label>

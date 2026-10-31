@@ -21,7 +21,7 @@
    1. `nginx -t`로 문법을 검사합니다.
    2. 통과하면 nginx를 reload합니다(연결을 끊지 않는 무중단 반영).
    3. reload 뒤 nginx가 정상인지 확인합니다.
-4. 결과가 화면에 나타나고, 성공하면 새 버전 번호로 [버전 이력](08-versions.md)에 남습니다.
+4. 결과가 화면에 나타나고, 성공하면 새 버전 번호로 [버전 이력](08-versions.md)에 남습니다. 반영한 변경은 **적용 대기 중인 변경**과 메뉴의 숫자에서 바로 빠집니다.
 
 <p align="center"><img src="images/apply-result.png" alt="적용 성공 결과" width="860"></p>
 
