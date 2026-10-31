@@ -57,8 +57,14 @@ public class ConfigVersion extends BaseEntity {
 
     public ConfigVersion(User author, String message, VersionSource source, VersionResult result,
                          String validationOutput) {
+        this(author, author == null ? null : author.getUsername(), message, source, result, validationOutput);
+    }
+
+    /** @param authorName 사용자가 아닌 행위자(API 토큰 token:이름)도 이력에 이름을 남긴다 */
+    public ConfigVersion(User author, String authorName, String message, VersionSource source, VersionResult result,
+                         String validationOutput) {
         this.author = author;
-        this.authorName = author == null ? null : author.getUsername();
+        this.authorName = authorName;
         this.message = message;
         this.source = source;
         this.result = result;

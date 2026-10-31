@@ -114,6 +114,9 @@ class ApiTokenTest extends ConfigRootTest {
         mvc.perform(post("/api/v1/apply").header("Authorization", token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result").value("SUCCESS"));
+        // 버전 이력에도 "시스템"이 아니라 토큰 이름이 남는다
+        assertThat(configVersionRepository.findFirstByOrderByIdDesc()).get()
+                .satisfies(v -> assertThat(v.getAuthorName()).isEqualTo("token:ci"));
         mvc.perform(post("/api/v1/apply").header("Authorization", token))
                 .andExpect(jsonPath("$.result").value("NOTHING_TO_APPLY"));
 

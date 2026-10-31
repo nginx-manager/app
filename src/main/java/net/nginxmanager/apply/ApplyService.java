@@ -45,6 +45,8 @@ public class ApplyService {
     static final String RELOAD_SKIPPED = "nginx가 멈춰 있어 reload하지 않았습니다. 대시보드에서 nginx를 시작하세요.";
 
     private static final Logger log = LoggerFactory.getLogger(ApplyService.class);
+    /** API 토큰으로 부른 요청의 행위자 앞머리(ApiTokenService.ACTOR_PREFIX와 같다). */
+    private static final String API_ACTOR_PREFIX = "token:";
 
     private final ConfigFileRepository configFileRepository;
     private final ConfigVersionRepository versionRepository;
@@ -277,7 +279,10 @@ public class ApplyService {
                                String detail, List<ValidationResult.ValidationMessage> messages) {
         Long versionId = tx.execute(status -> {
             User author = origin.actor() == null ? null : userRepository.findByUsername(origin.actor()).orElse(null);
-            ConfigVersion version = new ConfigVersion(author, origin.message(), origin.source(), result, detail)
+            // API 토큰(token:이름)으로 적용하면 사용자가 없어도 그 이름을 남긴다. 비우면 "시스템"으로 보인다
+            String authorName = author != null ? author.getUsername()
+                    : origin.actor() != null && origin.actor().startsWith(API_ACTOR_PREFIX) ? origin.actor() : null;
+            ConfigVersion version = new ConfigVersion(author, authorName, origin.message(), origin.source(), result, detail)
                     .rolledBackTo(origin.rolledBackToId());
             if (result == VersionResult.SUCCESS) {
                 if (origin.onSuccess() != null) {
