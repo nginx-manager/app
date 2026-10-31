@@ -65,6 +65,14 @@ class StreamWebTest extends ConfigRootTest {
     }
 
     @Test
+    void newFormStartsWithEmptyPort() throws Exception {
+        // 포트 칸이 0으로 채워져 나오면 지우고 다시 적어야 한다
+        mvc.perform(get("/streams/new").with(user("ed").roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("name=\"listenPort\" value=\"\"")));
+    }
+
+    @Test
     void createsADraftThatApplyWrites() throws Exception {
         mvc.perform(create("TCP", 5432, "10.0.0.5:5432\n10.0.0.6:5432").param("loadBalancing", "LEAST_CONN"))
                 .andExpect(status().is3xxRedirection())

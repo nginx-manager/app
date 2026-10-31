@@ -12,6 +12,7 @@ import net.nginxmanager.site.SiteQueryRepository;
 import net.nginxmanager.site.SiteQueryRepository.SiteRow;
 import net.nginxmanager.site.SiteService;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -128,6 +129,12 @@ public class ApiController {
 
     private static ResponseEntity<Map<String, String>> error(HttpStatus status, String message) {
         return ResponseEntity.status(status).body(Map.of("error", message));
+    }
+
+    /** 본문이 없거나 JSON이 아니면 다른 오류처럼 {"error": …}로 이유를 알린다. */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    ResponseEntity<Map<String, String>> unreadable() {
+        return error(HttpStatus.BAD_REQUEST, "request body must be JSON, e.g. {\"enabled\": true}");
     }
 
     @ExceptionHandler(NotFoundException.class)

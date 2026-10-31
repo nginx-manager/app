@@ -153,6 +153,16 @@ class ApiTokenTest extends ConfigRootTest {
                 .andExpect(jsonPath("$.error").value(containsString("none.local")));
         mvc.perform(post("/api/v1/sites/app.local/maintenance").header("Authorization", token)
                         .contentType(MediaType.APPLICATION_JSON).content("{}"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value(containsString("enabled")));
+        // 본문이 없거나 JSON이 아니어도 같은 모양({"error": …})으로 이유를 알린다
+        mvc.perform(post("/api/v1/sites/app.local/maintenance").header("Authorization", token)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value(containsString("JSON")));
+        mvc.perform(post("/api/v1/sites/app.local/maintenance").header("Authorization", token)
+                        .contentType(MediaType.APPLICATION_JSON).content("enabled=true"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value(containsString("JSON")));
     }
 }
