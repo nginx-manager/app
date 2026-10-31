@@ -114,6 +114,9 @@ class ApiTokenTest extends ConfigRootTest {
         mvc.perform(post("/api/v1/apply").header("Authorization", token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result").value("SUCCESS"));
+        // 버전 이력에도 "시스템"이 아니라 토큰 이름이 남는다
+        assertThat(configVersionRepository.findFirstByOrderByIdDesc()).get()
+                .satisfies(v -> assertThat(v.getAuthorName()).isEqualTo("token:ci"));
         mvc.perform(post("/api/v1/apply").header("Authorization", token))
                 .andExpect(jsonPath("$.result").value("NOTHING_TO_APPLY"));
 
@@ -153,6 +156,16 @@ class ApiTokenTest extends ConfigRootTest {
                 .andExpect(jsonPath("$.error").value(containsString("none.local")));
         mvc.perform(post("/api/v1/sites/app.local/maintenance").header("Authorization", token)
                         .contentType(MediaType.APPLICATION_JSON).content("{}"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value(containsString("enabled")));
+        // 본문이 없거나 JSON이 아니어도 같은 모양({"error": …})으로 이유를 알린다
+        mvc.perform(post("/api/v1/sites/app.local/maintenance").header("Authorization", token)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value(containsString("JSON")));
+        mvc.perform(post("/api/v1/sites/app.local/maintenance").header("Authorization", token)
+                        .contentType(MediaType.APPLICATION_JSON).content("enabled=true"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value(containsString("JSON")));
     }
 }

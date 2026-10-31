@@ -89,9 +89,13 @@ public class ApplyController {
             log.error("apply failed", e);
             model.addAttribute("failure", failureText(e));
         }
-        model.addAttribute("pending", pendingFiles(authentication));
+        List<PendingFile> pending = pendingFiles(authentication);
+        model.addAttribute("pending", pending);
+        // 메뉴 숫자는 적용 전에 셌으므로 적용한 뒤의 수로 바꾼다
+        model.addAttribute("pendingCount", (long) pending.size());
         model.addAttribute("applyBlocked", applyBlocked());
-        return htmx != null ? "apply/pending :: result" : "apply/pending";
+        model.addAttribute("htmx", htmx != null);
+        return htmx != null ? "apply/pending :: area" : "apply/pending";
     }
 
     /** 설정 디렉터리에 쓰지 못한 경우(서버에서 sudo로 만든 root 소유 디렉터리 등)는 고치는 방법을 함께 보인다. */

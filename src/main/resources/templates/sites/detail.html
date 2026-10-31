@@ -14,7 +14,8 @@
         <a class="button secondary" th:href="@{/logs/{id}(id=${site.id})}" th:text="#{sites.detail.viewLogs}">로그 보기</a>
         <a class="button secondary" th:href="@{/versions(domain=${site.primaryDomain})}" th:text="#{sites.detail.history}">변경 이력</a>
         <a class="button secondary" th:if="${currentUser.canEdit() and site.type.name() != 'RAW'}" th:href="@{/sites/new(copy=${site.id})}" th:text="#{sites.detail.copy}">복제</a>
-        <form th:if="${currentUser.canEdit()}" th:action="@{/sites/{id}/enabled(id=${site.id})}" method="post">
+        <!-- 삭제 대기 중인 사이트는 켜고 끄거나 고치면 삭제 초안이 말없이 사라지므로, 초안을 버린 뒤에 고친다 -->
+        <form th:if="${currentUser.canEdit() and !site.configFile.draftDelete}" th:action="@{/sites/{id}/enabled(id=${site.id})}" method="post">
             <input type="hidden" name="version" th:value="${site.version}">
             <input type="hidden" name="enabled" th:value="${!site.enabled}">
             <button type="submit" class="secondary" th:text="${site.enabled} ? #{sites.detail.disable} : #{sites.detail.enable}">비활성화</button>
@@ -35,7 +36,7 @@
         <th:block th:text="#{import.detail.source}">가져온 원본</th:block>: <code th:text="${site.importPath}">/home/a/nginx/app.conf</code>
         <span th:if="${importChanged}" class="badge warn" th:text="#{import.status.changed}">원본 바뀜</span>
     </p>
-    <form th:if="${importChanged and currentUser.isAdmin()}" th:action="@{/sites/{id}/reimport(id=${site.id})}" method="post">
+    <form th:if="${importChanged and currentUser.isAdmin() and !site.configFile.draftDelete}" th:action="@{/sites/{id}/reimport(id=${site.id})}" method="post">
         <input type="hidden" name="version" th:value="${site.version}">
         <p class="hint" th:text="#{import.detail.reimport.hint}">원본이 가져온 뒤 바뀌었습니다. 다시 가져오면 바뀐 내용으로 초안을 만듭니다.</p>
         <button type="submit" class="secondary" th:text="#{import.detail.reimport}">원본에서 다시 가져오기</button>
@@ -91,7 +92,7 @@
                 </label>
                 <th:block th:replace="~{sites/https-fields :: fields(${currentUser.canEdit()})}"></th:block>
                 <th:block th:replace="~{sites/options-fields :: options(${currentUser.canEdit()})}"></th:block>
-                <button type="submit" th:if="${currentUser.canEdit()}" th:text="#{sites.field.saveDraft}">초안 저장</button>
+                <button type="submit" th:if="${currentUser.canEdit() and !site.configFile.draftDelete}" th:text="#{sites.field.saveDraft}">초안 저장</button>
             </form>
         </section>
         <section class="card" id="https" th:if="${site.type.name() != 'RAW' or currentUser.isAdmin()}">
@@ -131,7 +132,7 @@
             </th:block>
             <th:block th:unless="${certificate}">
                 <p class="muted" th:text="#{sites.detail.https.none}">HTTPS를 쓰지 않습니다.</p>
-                <form th:if="${currentUser.canEdit()}" th:action="@{/certs/letsencrypt}" method="post">
+                <form th:if="${currentUser.canEdit() and !site.configFile.draftDelete}" th:action="@{/certs/letsencrypt}" method="post">
                     <input type="hidden" name="siteId" th:value="${site.id}">
                     <button type="submit" th:text="#{sites.detail.https.enable}">Let's Encrypt 인증서 발급</button>
                     <th:block th:if="${site.type.name() == 'RAW'}">
@@ -150,15 +151,15 @@
             <p th:text="#{sites.detail.raw.body}">이 사이트는 원문으로만 관리합니다. 폼이 설정을 다시 덮어쓰지 않습니다.</p>
             <p class="hint" th:unless="${currentUser.isAdmin()}" th:text="#{sites.detail.raw.memberHint}">원문 편집은 관리자에게 요청하세요.</p>
         </section>
-
-        <section class="card">
-            <div class="title-row">
-                <h2 th:text="${site.configFile.path}">conf.d/sites/app.local.conf</h2>
-                <a th:if="${currentUser.isAdmin()}" th:href="@{/files/{id}(id=${site.configFile.id})}" th:text="#{sites.detail.editRaw}">Raw 편집</a>
-            </div>
-            <pre class="code" th:text="${content}"></pre>
-        </section>
     </div>
+    <!-- 설정 원문은 줄이 길어 두 칸 중 한 칸에 두면 잘린다. 아래에 화면 너비로 둔다 -->
+    <section class="card">
+        <div class="title-row">
+            <h2 th:text="${site.configFile.path}">conf.d/sites/app.local.conf</h2>
+            <a th:if="${currentUser.isAdmin()}" th:href="@{/files/{id}(id=${site.configFile.id})}" th:text="#{sites.detail.editRaw}">Raw 편집</a>
+        </div>
+        <pre class="code" th:text="${content}"></pre>
+    </section>
 </main>
 <footer th:replace="~{fragments/layout :: footer}"></footer>
 </body>

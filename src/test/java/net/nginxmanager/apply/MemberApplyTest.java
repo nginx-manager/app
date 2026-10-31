@@ -60,7 +60,7 @@ class MemberApplyTest extends ConfigRootTest {
                 .andExpect(content().string(not(containsString(BOB))))
                 .andExpect(content().string(containsString("내가 담당한 사이트의 변경만")));
         mvc.perform(get("/sites").with(user("alice").roles("MEMBER")))
-                .andExpect(content().string(containsString("<span class=\"count\">1</span>")));
+                .andExpect(content().string(containsString("id=\"nav-pending\" class=\"count\">1</span>")));
 
         mvc.perform(post("/apply").with(csrf()).with(user("alice").roles("MEMBER")).header("HX-Request", "true"))
                 .andExpect(status().isOk())

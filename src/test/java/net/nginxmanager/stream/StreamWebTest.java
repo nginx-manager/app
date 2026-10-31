@@ -65,6 +65,14 @@ class StreamWebTest extends ConfigRootTest {
     }
 
     @Test
+    void newFormStartsWithEmptyPort() throws Exception {
+        // 포트 칸이 0으로 채워져 나오면 지우고 다시 적어야 한다
+        mvc.perform(get("/streams/new").with(user("ed").roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("name=\"listenPort\" value=\"\"")));
+    }
+
+    @Test
     void createsADraftThatApplyWrites() throws Exception {
         mvc.perform(create("TCP", 5432, "10.0.0.5:5432\n10.0.0.6:5432").param("loadBalancing", "LEAST_CONN"))
                 .andExpect(status().is3xxRedirection())
@@ -210,6 +218,21 @@ class StreamWebTest extends ConfigRootTest {
                         .param("protocol", "UDP").param("listenPort", "53").param("backends", "10.0.0.2:53"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("listen 53 udp;")));
+        // 고칠 곳이 있으면 빈 미리보기 대신 그 이유를 보인다
+        mvc.perform(post("/streams/preview").with(csrf()).with(user("ed").roles("ADMIN"))
+                        .param("protocol", "TCP").param("listenPort", "70000").param("backends", "10.0.0.2:53"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("아래를 고치면 미리보기가 보입니다.")));
+        mvc.perform(post("/sites/preview").with(csrf()).with(user("ed").roles("ADMIN"))
+                        .param("primaryDomain", "app.local").param("type", "PROXY").param("listenHttpPort", "80")
+                        .param("proxyTarget", "http://127.0.0.1:9000"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("아래를 고치면 미리보기가 보입니다.")))
+                .andExpect(content().string(containsString("9000")));
+        // 도메인을 아직 적지 않았으면 안내만 보인다
+        mvc.perform(post("/sites/preview").with(csrf()).with(user("ed").roles("ADMIN"))
+                        .param("primaryDomain", "").param("type", "PROXY").param("listenHttpPort", "80"))
+                .andExpect(content().string(containsString("값을 입력하면")));
     }
 
     @Test

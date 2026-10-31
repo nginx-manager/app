@@ -1,6 +1,7 @@
 package net.nginxmanager.stream;
 
 import jakarta.validation.Valid;
+import net.nginxmanager.common.Messages;
 import net.nginxmanager.config.ConfigFile;
 import net.nginxmanager.config.ConfigFileRepository;
 import net.nginxmanager.config.ConfigFileStore;
@@ -30,15 +31,17 @@ public class StreamController {
     private final ConfigFileRepository configFileRepository;
     private final ConfigFileStore store;
     private final StreamConfigRenderer renderer;
+    private final Messages messages;
 
     public StreamController(StreamService streamService, StreamProxyRepository streamRepository,
                             ConfigFileRepository configFileRepository, ConfigFileStore store,
-                            StreamConfigRenderer renderer) {
+                            StreamConfigRenderer renderer, Messages messages) {
         this.streamService = streamService;
         this.streamRepository = streamRepository;
         this.configFileRepository = configFileRepository;
         this.store = store;
         this.renderer = renderer;
+        this.messages = messages;
     }
 
     /** 목록 한 줄. 설정 파일은 스트림 디렉터리 전체를 한 번에 읽어 붙인다. */
@@ -123,6 +126,9 @@ public class StreamController {
     @PostMapping("/preview")
     public String preview(@Valid @ModelAttribute("form") StreamForm form, BindingResult bindingResult, Model model) {
         model.addAttribute("preview", bindingResult.hasErrors() ? null : renderer.render(form));
+        if (bindingResult.hasErrors() && (form.listenPort() > 0 || form.backends() != null && !form.backends().isBlank())) {
+            model.addAttribute("preview", messages.previewErrors(bindingResult));
+        }
         return "streams/form :: preview";
     }
 

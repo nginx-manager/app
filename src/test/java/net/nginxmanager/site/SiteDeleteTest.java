@@ -15,6 +15,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -80,7 +81,10 @@ class SiteDeleteTest extends ConfigRootTest {
         assertThat(readFile(path)).isNotNull();
         mvc.perform(get("/sites/" + site.getId()).with(user("admin").roles("ADMIN")))
                 .andExpect(content().string(containsString("삭제 대기")))
-                .andExpect(content().string(containsString("사이트 삭제가 적용 대기 중입니다")));
+                .andExpect(content().string(containsString("사이트 삭제가 적용 대기 중입니다")))
+                // 고치거나 켜고 끄면 삭제 초안이 말없이 사라지므로 그 버튼은 감춘다
+                .andExpect(content().string(not(containsString(">저장</button>"))))
+                .andExpect(content().string(not(containsString("/enabled\""))));
         mvc.perform(get("/sites").with(user("admin").roles("ADMIN")))
                 .andExpect(content().string(containsString("삭제 대기")));
 
