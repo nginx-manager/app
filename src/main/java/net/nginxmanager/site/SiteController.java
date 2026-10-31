@@ -295,6 +295,10 @@ public class SiteController {
         model.addAttribute("preview", bindingResult.hasErrors()
                 ? null
                 : rendering.render(form.primaryDomain().toLowerCase(Locale.ROOT), form, form.certificateId()));
+        // 도메인을 적기 시작했는데 미리보기가 비면 왜 비었는지 알 수 없으므로, 고칠 곳을 대신 보인다
+        if (bindingResult.hasErrors() && form.primaryDomain() != null && !form.primaryDomain().isBlank()) {
+            model.addAttribute("preview", messages.previewErrors(bindingResult));
+        }
         return "sites/form :: preview";
     }
 
