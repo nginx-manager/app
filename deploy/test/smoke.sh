@@ -88,8 +88,22 @@ if "$dir/nm" upgrade --nginx --bundle "$work/b-$NEW/nginx-manager.tar.gz"; then
 fi
 check "nginx 이미지는 그대로" [ "$(env_of NGINX_IMAGE)" = "$OLD_NGINX" ]
 docker run --rm -v "$dir/data/conf:/c" alpine:3.20 rm -f /c/BAD /c/conf.d/sites/zz-bad.conf
+# 사전 검사는 지금 nginx와 똑같이 이름을 푼다: compose.override.yml의 extra_hosts로만 풀리는
+# upstream 이름(v1.9.2에서 고침)이 있어도 거부하지 않는다
+cat > "$dir/compose.override.yml" <<'YML'
+services:
+  nginx:
+    extra_hosts:
+      - "minio1.internal:127.0.0.1"
+YML
+(cd "$dir" && docker compose up -d --wait nginx >/dev/null)
+printf 'upstream zz_internal {\n    server minio1.internal:9000;\n}\n' > "$work/internal.conf"
+docker run --rm -v "$dir/data/conf:/c" -v "$work/internal.conf:/i.conf:ro" alpine:3.20 \
+    sh -c 'mkdir -p /c/conf.d/sites && cp /i.conf /c/conf.d/sites/zz-internal.conf'
 "$dir/nm" upgrade --nginx --bundle "$work/b-$NEW/nginx-manager.tar.gz"
 check "nginx 이미지가 $NEW_NGINX" [ "$(env_of NGINX_IMAGE)" = "$NEW_NGINX" ]
+docker run --rm -v "$dir/data/conf:/c" alpine:3.20 rm -f /c/conf.d/sites/zz-internal.conf
+rm -f "$dir/compose.override.yml"
 check "nginx가 healthy" sh -c "cd '$dir' && docker compose ps nginx --format '{{.Health}}' | grep -q healthy"
 
 step "가져오기 디렉터리: 두 컨테이너에 같은 경로로 붙이고 읽기 권한을 확인한다"
