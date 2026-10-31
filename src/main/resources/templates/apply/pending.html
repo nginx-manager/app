@@ -8,7 +8,9 @@
     <p class="hint" th:text="#{apply.help.intro}">초안으로 저장한 변경은 여기서 적용해야 서버에 반영됩니다.</p>
     <p class="hint" th:unless="${currentUser.isAdmin()}" th:text="#{apply.help.member}">내가 담당한 사이트의 변경만 보이고, 적용하면 그 변경만 반영됩니다.</p>
 
-    <div id="result" th:fragment="result">
+    <!-- 적용 결과와 대기 중인 변경을 함께 바꿔 넣는다. 적용한 변경이 목록과 메뉴 숫자에 남지 않게 한다 -->
+    <div id="apply-area" th:fragment="area">
+    <div id="result">
         <th:block th:if="${result != null}">
             <section class="card result ok" th:if="${result.succeeded()}">
                 <h2 th:text="#{apply.result.ok.title}">적용했습니다</h2>
@@ -59,7 +61,7 @@
         </details>
         <p th:if="${currentUser.canEdit() and !#lists.isEmpty(pending) and applyBlocked}" class="hint warn" th:text="#{apply.form.blocked}">nginx에 연결할 수 없어 지금은 적용할 수 없습니다. 연결되면 다시 적용하세요.</p>
         <form th:if="${currentUser.canEdit() and !#lists.isEmpty(pending) and !applyBlocked}" th:action="@{/apply}" method="post"
-              hx-post="/apply" hx-target="#result" hx-swap="outerHTML" hx-disabled-elt="find button">
+              hx-post="/apply" hx-target="#apply-area" hx-swap="outerHTML" hx-disabled-elt="find button">
             <label><th:block th:text="#{apply.form.message}">변경 메모 (선택)</th:block>
                 <input type="text" name="message" maxlength="500" placeholder="예: app 백엔드 포트 변경" th:placeholder="#{apply.form.message.placeholder}">
                 <span class="hint" th:text="#{apply.form.message.hint}">이력에 함께 남아, 나중에 무엇을 왜 바꿨는지 찾을 때 도움이 됩니다.</span>
@@ -69,6 +71,11 @@
             <span class="htmx-indicator muted" th:text="#{apply.form.progress}">검증하고 reload하는 중…</span>
         </form>
     </section>
+    <th:block th:if="${htmx}">
+        <span id="nav-pending" class="count" hx-swap-oob="true" th:hidden="${pendingCount == 0}" th:text="${pendingCount}">2</span>
+        <span id="nav-pending-toggle" class="count" hx-swap-oob="true" th:hidden="${pendingCount == 0}" th:text="${pendingCount}">2</span>
+    </th:block>
+    </div>
 </main>
 <footer th:replace="~{fragments/layout :: footer}"></footer>
 </body>

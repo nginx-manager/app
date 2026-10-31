@@ -133,10 +133,14 @@
     });
     // 결과는 화면 위쪽에 바뀌어 들어간다. 아래의 버튼을 누른 사람이 결과를 보도록 그리로 옮긴다
     document.addEventListener('htmx:afterSettle', function (event) {
-        const result = event.detail.target && event.detail.target.id === 'result'
-            ? document.getElementById('result') : null;
+        const area = event.detail.target && event.detail.target.id === 'apply-area'
+            ? document.getElementById('apply-area') : null;
+        if (!area) {
+            return;
+        }
+        area.querySelectorAll('pre.diff').forEach(colorDiff);
+        const result = document.getElementById('result');
         if (result && result.children.length > 0) {
-            result.querySelectorAll('pre.diff').forEach(colorDiff);
             result.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
     });

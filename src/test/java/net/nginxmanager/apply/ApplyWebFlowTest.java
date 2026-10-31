@@ -51,7 +51,10 @@ class ApplyWebFlowTest extends ConfigRootTest {
 
         mvc.perform(post("/apply").with(csrf()).with(user("ed").roles("ADMIN")).header("HX-Request", "true"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("모두 통과했습니다")));
+                .andExpect(content().string(containsString("모두 통과했습니다")))
+                // 적용한 변경은 대기 목록에서 빠지고, 메뉴 숫자도 함께 바뀐다
+                .andExpect(content().string(not(containsString("conf.d/sites/app.local.conf"))))
+                .andExpect(content().string(containsString("id=\"nav-pending\" class=\"count\" hx-swap-oob=\"true\" hidden=\"hidden\"")));
 
         assertThat(readFile("conf.d/sites/app.local.conf")).contains("root /srv/www/app;");
         assertThat(configVersionRepository.findFirstByOrderByIdDesc()).get()
