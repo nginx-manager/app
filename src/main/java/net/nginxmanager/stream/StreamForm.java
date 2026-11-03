@@ -4,6 +4,7 @@ import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import net.nginxmanager.site.Loopback;
 import net.nginxmanager.site.SiteOptions;
 
 import java.util.Arrays;
@@ -140,6 +141,15 @@ public record StreamForm(
             }
         }
         return true;
+    }
+
+    /** nginx 컨테이너 안의 127.0.0.1·localhost는 컨테이너 자신이다. 같은 서버의 서비스는 host.docker.internal로 적는다. */
+    @AssertTrue(message = "{msg.validation.loopbackTarget}")
+    public boolean isBackendsNotLoopback() {
+        if (!isBackendsValid() || !isBackendsNotManager()) {
+            return true;
+        }
+        return backendList().stream().noneMatch(Loopback::target);
     }
 
     @AssertTrue(message = "{msg.validation.streamReservedPort}")

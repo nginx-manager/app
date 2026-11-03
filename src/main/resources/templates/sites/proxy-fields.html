@@ -9,7 +9,7 @@
     <span class="type-fields type-php" th:text="#{sites.php.target}">PHP-FPM 주소</span>
     <span class="hint type-fields type-proxy" th:text="#{sites.proxy.target.hint}">요청을 넘길 백엔드 주소입니다.</span>
     <span class="hint type-fields type-php" th:text="#{sites.php.target.hint}">.php 요청을 넘길 PHP-FPM 주소입니다.</span>
-    <textarea th:field="*{proxyTarget}" rows="3" placeholder="http://127.0.0.1:8080" th:disabled="${!editable}"></textarea>
+    <textarea th:field="*{proxyTarget}" rows="3" placeholder="http://host.docker.internal:8080" th:disabled="${!editable}"></textarea>
     <span class="error" th:errors="*{proxyTargetValid}"></span>
     <span class="error" th:errors="*{proxyTargetNotManager}"></span>
     <span class="error" th:errors="*{fastcgiTargetValid}"></span>

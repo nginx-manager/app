@@ -55,6 +55,15 @@ sudo /opt/nginx-manager/nm restart
 
 새 관리 화면이 정해진 시간 안에 뜨지 않아 이전 버전과 업그레이드 전 DB로 롤백한 것입니다. nginx는 그대로 돌고 있습니다. 출력에 보인 로그 끝부분으로 이유를 확인하고, 느린 서버라면 `NM_WAIT_TIMEOUT=600 nm upgrade`처럼 기다리는 시간을 늘려 다시 합니다.
 
+## 사이트를 등록했는데 502가 나거나 연결되지 않을 때
+
+사이트의 오류 로그(`data/logs/sites/<도메인>.error.log`, 또는 관리 화면의 로그)에 `connect() failed (111: Connection refused) while connecting to upstream`이 보이면 nginx가 백엔드에 닿지 못한 것입니다.
+
+- **백엔드를 `127.0.0.1`이나 `localhost`로 적었다면**: nginx는 컨테이너 안에서 돌아서, 거기서 `127.0.0.1`은 서버가 아니라 nginx 컨테이너 자신입니다. 같은 서버의 앱이라도 닿지 않습니다. 프록시 대상을 `http://host.docker.internal:<포트>`나 서버의 사설 IP로 바꾸고 적용합니다([4장](04-sites.md#리버스-프록시)). v1.9.3부터는 폼이 이런 주소를 받지 않고, 가져오기는 `host.docker.internal`로 바꿔 줍니다.
+- **`host not found in upstream "host.docker.internal"`로 적용이 실패하면**: v1.9.2 이전에 설치한 nginx 컨테이너에는 이 이름이 없습니다. `sudo /opt/nginx-manager/nm upgrade --nginx`로 nginx를 다시 띄웁니다. 급하면 서버의 사설 IP를 적습니다.
+- **앱이 `127.0.0.1`에서만 받고 있으면**: 서버에서 `ss -ltnp | grep <포트>`로 확인합니다. `127.0.0.1:<포트>`로 보이면 컨테이너에서 닿지 않으므로 앱이 `0.0.0.0`에서 받게 바꿉니다. 밖에서 그 포트로 바로 들어오는 것이 싫으면 방화벽으로 막고, Docker 네트워크(172.16.0.0/12)에서 오는 연결만 허용합니다.
+- **확인**: `cd /opt/nginx-manager && sudo docker compose exec nginx wget -qO- -T3 http://host.docker.internal:<포트>`가 응답을 보여 주면 nginx에서 백엔드가 닿는 것입니다.
+
 ## nm upgrade --nginx가 "host not found in upstream"으로 멈출 때
 
 `nginx: [emerg] host not found in upstream "minio1.internal:9000"`처럼 나오면, nginx가 업스트림의 `server` 이름을 풀지 못한 것입니다. nginx는 이 이름을 설정 검사와 시작 때 한 번 풀기 때문에, 이름이 하나라도 안 풀리면 설정 전체가 실패합니다. 이때 nginx 이미지는 바뀌지 않았고 지금 nginx가 그대로 트래픽을 받습니다.

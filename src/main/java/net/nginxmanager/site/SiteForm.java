@@ -270,6 +270,26 @@ public record SiteForm(
         return port >= 1 && port <= 65535;
     }
 
+    /**
+     * nginx는 컨테이너 안에서 돌아 127.0.0.1·localhost가 nginx 컨테이너 자신이다. 같은 서버의 앱이면
+     * host.docker.internal로 적게 한다. 관리용 포트는 {@link #isProxyTargetNotManager()}가 따로 막는다.
+     */
+    @AssertTrue(message = "{msg.validation.loopbackTarget}")
+    public boolean isTargetNotLoopback() {
+        if (type == SiteType.PROXY && isProxyTargetValid()) {
+            if (proxyTargets().stream().map(ProxyBackend::parse).anyMatch(b -> Loopback.is(b.host()) && !b.isManager())) {
+                return false;
+            }
+            if (options.backupTargetList().stream().anyMatch(Loopback::target)) {
+                return false;
+            }
+        }
+        if (type == SiteType.PHP && isFastcgiTargetValid() && Loopback.target(proxyTargets().getFirst())) {
+            return false;
+        }
+        return options.pathRouteList().stream().noneMatch(r -> r.proxy() && Loopback.target(r.target()));
+    }
+
     /** 관리 화면과 상태 확인 포트로 프록시하면 관리 화면이 사이트 포트로 공개된다. */
     @AssertTrue(message = "{msg.validation.proxyNotManager}")
     public boolean isProxyTargetNotManager() {

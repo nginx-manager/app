@@ -47,6 +47,7 @@ check ".env에 버전과 포트" sh -c "grep -q '^MANAGER_VERSION=$OLD\$' '$dir/
 check ".env는 다른 사용자가 읽지 못한다" sh -c "[ \"\$(stat -c %a '$dir/.env')\" = 600 ]"
 check "관리 화면은 127.0.0.1에만" sh -c "cd '$dir' && docker compose port manager 9000 | grep -q '^127.0.0.1:19000\$'"
 check "nginx가 응답" sh -c "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:$HTTP/ | grep -qv '^000\$'"
+check "nginx 컨테이너에서 호스트를 host.docker.internal로 찾음" sh -c "cd '$dir' && docker compose exec -T nginx grep -q host.docker.internal /etc/hosts"
 check "매일 03:30 자동 백업 스케줄" grep -q "^30 3 \* \* \* root $dir/nm backup --label auto" "$NM_CRON_DIR/nginx-manager-backup"
 
 step "다시 설치하면 덮어쓰지 않는다"
