@@ -271,23 +271,21 @@ public record SiteForm(
     }
 
     /**
-     * nginx는 컨테이너 안에서 돌아 127.0.0.1·localhost가 nginx 컨테이너 자신이다. 같은 서버의 앱이면
-     * host.docker.internal로 적게 한다. 관리용 포트는 {@link #isProxyTargetNotManager()}가 따로 막는다.
+     * 백엔드를 127.0.0.1·localhost로 적었는지. nginx는 컨테이너 안에서 돌아 이 주소는 서버가 아니라 nginx 컨테이너
+     * 자신이므로, 같은 서버의 앱을 가리키려 했다면 닿지 않는다(v1.9.3). nginx 자신의 다른 포트를 가리키는 쓰임도
+     * 있어서 막지 않고 미리보기와 사이트 화면에서 알린다.
      */
-    @AssertTrue(message = "{msg.validation.loopbackTarget}")
-    public boolean isTargetNotLoopback() {
+    public boolean loopbackTarget() {
         if (type == SiteType.PROXY && isProxyTargetValid()) {
-            if (proxyTargets().stream().map(ProxyBackend::parse).anyMatch(b -> Loopback.is(b.host()) && !b.isManager())) {
-                return false;
-            }
-            if (options.backupTargetList().stream().anyMatch(Loopback::target)) {
-                return false;
+            if (proxyTargets().stream().anyMatch(Loopback::target)
+                    || options.backupTargetList().stream().anyMatch(Loopback::target)) {
+                return true;
             }
         }
         if (type == SiteType.PHP && isFastcgiTargetValid() && Loopback.target(proxyTargets().getFirst())) {
-            return false;
+            return true;
         }
-        return options.pathRouteList().stream().noneMatch(r -> r.proxy() && Loopback.target(r.target()));
+        return options.pathRouteList().stream().anyMatch(r -> r.proxy() && Loopback.target(r.target()));
     }
 
     /** 관리 화면과 상태 확인 포트로 프록시하면 관리 화면이 사이트 포트로 공개된다. */

@@ -11,7 +11,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** nginx 컨테이너 안의 127.0.0.1·localhost는 컨테이너 자신이라 프록시 대상으로 받지 않는다(v1.9.3). */
+/** nginx 컨테이너 안의 127.0.0.1·localhost는 컨테이너 자신이라 같은 서버의 앱에 닿지 않음을 알린다(v1.9.3). */
 class LoopbackTargetTest {
 
     final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
@@ -29,40 +29,42 @@ class LoopbackTargetTest {
     @ParameterizedTest
     @ValueSource(strings = {"http://127.0.0.1:8422", "http://localhost:8080", "https://127.0.1.1",
             "http://0.0.0.0:3000/app", "grpc://127.0.0.1:50051"})
-    void rejectsLoopbackBackends(String target) {
-        assertThat(violations(proxy(target, SiteModuleOptionsTest.options()))).contains("targetNotLoopback");
+    void warnsAboutLoopbackBackends(String target) {
+        SiteForm form = proxy(target, SiteModuleOptionsTest.options());
+        // nginx 자신의 다른 포트를 가리키는 쓰임도 있어서 저장은 막지 않는다
+        assertThat(violations(form)).isEmpty();
+        assertThat(form.loopbackTarget()).isTrue();
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"http://host.docker.internal:8422", "http://10.116.64.12:8422", "http://app:8080"})
     void acceptsAddressesTheContainerCanReach(String target) {
         assertThat(violations(proxy(target, SiteModuleOptionsTest.options()))).isEmpty();
-    }
-
-    @Test
-    void managerPortsKeepTheirOwnMessage() {
-        assertThat(violations(proxy("http://127.0.0.1:9000", SiteModuleOptionsTest.options())))
-                .contains("proxyTargetNotManager").doesNotContain("targetNotLoopback");
+        assertThat(proxy(target, SiteModuleOptionsTest.options()).loopbackTarget()).isFalse();
     }
 
     @Test
     void checksBackupsAndPathRoutesToo() {
-        assertThat(violations(proxy("http://10.0.0.1:8080",
-                SiteModuleOptionsTest.options("backupTargets", "http://127.0.0.1:8080"))))
-                .contains("targetNotLoopback");
-        assertThat(violations(proxy("http://10.0.0.1:8080",
-                SiteModuleOptionsTest.options("pathRoutes", "/api/ http://localhost:3000/"))))
-                .contains("targetNotLoopback");
-        assertThat(violations(proxy("http://10.0.0.1:8080",
-                SiteModuleOptionsTest.options("pathRoutes", "/files/ /srv/uploads")))).isEmpty();
+        assertThat(proxy("http://10.0.0.1:8080",
+                SiteModuleOptionsTest.options("backupTargets", "http://127.0.0.1:8080")).loopbackTarget()).isTrue();
+        assertThat(proxy("http://10.0.0.1:8080",
+                SiteModuleOptionsTest.options("pathRoutes", "/api/ http://localhost:3000/")).loopbackTarget()).isTrue();
+        assertThat(proxy("http://10.0.0.1:8080",
+                SiteModuleOptionsTest.options("pathRoutes", "/files/ /srv/uploads")).loopbackTarget()).isFalse();
     }
 
     @Test
     void phpFpmOnTheHost() {
-        assertThat(violations(new SiteForm("blog.local", "", SiteType.PHP, 80, "/srv/www/blog", "127.0.0.1:9000",
-                null))).contains("targetNotLoopback");
-        assertThat(violations(new SiteForm("blog.local", "", SiteType.PHP, 80, "/srv/www/blog",
-                "unix:/run/php/php-fpm.sock", null))).isEmpty();
+        assertThat(new SiteForm("blog.local", "", SiteType.PHP, 80, "/srv/www/blog", "127.0.0.1:9000",
+                null).loopbackTarget()).isTrue();
+        assertThat(new SiteForm("blog.local", "", SiteType.PHP, 80, "/srv/www/blog",
+                "unix:/run/php/php-fpm.sock", null).loopbackTarget()).isFalse();
+    }
+
+    @Test
+    void previewStartsWithTheWarningAsAComment() {
+        assertThat(Loopback.warn("server {}\n", true, "경고")).isEqualTo("# 경고\n\nserver {}\n");
+        assertThat(Loopback.warn("server {}\n", false, "경고")).isEqualTo("server {}\n");
     }
 
     @Test

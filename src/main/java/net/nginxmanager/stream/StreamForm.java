@@ -143,13 +143,12 @@ public record StreamForm(
         return true;
     }
 
-    /** nginx 컨테이너 안의 127.0.0.1·localhost는 컨테이너 자신이다. 같은 서버의 서비스는 host.docker.internal로 적는다. */
-    @AssertTrue(message = "{msg.validation.loopbackTarget}")
-    public boolean isBackendsNotLoopback() {
-        if (!isBackendsValid() || !isBackendsNotManager()) {
-            return true;
-        }
-        return backendList().stream().noneMatch(Loopback::target);
+    /**
+     * 백엔드를 127.0.0.1·localhost로 적었는지. nginx 컨테이너 안에서는 컨테이너 자신이라 같은 서버의 서비스에는
+     * 닿지 않는다(v1.9.3). nginx 자신의 포트(예: 127.0.0.1:80)로 넘기는 쓰임이 있어 막지 않고 미리보기에서 알린다.
+     */
+    public boolean loopbackBackend() {
+        return isBackendsValid() && backendList().stream().anyMatch(Loopback::target);
     }
 
     @AssertTrue(message = "{msg.validation.streamReservedPort}")

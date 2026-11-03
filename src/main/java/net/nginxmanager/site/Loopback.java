@@ -56,6 +56,14 @@ public final class Loopback {
         return is(host) ? prefix + HOST + port + tail : target;
     }
 
+    /** 미리보기 맨 위에 경고를 nginx 주석으로 붙인다. 미리보기는 설정 원문이라 주석이면 그대로 읽힌다. */
+    public static String warn(String preview, boolean loopback, String warning) {
+        if (!loopback || preview == null) {
+            return preview;
+        }
+        return "# " + warning.replace("\n", "\n# ") + "\n\n" + preview;
+    }
+
     /** 대상 주소의 호스트가 루프백인지. 형식이 틀린 값은 false(형식 검사가 따로 잡는다). */
     public static boolean target(String target) {
         return target != null && !toHost(target).equals(target);
