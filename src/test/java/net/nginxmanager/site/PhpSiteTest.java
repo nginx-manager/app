@@ -50,7 +50,7 @@ class PhpSiteTest {
 
     @Test
     void acceptsHostPortAndSockets() {
-        assertThat(validator.validate(php("/srv/www/blog", "127.0.0.1:9000"))).isEmpty();
+        assertThat(validator.validate(php("/srv/www/blog", "host.docker.internal:9000"))).isEmpty();
         assertThat(validator.validate(php("/srv/www/blog", "php-fpm:9000"))).isEmpty();
         assertThat(validator.validate(php("/srv/www/blog", "unix:/run/php/php-fpm.sock"))).isEmpty();
     }

@@ -264,10 +264,10 @@ public class SiteImporter {
                 if (resolved == null) {
                     return null;
                 }
-                targets = resolved.targets();
+                targets = hostLoopback(resolved.targets());
                 balancing = resolved.balancing();
             } else if (type == SiteType.PHP && upstreams.isEmpty()) {
-                targets = fastcgiPass;
+                targets = hostLoopback(fastcgiPass);
             } else if (!upstreams.isEmpty()) {
                 unsupported("import.reason.directive", "upstream");
                 return null;
@@ -406,6 +406,25 @@ public class SiteImporter {
                 return;
             }
             unsupported("import.reason.header", d.arg(0));
+        }
+
+        /**
+         * 호스트의 nginx에서 127.0.0.1·localhost는 같은 서버의 앱이었다. 컨테이너 안의 nginx에서는 컨테이너 자신이므로
+         * 호스트를 부르는 이름(host.docker.internal)으로 바꾸고 바뀐 점에 남긴다.
+         */
+        private String hostLoopback(String targets) {
+            if (targets == null) {
+                return null;
+            }
+            List<String> converted = new ArrayList<>();
+            for (String target : targets.split("\n")) {
+                String host = Loopback.toHost(target);
+                if (!host.equals(target)) {
+                    change("import.change.loopback", target);
+                }
+                converted.add(host);
+            }
+            return String.join("\n", converted);
         }
 
         private record ProxyTargets(String targets, LoadBalancing balancing) {

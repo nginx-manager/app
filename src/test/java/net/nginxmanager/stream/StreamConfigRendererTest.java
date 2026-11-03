@@ -53,7 +53,13 @@ class StreamConfigRendererTest {
 
     @Test
     void backendValidation() {
-        assertThat(violations(tcp(5432, "db.internal:5432 10.0.0.5:5432 [::1]:5432"))).isEmpty();
+        assertThat(violations(tcp(5432, "db.internal:5432 10.0.0.5:5432 [2001:db8::1]:5432"))).isEmpty();
+        // nginx 컨테이너 안의 루프백은 컨테이너 자신이다. nginx 자신의 포트로 넘기는 쓰임이 있어 알리기만 한다
+        assertThat(violations(tcp(5432, "127.0.0.1:80"))).isEmpty();
+        assertThat(tcp(5432, "127.0.0.1:5432").loopbackBackend()).isTrue();
+        assertThat(tcp(5432, "[::1]:5432").loopbackBackend()).isTrue();
+        assertThat(tcp(5432, "localhost:5432").loopbackBackend()).isTrue();
+        assertThat(tcp(5432, "host.docker.internal:5432").loopbackBackend()).isFalse();
         assertThat(violations(tcp(5432, ""))).contains("backendsValid");
         assertThat(violations(tcp(5432, "10.0.0.5"))).contains("backendsValid");
         assertThat(violations(tcp(5432, "10.0.0.5:70000"))).contains("backendsValid");

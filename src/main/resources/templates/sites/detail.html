@@ -28,6 +28,7 @@
     </div>
     <p class="notice" th:if="${site.configFile.draftDelete}"><th:block th:text="#{sites.detail.deleting.before}">사이트를 지우는 초안이 있습니다.</th:block> <a th:href="@{/apply}" th:text="#{sites.detail.saved.link}">적용 화면</a><th:block th:text="#{sites.detail.deleting.after}">에서 적용하면 지워지고, 초안을 버리면 그대로 남습니다.</th:block></p>
     <p class="notice" th:if="${notice}" th:text="${notice}">완료</p>
+    <p class="error" th:if="${loopbackTarget}" th:text="#{sites.loopback.warning}">백엔드 주소에 127.0.0.1이 있습니다.</p>
     <p class="error" th:if="${error}" th:text="${error}">오류</p>
     <p class="error" th:if="${param.rawOnly}" th:text="#{sites.detail.rawOnly}">원문 편집기로 고친 사이트라 폼으로 저장하지 않았습니다.</p>
     <p class="notice" th:if="${param.imported}"><th:block th:text="#{import.detail.imported}">설정 파일을 가져와 사이트 초안을 만들었습니다.</th:block> <a th:href="@{/apply}" th:text="#{sites.detail.saved.link}">적용 화면</a><th:block th:text="#{sites.detail.saved.after}">에서 반영하세요.</th:block></p>

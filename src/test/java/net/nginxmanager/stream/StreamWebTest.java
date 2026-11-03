@@ -18,6 +18,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -229,6 +230,19 @@ class StreamWebTest extends ConfigRootTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("아래를 고치면 미리보기가 보입니다.")))
                 .andExpect(content().string(containsString("9000")));
+        // 127.0.0.1은 nginx 컨테이너 자신이라 같은 서버의 앱에 닿지 않음을 미리보기 맨 위에 알린다(v1.9.3)
+        mvc.perform(post("/sites/preview").with(csrf()).with(user("ed").roles("ADMIN"))
+                        .param("primaryDomain", "app.local").param("type", "PROXY").param("listenHttpPort", "80")
+                        .param("proxyTarget", "http://127.0.0.1:8422"))
+                .andExpect(content().string(containsString("# 백엔드 주소에 127.0.0.1(localhost)이 있습니다.")))
+                .andExpect(content().string(containsString("proxy_pass http://127.0.0.1:8422;")));
+        mvc.perform(post("/streams/preview").with(csrf()).with(user("ed").roles("ADMIN"))
+                        .param("protocol", "TCP").param("listenPort", "5432").param("backends", "localhost:5432"))
+                .andExpect(content().string(containsString("host.docker.internal")));
+        mvc.perform(post("/sites/preview").with(csrf()).with(user("ed").roles("ADMIN"))
+                        .param("primaryDomain", "app.local").param("type", "PROXY").param("listenHttpPort", "80")
+                        .param("proxyTarget", "http://host.docker.internal:8422"))
+                .andExpect(content().string(not(containsString("127.0.0.1(localhost)"))));
         // 도메인을 아직 적지 않았으면 안내만 보인다
         mvc.perform(post("/sites/preview").with(csrf()).with(user("ed").roles("ADMIN"))
                         .param("primaryDomain", "").param("type", "PROXY").param("listenHttpPort", "80"))

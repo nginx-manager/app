@@ -106,7 +106,7 @@ class SiteImportWebTest extends ConfigRootTest {
 
         Site site = siteRepository.findByPrimaryDomain("app.example.com").orElseThrow();
         assertThat(site.getType()).isEqualTo(SiteType.PROXY);
-        assertThat(site.getProxyTarget()).isEqualTo("http://127.0.0.1:3000");
+        assertThat(site.getProxyTarget()).isEqualTo("http://host.docker.internal:3000");
         assertThat(site.getImportPath()).isEqualTo(CONFIG_ROOT.toRealPath().resolve("conf.d/app.conf").toString());
         assertThat(configFileRepository.findByPath("conf.d/app.conf")).get()
                 .extracting(ConfigFile::isDraftDelete).isEqualTo(true);
@@ -115,7 +115,7 @@ class SiteImportWebTest extends ConfigRootTest {
         assertThat(applyService.applyPending("ed", "import").succeeded()).isTrue();
 
         assertThat(readFile("conf.d/app.conf")).isNull();
-        assertThat(readFile("conf.d/sites/app.example.com.conf")).contains("proxy_pass http://127.0.0.1:3000;");
+        assertThat(readFile("conf.d/sites/app.example.com.conf")).contains("proxy_pass http://host.docker.internal:3000;");
         Site applied = siteRepository.findByPrimaryDomain("app.example.com").orElseThrow();
         assertThat(applied.getType()).isEqualTo(SiteType.PROXY);
         assertThat(configFileRepository.findByPath("conf.d/sites/app.example.com.conf")).get()
@@ -198,9 +198,9 @@ class SiteImportWebTest extends ConfigRootTest {
 
         Site after = siteRepository.findByPrimaryDomain("app.example.com").orElseThrow();
         assertThat(after.getType()).isEqualTo(SiteType.PROXY);
-        assertThat(after.getProxyTarget()).isEqualTo("http://127.0.0.1:4000");
+        assertThat(after.getProxyTarget()).isEqualTo("http://host.docker.internal:4000");
         assertThat(configFileRepository.findByPath("conf.d/sites/app.example.com.conf").orElseThrow().getDraftContent())
-                .contains("proxy_pass http://127.0.0.1:4000;");
+                .contains("proxy_pass http://host.docker.internal:4000;");
         mvc.perform(get("/sites/{id}", site.getId()).with(user("ed").roles("ADMIN")))
                 .andExpect(content().string(not(containsString("/reimport"))));
     }

@@ -2,6 +2,7 @@ package net.nginxmanager.stream;
 
 import jakarta.validation.Valid;
 import net.nginxmanager.common.Messages;
+import net.nginxmanager.site.Loopback;
 import net.nginxmanager.config.ConfigFile;
 import net.nginxmanager.config.ConfigFileRepository;
 import net.nginxmanager.config.ConfigFileStore;
@@ -125,7 +126,8 @@ public class StreamController {
     /** 폼 값으로 만들 설정을 저장 전에 미리 본다(htmx). */
     @PostMapping("/preview")
     public String preview(@Valid @ModelAttribute("form") StreamForm form, BindingResult bindingResult, Model model) {
-        model.addAttribute("preview", bindingResult.hasErrors() ? null : renderer.render(form));
+        model.addAttribute("preview", bindingResult.hasErrors() ? null
+                : Loopback.warn(renderer.render(form), form.loopbackBackend(), messages.get("sites.loopback.warning")));
         if (bindingResult.hasErrors() && (form.listenPort() > 0 || form.backends() != null && !form.backends().isBlank())) {
             model.addAttribute("preview", messages.previewErrors(bindingResult));
         }

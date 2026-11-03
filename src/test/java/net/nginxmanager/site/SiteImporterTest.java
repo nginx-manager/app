@@ -112,7 +112,10 @@ class SiteImporterTest {
         SiteImportAnalysis analysis = importer.analyze(conf, null);
         String rendered = renderer.render("api.example.com", analysis.form());
 
-        assertThat(rendered).contains("listen 80;", "server_name api.example.com;", "proxy_pass http://127.0.0.1:3000;");
+        // 호스트 nginx의 127.0.0.1은 같은 서버의 앱이므로 컨테이너에서 닿는 host.docker.internal로 바꾼다
+        assertThat(rendered).contains("listen 80;", "server_name api.example.com;",
+                "proxy_pass http://host.docker.internal:3000;");
+        assertThat(analysis.changes()).extracting(SiteImportAnalysis.Note::key).contains("import.change.loopback");
         // 폼이 만든 설정을 다시 읽어도 같은 폼이 된다
         assertThat(importer.analyze(rendered, null).form()).isEqualTo(analysis.form());
     }

@@ -57,7 +57,7 @@
         <summary th:text="#{sites.opt.routes.title}">경로별 라우팅 (location)</summary>
         <label><th:block th:text="#{sites.opt.pathRoutes}">경로와 대상</th:block>
             <span class="hint" th:text="#{sites.opt.pathRoutes.hint}">설명</span>
-            <textarea th:field="*{options.pathRoutes}" rows="3" placeholder="/api/ http://127.0.0.1:8080/&#10;/files/ /srv/uploads" spellcheck="false" th:disabled="${!editable}"></textarea>
+            <textarea th:field="*{options.pathRoutes}" rows="3" placeholder="/api/ http://host.docker.internal:8080/&#10;/files/ /srv/uploads" spellcheck="false" th:disabled="${!editable}"></textarea>
             <span class="error" th:errors="*{options.pathRoutesValid}"></span>
             <span class="error" th:errors="*{pathRoutesAllowed}"></span>
         </label>

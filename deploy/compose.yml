@@ -17,6 +17,9 @@ services:
       - ./data/conf:/etc/nginx                # nginx 설정, 인증서(certs/)
       - ./data/logs:/var/log/nginx            # 접근·오류 로그
       - ./data/shared:/var/lib/nginx-manager  # ACME 챌린지 파일, 에이전트 토큰
+    # 같은 서버(호스트)의 앱으로 프록시할 때 쓰는 이름. 컨테이너 안의 127.0.0.1은 nginx 컨테이너 자신이다
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       TZ: ${TZ:-Asia/Seoul}
     # nginx가 연결을 정리할 시간을 준다
