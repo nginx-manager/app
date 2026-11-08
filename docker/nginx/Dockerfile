@@ -30,7 +30,7 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
-RUN curl -fsSL "https://github.com/nginx/nginx/releases/download/release-${NGINX_VERSION}/nginx-${NGINX_VERSION}.tar.gz" | tar xz \
+RUN curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors "https://github.com/nginx/nginx/releases/download/release-${NGINX_VERSION}/nginx-${NGINX_VERSION}.tar.gz" | tar xz \
     && git clone --quiet --depth 1 --branch "${NJS_VERSION}" https://github.com/nginx/njs "njs-${NJS_VERSION}"
 
 WORKDIR /build/nginx-${NGINX_VERSION}
@@ -116,8 +116,8 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
         libxml2 libxslt1.1 libgd3 libgeoip1t64 libperl5.38t64 perl libgoogle-perftools4t64 \
     && rm -rf /var/lib/apt/lists/*
 
-RUN curl -fsSL "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz" | tar -C / -Jxp \
-    && curl -fsSL "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-$(uname -m).tar.xz" | tar -C / -Jxp
+RUN curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz" | tar -C / -Jxp \
+    && curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-$(uname -m).tar.xz" | tar -C / -Jxp
 
 COPY --from=nginx-build /out/ /
 

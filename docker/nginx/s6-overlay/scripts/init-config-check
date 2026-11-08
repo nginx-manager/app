@@ -18,6 +18,8 @@ chown nginxm:nginxm /run/nginx-manager "$dir" /run/nginx
 
 # /run은 컨테이너를 다시 시작해도 남는다. 예전 마스터의 pid 파일이 남아 있으면 다른 프로세스를 nginx로 오인한다
 rm -f /run/nginx/nginx.pid
+# 이번 컨테이너 시작에서 nginx가 처음 뜰 때만 업스트림 이름 풀기를 기다린다(s6-rc.d/nginx/run)
+touch /run/nginx-manager/startup-retry
 
 if s6-setuidgid nginxm /usr/sbin/nginx -t > "$dir/output" 2>&1; then
     echo ok > "$dir/result"

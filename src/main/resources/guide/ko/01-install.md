@@ -103,6 +103,14 @@ NGINX_MANAGER_ADMIN_EMAIL=ops@example.com
 
 ## 포트
 
+서버에 nginx manager와 따로 깐 nginx(apt로 깐 `nginx.service` 등)가 있으면 80/443을 두고 다툽니다. 설치는 포트가 쓰이고 있으면 멈추지만, 그 nginx가 부팅 때 자동으로 뜨게 되어 있으면 재부팅 뒤 먼저 80/443을 잡아 모든 사이트가 응답하지 않습니다. 쓰지 않는 nginx는 꺼 둡니다. `nm status`와 `nm upgrade`가 이런 nginx를 찾으면 알려 줍니다(v1.10.0부터).
+
+```bash
+sudo systemctl disable --now nginx
+sudo systemctl mask nginx      # 누가 실수로 start해도 뜨지 않게
+```
+
+
 포트는 `.env`에서 바꿉니다. 바뀌는 것은 서버 쪽 포트이고, 컨테이너 안(80/443/9000)은 그대로라 사이트 설정을 고칠 필요가 없습니다.
 
 | `.env` | 기본 | 용도 |
@@ -141,6 +149,8 @@ services:
 | `NGINX_MANAGER_BACKUP_AT` | 매일 자동 백업 시각(기본 03:30, `off`면 끔). 바꾼 뒤 `sudo nm backup-schedule` |
 | `TZ` | 시간대(기본 `Asia/Seoul`) |
 
+nginx 서비스의 `environment`로는 `NGINX_STARTUP_RESOLVE_WAIT`(초, 기본 180, `0`이면 끔)를 줄 수 있습니다. 컨테이너가 시작할 때 업스트림 이름을 아직 못 풀면 이 시간 동안 5초마다 다시 검사한 뒤 nginx를 띄웁니다([13장](13-troubleshooting.md#서버를-재부팅한-뒤-모든-사이트가-응답하지-않을-때), v1.10.0부터).
+
 그 밖에 `compose.override.yml`의 manager `environment`로 줄 수 있는 값: `NGINX_MANAGER_ACME_DIRECTORY_URL`(다른 ACME 서버), `NGINX_MANAGER_CERT_CHECK_INTERVAL`(갱신 확인 주기, 기본 `PT6H`), `NGINX_RUNTIME_AGENT_TOKEN`(에이전트 토큰을 직접 정할 때. nginx의 `NGINX_AGENT_TOKEN`과 같게).
 
 ## 운영 명령(nm)
@@ -149,7 +159,7 @@ services:
 
 | 명령 | 하는 일 |
 | --- | --- |
-| `nm status` | 컨테이너 상태와 버전, 관리 화면 주소, 관리 도메인 점검 |
+| `nm status` | 컨테이너 상태와 버전, 관리 화면 주소, 관리 도메인 점검. 서버에 따로 깔린 nginx가 부팅 때 자동으로 뜨게 되어 있으면 알려 줍니다(v1.10.0부터) |
 | `nm check-domain` | 관리 도메인이 DNS에 있고 이 서버의 nginx로 들어오는지 확인([13장](13-troubleshooting.md#관리-도메인이-열리지-않을-때)) |
 | `nm reload` | nginx 설정을 검사하고 끊김 없이 다시 읽기(호스트 Certbot이 인증서를 갱신한 뒤 등, [5장](05-import.md#certbot-인증서를-그대로-쓰기)) |
 | `nm version` | 설치된 버전과 최신 릴리스 |

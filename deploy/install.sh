@@ -166,3 +166,5 @@ if [ -n "$IMPORT_ROOTS" ]; then
 fi
 say "  처음 접속하면 관리자 계정을 만드는 화면이 나옵니다."
 say "  운영 명령: $DIR/nm help"
+# 따로 깔린 nginx가 부팅 때 자동으로 뜨면 재부팅 뒤 80/443을 빼앗긴다
+"$DIR/nm" host-nginx-check || true
