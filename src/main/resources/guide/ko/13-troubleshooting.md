@@ -83,6 +83,15 @@ sudo /opt/nginx-manager/nm restart
 
    - 급하면 그 사이트를 비활성화하고 적용합니다.
 
+## 서버를 재부팅한 뒤 모든 사이트가 응답하지 않을 때
+
+재부팅 뒤 사이트 하나가 아니라 전부 안 열리면 두 가지를 봅니다.
+
+1. **따로 깐 nginx가 80/443을 잡았는지**: `sudo ss -ltnp | grep -E ':(80|443) '`에 `docker-proxy`가 아니라 `nginx`가 보이고 `systemctl is-active nginx`가 `active`이면, 서버에 apt 등으로 깐 nginx가 먼저 떠서 포트를 가져간 것입니다. 인증서가 다른 사이트 것으로 나오거나 응답 헤더가 `Server: nginx/1.18.0 (Ubuntu)`처럼 보이는 것도 같은 경우입니다. 그 nginx를 끄고(`sudo systemctl disable --now nginx && sudo systemctl mask nginx`) `sudo ./nm restart nginx`로 nginx manager의 nginx를 다시 띄웁니다.
+2. **업스트림 이름을 못 풀어 nginx가 내려가 있는지**: 대시보드에 "시작 시 nginx -t 실패"가 보이거나 `sudo docker compose logs nginx`에 `host not found in upstream "minio1.internal:9000"`처럼 나오면, 사이트가 쓰는 다른 컨테이너가 nginx보다 늦게 떠서 이름을 아직 못 푼 것입니다. nginx는 설정 파일 하나라도 이름을 못 풀면 아무 사이트도 띄우지 않습니다. v1.10.0부터는 컨테이너가 시작할 때 이 경우만 `NGINX_STARTUP_RESOLVE_WAIT`초(기본 180) 동안 5초마다 다시 검사하고, 이름이 풀리면 nginx를 띄웁니다. 그래도 내려가 있으면 그 컨테이너를 띄운 뒤(`sudo docker start <이름>`, 재부팅 때 같이 뜨게 `sudo docker update --restart unless-stopped <이름>`) 대시보드의 **nginx 시작**을 누르거나 `sudo ./nm restart nginx`를 실행합니다. 그 컨테이너를 늘 띄울 수 없다면 사이트의 백엔드를 IP 주소로 바꾸거나 `compose.override.yml`의 `extra_hosts`에 적습니다([위](#nm-upgrade---nginx가-host-not-found-in-upstream으로-멈출-때)).
+
+학교·회사 망의 웹 필터가 80을 막으면 사이트 대신 필터의 차단 안내 페이지가 보입니다. 이때는 서버 안에서 `curl -sI http://127.0.0.1 -H 'Host: <도메인>'`으로 nginx가 응답하는지 보고, 망 관리자에게 차단 해제를 요청합니다.
+
 ## 업그레이드 뒤 nginx가 뜨지 않을 때
 
 새 nginx가 지금 설정을 받아들이지 않으면 nginx를 띄우지 않고 대시보드에 문제의 파일과 줄을 보여 줍니다. 두 가지 방법 중 하나로 고칩니다.

@@ -334,6 +334,7 @@ cmd_upgrade() {
     fi
     # 새 nm으로 자동 백업 스케줄을 깐다(015)
     "$DIR/nm" backup-schedule || warn "자동 백업 스케줄을 깔지 못했습니다: sudo $DIR/nm backup-schedule"
+    host_nginx_check || true
 }
 
 # 새 묶음의 env.example에만 있는 키를 기본값으로 .env 끝에 더한다. 이미 있는 값은 건드리지 않는다
@@ -658,10 +659,27 @@ check_admin_domain() {
 
 # ---------------------------------------------------------------- 그 밖
 
+# 서버에 따로 깔린 nginx(apt 등, systemd nginx.service)가 부팅 때 자동으로 뜨면 nginx manager보다 먼저 80/443을 잡는다.
+# 그러면 재부팅 뒤 모든 사이트가 그 nginx로 가서 응답하지 않으므로 알려 준다. 문제가 있으면 1을 돌려준다.
+host_nginx_check() {
+    command -v systemctl >/dev/null 2>&1 || return 0
+    state="$(systemctl is-enabled nginx.service 2>/dev/null || true)"
+    case "$state" in
+        enabled|enabled-runtime) ;;
+        *) return 0 ;;
+    esac
+    warn ""
+    warn "주의: 이 서버에 nginx manager와 따로 깔린 nginx(nginx.service)가 부팅 때 자동으로 뜨도록 되어 있습니다."
+    warn "      재부팅하면 그 nginx가 80/443을 먼저 잡아 nginx manager의 사이트가 응답하지 않을 수 있습니다."
+    warn "      쓰지 않는다면 꺼 두세요: sudo systemctl disable --now nginx && sudo systemctl mask nginx"
+    return 1
+}
+
 cmd_status() {
     dc ps
     say ""
     cmd_version_local
+    host_nginx_check || true
     domain="$(env_get NGINX_MANAGER_ADMIN_DOMAIN)"
     if [ -n "$domain" ]; then
         say "관리 화면: https://$domain (그리고 $(local_url))"
@@ -722,6 +740,7 @@ cmd="${1:-help}"
 [ $# -gt 0 ] && shift
 case "$cmd" in
     status) cmd_status ;;
+    host-nginx-check) host_nginx_check ;;
     version) cmd_version ;;
     logs) dc logs -f --tail 200 "$@" ;;
     restart)

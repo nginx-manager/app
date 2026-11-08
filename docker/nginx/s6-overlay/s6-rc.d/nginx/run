@@ -10,10 +10,40 @@ pkill -KILL -u nginxm -f '^nginx: ' 2>/dev/null || true
 s6-svperms -G nginxm . 2>/dev/null || true
 # 설정이 이 nginx와 맞지 않으면(업그레이드 직후 등) 띄우지 않고 내려 둔다.
 # 관리 화면에서 설정을 고친 뒤 "nginx 시작"으로 다시 띄운다.
-if ! s6-setuidgid nginxm /usr/sbin/nginx -t -q > /dev/null 2>&1; then
+#
+# 다만 컨테이너가 막 시작했을 때 업스트림 이름(다른 컨테이너 이름, extra_hosts 등)을 아직 풀지 못한 것이면
+# 그 컨테이너가 늦게 뜨는 중일 수 있다(서버 재부팅). 사이트 하나 때문에 모든 사이트가 내려가 있지 않도록
+# NGINX_STARTUP_RESOLVE_WAIT초(기본 180, 0이면 끔) 동안 5초마다 다시 검사한다. 표시는 init-config-check가 남긴다.
+check_out=/run/nginx/startup-test.out
+startup_dir=/run/nginx-manager/startup-check
+retry_marker=/run/nginx-manager/startup-retry
+wait_left="${NGINX_STARTUP_RESOLVE_WAIT:-180}"
+case "$wait_left" in ''|*[!0-9]*) wait_left=180 ;; esac
+retried=0
+while ! s6-setuidgid nginxm /usr/sbin/nginx -t > "$check_out" 2>&1; do
+    if [ -e "$retry_marker" ] && [ "$wait_left" -gt 0 ] && grep -q 'host not found in upstream' "$check_out"; then
+        if [ "$retried" = 0 ]; then
+            echo "nginx: an upstream host name does not resolve yet, retrying for up to ${wait_left}s:" >&2
+            grep 'host not found in upstream' "$check_out" >&2
+        fi
+        retried=1
+        sleep 5
+        wait_left=$((wait_left - 5))
+        continue
+    fi
+    rm -f "$retry_marker"
     echo "nginx: configuration test failed, staying down (see the manager dashboard)" >&2
+    cat "$check_out" >&2
     rm -f /run/nginx/nginx.pid
     s6-svc -d .
     exit 1
+done
+rm -f "$retry_marker"
+if [ "$retried" = 1 ]; then
+    echo "nginx: upstream host names resolve now, starting" >&2
+    # 시작 검사 결과를 이번 통과로 바꿔 둔다(관리 화면의 시작 검사 기록)
+    cp "$check_out" "$startup_dir/output" && echo ok > "$startup_dir/result" \
+        && date -u +%Y-%m-%dT%H:%M:%SZ > "$startup_dir/checked-at" \
+        && chown nginxm:nginxm "$startup_dir"/* 2>/dev/null || true
 fi
 exec s6-setuidgid nginxm /usr/sbin/nginx -g 'daemon off;'
