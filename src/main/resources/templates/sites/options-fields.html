@@ -166,13 +166,12 @@
         <p class="hint" th:text="#{sites.opt.autoindex.hint}">설명</p>
     </details>
     <details class="site-options" th:open="${form?.options?.serverDirectives != null}">
-        <summary th:text="#{sites.opt.directives.title}">추가 지시어 (관리자)</summary>
+        <summary th:text="#{sites.opt.directives.title}">추가 지시어</summary>
         <label><th:block th:text="#{sites.opt.directives}">server 블록에 덧붙일 지시어</th:block>
             <span class="hint" th:text="#{sites.opt.directives.hint}">설명</span>
             <textarea th:field="*{options.serverDirectives}" rows="5" maxlength="4000" spellcheck="false"
                       placeholder="client_body_timeout 30s;&#10;location = /healthz { return 200; }"
-                      th:readonly="${!currentUser.isAdmin()}" th:disabled="${!editable}"></textarea>
-            <span class="hint" th:unless="${currentUser.isAdmin()}" th:text="#{sites.opt.directives.adminOnly}">관리자만 바꿀 수 있습니다.</span>
+                      th:disabled="${!editable}"></textarea>
             <span class="error" th:errors="*{options.serverDirectivesValid}"></span>
         </label>
     </details>

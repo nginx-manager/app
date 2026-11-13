@@ -25,7 +25,6 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.List;
 import java.util.Locale;
-import java.util.Objects;
 
 @Controller
 @RequestMapping("/sites")
@@ -99,15 +98,6 @@ public class SiteController {
         return "sites/list";
     }
 
-    /** 추가 지시어(032)는 관리자만 바꾼다. 멤버가 보낸 값은 버리고 지금 값을 그대로 둔다(새 사이트면 없음). */
-    private static SiteForm directivesGuarded(SiteForm form, String current, Authentication authentication) {
-        if (SiteAccess.isAdmin(authentication) || form.options() == null
-                || Objects.equals(form.options().serverDirectives(), current)) {
-            return form;
-        }
-        return form.withOptions(form.options().withServerDirectives(current));
-    }
-
     private static SiteQueryRepository.OwnerFilter adminFilter(String owner) {
         if (owner == null || owner.isBlank()) {
             return SiteQueryRepository.OwnerFilter.ALL;
@@ -146,7 +136,7 @@ public class SiteController {
         }
         try {
             // 멤버가 만든 사이트는 그 멤버가 담당한다. 관리자가 만든 사이트는 담당자 없이 시작한다
-            Site site = siteService.create(directivesGuarded(form, null, authentication), authentication.getName(),
+            Site site = siteService.create(form, authentication.getName(),
                     access.ownerOfNewSite(authentication));
             return "redirect:/sites/" + site.getId() + "?saved";
         } catch (DuplicateSiteException e) {
@@ -180,8 +170,8 @@ public class SiteController {
             return "sites/detail";
         }
         try {
-            String current = siteQueryRepository.findWithFile(id).map(site -> site.getOptions().serverDirectives()).orElse(null);
-            siteService.update(id, directivesGuarded(form, current, authentication), authentication.getName());
+            // 추가 지시어(032)도 다른 옵션처럼 이 사이트를 다룰 수 있는 사람(관리자, 담당 멤버)이 고친다(035)
+            siteService.update(id, form, authentication.getName());
         } catch (DuplicateSiteException e) {
             bindingResult.rejectValue("extraDomains", "msg.site.domainTaken", new Object[] {e.getDomain()}, duplicateMessage(e));
             Site site = siteQueryRepository.findWithFile(id).orElseThrow(() -> new NotFoundException("site " + id));

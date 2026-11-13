@@ -19,7 +19,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** 031·032 화면: 메모는 목록에 보이고, 추가 지시어는 관리자만 바꾼다. */
+/** 031·032·035 화면: 메모는 목록에 보이고, 추가 지시어는 관리자와 그 사이트 담당 멤버가 바꾼다. */
 class SiteDirectivesWebTest extends ConfigRootTest {
 
     @Autowired
@@ -49,7 +49,7 @@ class SiteDirectivesWebTest extends ConfigRootTest {
     }
 
     @Test
-    void onlyAdminsChangeDirectives() throws Exception {
+    void ownersChangeDirectivesLikeAdmins() throws Exception {
         Site site = siteService.create(new SiteForm("docs.local", "", SiteType.STATIC, 80, "/srv/www/docs", null, null),
                 "alice", alice.getId());
 
@@ -58,30 +58,42 @@ class SiteDirectivesWebTest extends ConfigRootTest {
         site = reload(site);
         assertThat(site.getOptions().serverDirectives()).isEqualTo("client_body_timeout 30s;");
 
-        mvc.perform(update(site, "alice", "MEMBER").param("options.serverDirectives", "root /etc;")
+        // 담당 멤버(035)도 고치고 비울 수 있다
+        mvc.perform(get("/sites/" + site.getId()).with(user("alice").roles("MEMBER")))
+                .andExpect(content().string(containsString(">추가 지시어</summary>")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("관리자만 바꿀 수 있습니다."))));
+        mvc.perform(update(site, "alice", "MEMBER").param("options.serverDirectives", "proxy_request_buffering off;")
                         .param("options.note", "알리스 담당"))
                 .andExpect(status().is3xxRedirection());
         site = reload(site);
-        assertThat(site.getOptions().serverDirectives()).isEqualTo("client_body_timeout 30s;");
+        assertThat(site.getOptions().serverDirectives()).isEqualTo("proxy_request_buffering off;");
         assertThat(site.getOptions().note()).isEqualTo("알리스 담당");
 
-        // 멤버가 지시어 칸을 비워 보내도 지워지지 않는다
-        mvc.perform(update(site, "alice", "MEMBER").param("options.note", "알리스 담당"))
-                .andExpect(status().is3xxRedirection());
-        assertThat(reload(site).getOptions().serverDirectives()).isEqualTo("client_body_timeout 30s;");
-
-        mvc.perform(get("/sites/" + site.getId()).with(user("alice").roles("MEMBER")))
-                .andExpect(content().string(containsString("관리자만 바꿀 수 있습니다.")));
+        mvc.perform(update(site, "alice", "MEMBER")).andExpect(status().is3xxRedirection());
+        assertThat(reload(site).getOptions().serverDirectives()).isNull();
     }
 
     @Test
-    void membersCannotCreateSitesWithDirectives() throws Exception {
+    void othersCannotChangeDirectives() throws Exception {
+        userRepository.save(new User("bob", "{noop}unused-password", Role.MEMBER));
+        Site site = siteService.create(new SiteForm("docs.local", "", SiteType.STATIC, 80, "/srv/www/docs", null, null)
+                .withOptions(SiteModuleOptionsTest.options("serverDirectives", "client_body_timeout 30s;")),
+                "alice", alice.getId());
+
+        mvc.perform(update(site, "bob", "MEMBER").param("options.serverDirectives", "root /etc;"))
+                .andExpect(status().isNotFound());
+        assertThat(reload(site).getOptions().serverDirectives()).isEqualTo("client_body_timeout 30s;");
+    }
+
+    @Test
+    void membersCreateSitesWithDirectives() throws Exception {
         mvc.perform(post("/sites/new").with(csrf()).with(user("alice").roles("MEMBER"))
                         .param("primaryDomain", "new.local").param("type", "STATIC").param("listenHttpPort", "80")
-                        .param("staticRoot", "/srv/www/new").param("options.serverDirectives", "root /etc;"))
+                        .param("staticRoot", "/srv/www/new").param("options.serverDirectives", "client_body_timeout 30s;"))
                 .andExpect(status().is3xxRedirection());
-        assertThat(siteRepository.findByPrimaryDomain("new.local").orElseThrow().getOptions().serverDirectives())
-                .isNull();
+        Site site = siteRepository.findByPrimaryDomain("new.local").orElseThrow();
+        assertThat(site.getOwnerId()).isEqualTo(alice.getId());
+        assertThat(site.getOptions().serverDirectives()).isEqualTo("client_body_timeout 30s;");
     }
 
     @Test
