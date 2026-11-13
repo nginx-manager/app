@@ -7,7 +7,9 @@ public enum NotificationEvent {
     NGINX_RESTART,
     DRIFT,
     BACKUP_FAILED,
-    ACCOUNT_LOCKED;
+    ACCOUNT_LOCKED,
+    /** 담당 멤버의 추가 지시어 요청(035). */
+    DIRECTIVE_REQUEST;
 
     /** 알림의 event 값이 속한 종류. 어느 종류도 아니면(TEST 등) null이고, 그런 알림은 거르지 않는다. */
     static NotificationEvent of(String event) {

@@ -72,6 +72,14 @@ public class OpsNotifier {
             return new NotificationService.Notice(down ? "NGINX_DOWN" : "NGINX_RESTARTED",
                     down ? "nginx가 내려갔습니다" : "nginx가 다시 시작됐습니다", detail);
         }
+        if (event.action() == AuditAction.DIRECTIVE_REQUEST && detail.startsWith("requested")) {
+            String site = event.target() != null && event.target().startsWith("site:")
+                    ? event.target().substring("site:".length()) : Objects.toString(event.target(), "");
+            return new NotificationService.Notice("DIRECTIVE_REQUEST", "추가 지시어 요청: " + site,
+                    actor + "가 " + site + "에 관리자 전용 추가 지시어를 요청했습니다("
+                            + detail.substring("requested".length()).replaceFirst("^:\\s*", "")
+                            + ").\n사이트 화면에서 반영하거나 거절하세요.");
+        }
         if (event.action() == AuditAction.ACCOUNT_LOCKED) {
             String username = event.target() != null && event.target().startsWith("user:")
                     ? event.target().substring("user:".length()) : actor;

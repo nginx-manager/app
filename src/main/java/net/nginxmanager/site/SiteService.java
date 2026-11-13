@@ -142,6 +142,23 @@ public class SiteService {
         });
     }
 
+    /** 추가 지시어만 바꾼다(035, 관리자가 요청을 반영할 때). 같은 값이면 초안을 만들지 않는다. */
+    public boolean setServerDirectives(long siteId, String directives, String actor) {
+        return locked(() -> {
+            Site site = load(siteId);
+            if (site.getType() == SiteType.RAW) {
+                throw new RawSiteFormException();
+            }
+            SiteOptions options = site.getOptions();
+            SiteOptions changed = options.withServerDirectives(directives);
+            if (java.util.Objects.equals(options.serverDirectives(), changed.serverDirectives())) {
+                return false;
+            }
+            doUpdate(siteId, rendering.formOf(site).withOptions(changed), actor);
+            return true;
+        });
+    }
+
     /** 담당자를 바꾼다. 설정 파일과 초안은 그대로이고, 초안은 사이트를 따라 새 담당자에게 넘어간다. */
     public Site assignOwner(long siteId, Long ownerId, long expectedVersion, String actor) {
         return locked(() -> doAssignOwner(siteId, ownerId, expectedVersion, actor));

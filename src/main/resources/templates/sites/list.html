@@ -10,6 +10,10 @@
         <a class="button" th:if="${currentUser.canEdit()}" th:href="@{/sites/new}" th:text="#{sites.list.add}">사이트 추가</a>
     </div>
     <p class="notice" th:if="${notice}" th:text="${notice}">완료</p>
+    <p class="notice" th:if="${directiveRequests != null and !#lists.isEmpty(directiveRequests)}">
+        <th:block th:text="#{sites.list.directiveRequests}">검토할 추가 지시어 요청</th:block>:
+        <th:block th:each="r, st : ${directiveRequests}"><a th:href="@{/sites/{id}(id=${r.siteId}) + '#directive-request'}" th:text="${r.domain}">app.local</a> (<span th:text="${r.requestedBy}">alice</span>)<th:block th:unless="${st.last}">, </th:block></th:block>
+    </p>
     <p class="hint" th:unless="${currentUser.isAdmin()}" th:text="#{sites.list.memberHint}">내가 담당한 사이트만 보입니다.</p>
     <form class="row-form card" th:action="@{/sites}" method="get">
         <label><span th:text="#{sites.list.search}">검색</span>

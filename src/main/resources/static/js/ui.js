@@ -170,6 +170,19 @@
                 });
             });
         });
+        // 추가 지시어 도움말(035): 고른 예시를 칸 끝에 한 줄로 더한다. 미리보기가 칸의 input 이벤트를 듣는다
+        document.querySelectorAll('[data-insert-directive]').forEach(function (button) {
+            button.addEventListener('click', function () {
+                const area = button.closest('details.site-options').querySelector('textarea[name="options.serverDirectives"]');
+                if (!area || area.disabled) {
+                    return;
+                }
+                const line = button.dataset.insertDirective;
+                area.value = area.value.replace(/\s*$/, '') + (area.value.trim() ? '\n' : '') + line;
+                area.dispatchEvent(new Event('input', {bubbles: true}));
+                area.focus();
+            });
+        });
         document.querySelectorAll('pre.diff').forEach(colorDiff);
         document.querySelectorAll('.theme-toggle').forEach(function (button) {
             button.addEventListener('click', toggleTheme);

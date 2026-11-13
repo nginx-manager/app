@@ -1,5 +1,6 @@
 package net.nginxmanager.site;
 
+import net.nginxmanager.audit.AuditAction;
 import net.nginxmanager.support.ConfigRootTest;
 import net.nginxmanager.user.Role;
 import net.nginxmanager.user.SetupState;
@@ -28,6 +29,8 @@ class SiteDirectivesWebTest extends ConfigRootTest {
     SetupState setupState;
     @Autowired
     SiteService siteService;
+    @Autowired
+    DirectiveRequestRepository directiveRequests;
 
     User alice;
 
@@ -94,6 +97,98 @@ class SiteDirectivesWebTest extends ConfigRootTest {
         Site site = siteRepository.findByPrimaryDomain("new.local").orElseThrow();
         assertThat(site.getOwnerId()).isEqualTo(alice.getId());
         assertThat(site.getOptions().serverDirectives()).isEqualTo("client_body_timeout 30s;");
+    }
+
+    @Test
+    void membersCannotAddServerWideDirectives() throws Exception {
+        Site site = siteService.create(new SiteForm("docs.local", "", SiteType.STATIC, 80, "/srv/www/docs", null, null),
+                "alice", alice.getId());
+
+        mvc.perform(update(site, "alice", "MEMBER")
+                        .param("options.serverDirectives", "client_body_timeout 30s;\nlocation /x { alias /etc/; }"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("관리자만 넣는 지시어입니다: alias")))
+                .andExpect(content().string(containsString("관리자에게 요청")));
+        assertThat(reload(site).getOptions().serverDirectives()).isNull();
+
+        mvc.perform(post("/sites/new").with(csrf()).with(user("alice").roles("MEMBER"))
+                        .param("primaryDomain", "new.local").param("type", "STATIC").param("listenHttpPort", "80")
+                        .param("staticRoot", "/srv/www/new").param("options.serverDirectives", "server_name other.example;"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("server_name")))
+                .andExpect(content().string(containsString("사이트를 먼저 저장한 뒤")));
+        assertThat(siteRepository.findByPrimaryDomain("new.local")).isEmpty();
+    }
+
+    @Test
+    void membersKeepDirectivesAnAdminAdded() throws Exception {
+        Site site = siteService.create(new SiteForm("docs.local", "", SiteType.STATIC, 80, "/srv/www/docs", null, null)
+                .withOptions(SiteModuleOptionsTest.options("serverDirectives", "location /files/ { alias /srv/files/; }")),
+                "alice", alice.getId());
+
+        mvc.perform(update(site, "alice", "MEMBER").param("options.serverDirectives",
+                        "location /files/ { alias /srv/files/; }\nclient_body_timeout 60s;"))
+                .andExpect(status().is3xxRedirection());
+        assertThat(reload(site).getOptions().serverDirectives())
+                .isEqualTo("location /files/ { alias /srv/files/; }\nclient_body_timeout 60s;");
+    }
+
+    @Test
+    void membersAskAdminsForServerWideDirectives() throws Exception {
+        Site site = siteService.create(new SiteForm("docs.local", "", SiteType.STATIC, 80, "/srv/www/docs", null, null),
+                "alice", alice.getId());
+        String wanted = "location /files/ { alias /srv/files/; }";
+
+        mvc.perform(post("/sites/" + site.getId() + "/directive-request").with(csrf()).with(user("alice").roles("MEMBER"))
+                        .param("options.serverDirectives", wanted))
+                .andExpect(status().is3xxRedirection());
+        assertThat(directiveRequests.findBySiteId(site.getId())).get()
+                .extracting(DirectiveRequest::getRequestedBy, DirectiveRequest::getDirectives)
+                .containsExactly("alice", wanted);
+        assertThat(auditLogRepository.findAll()).anyMatch(l -> l.getAction() == AuditAction.DIRECTIVE_REQUEST
+                && "requested: alias".equals(l.getDetail()));
+
+        mvc.perform(get("/sites/" + site.getId()).with(user("alice").roles("MEMBER")))
+                .andExpect(content().string(containsString("관리자가 검토하고 있습니다")));
+        mvc.perform(get("/sites").with(user("admin").roles("ADMIN")))
+                .andExpect(content().string(containsString("검토할 추가 지시어 요청")));
+        mvc.perform(post("/sites/" + site.getId() + "/directive-request/approve").with(csrf())
+                        .with(user("alice").roles("MEMBER")))
+                .andExpect(status().isForbidden());
+
+        mvc.perform(post("/sites/" + site.getId() + "/directive-request/approve").with(csrf())
+                        .with(user("admin").roles("ADMIN")))
+                .andExpect(status().is3xxRedirection());
+        assertThat(reload(site).getOptions().serverDirectives()).isEqualTo(wanted);
+        assertThat(directiveRequests.findBySiteId(site.getId())).isEmpty();
+    }
+
+    @Test
+    void adminsRejectRequests() throws Exception {
+        Site site = siteService.create(new SiteForm("docs.local", "", SiteType.STATIC, 80, "/srv/www/docs", null, null),
+                "alice", alice.getId());
+        mvc.perform(post("/sites/" + site.getId() + "/directive-request").with(csrf()).with(user("alice").roles("MEMBER"))
+                        .param("options.serverDirectives", "root /etc;"))
+                .andExpect(status().is3xxRedirection());
+        mvc.perform(post("/sites/" + site.getId() + "/directive-request/reject").with(csrf())
+                        .with(user("admin").roles("ADMIN")))
+                .andExpect(status().is3xxRedirection());
+        assertThat(directiveRequests.findBySiteId(site.getId())).isEmpty();
+        assertThat(reload(site).getOptions().serverDirectives()).isNull();
+    }
+
+    @Test
+    void basicDirectivesNeedNoRequestAndHelpIsShown() throws Exception {
+        Site site = siteService.create(new SiteForm("docs.local", "", SiteType.STATIC, 80, "/srv/www/docs", null, null),
+                "alice", alice.getId());
+        mvc.perform(post("/sites/" + site.getId() + "/directive-request").with(csrf()).with(user("alice").roles("MEMBER"))
+                        .param("options.serverDirectives", "client_body_timeout 30s;"))
+                .andExpect(status().is3xxRedirection());
+        assertThat(directiveRequests.findBySiteId(site.getId())).isEmpty();
+
+        mvc.perform(get("/sites/" + site.getId()).with(user("alice").roles("MEMBER")))
+                .andExpect(content().string(containsString("쓸 수 있는 지시어")))
+                .andExpect(content().string(containsString("data-insert-directive=\"proxy_request_buffering off;\"")));
     }
 
     @Test

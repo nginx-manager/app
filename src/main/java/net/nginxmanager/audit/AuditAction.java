@@ -20,5 +20,6 @@ public enum AuditAction {
     RUNTIME_START,
     UPGRADE,
     NGINX_RESTART,
-    API_TOKEN
+    API_TOKEN,
+    DIRECTIVE_REQUEST
 }
