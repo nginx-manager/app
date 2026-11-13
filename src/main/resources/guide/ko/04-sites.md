@@ -213,16 +213,22 @@ location = /healthz {
 | `server_tokens off;` | 오류 페이지와 Server 헤더에 nginx 버전을 숨깁니다. |
 | `charset utf-8;` | 응답의 Content-Type에 문자 인코딩을 붙입니다. |
 | `rewrite ^/old/(.*)$ /new/$1 permanent;` | 옛 주소를 새 주소로 301 넘깁니다. |
+| `location /files/ { alias /srv/files/; }` | 이 경로는 서버의 다른 디렉터리 파일을 그대로 보여 줍니다. |
+| `add_header X-Frame-Options SAMEORIGIN always;` | 응답에 헤더를 붙입니다. |
+| `error_page 404 /404.html;` | 오류 때 보여 줄 페이지를 정합니다. |
 | `location = /healthz { return 200 'ok'; }` | 백엔드를 거치지 않는 상태 확인 주소. |
 | `location ^~ /internal/ { deny all; }` | 외부에서 열면 안 되는 경로를 막습니다(403). |
 
 #### 관리자만 넣는 지시어와 관리자에게 요청하기
 
-서버 전체 운영에 영향을 줄 수 있는 지시어는 관리자만 넣습니다. 멤버가 이런 지시어를 새로 적어 저장하면 저장되지 않고 칸 아래에 어떤 지시어가 막혔는지 나옵니다. 관리자가 이미 넣어 둔 지시어는 멤버가 다른 줄을 고쳐 저장해도 그대로 둘 수 있습니다.
+담당자는 자기 사이트를 등록하고 운영하는 데 필요한 지시어를 모두 넣습니다. `root`, `alias`, `listen`, `server_name`, `ssl_certificate`, `location`, 헤더, 타임아웃, 버퍼 같은 지시어입니다. `server_name`에 다른 사이트가 쓰는 도메인을 적거나 `listen`에 스트림이 쓰는 포트를 적으면 폼의 도메인·포트처럼 저장하지 않습니다. 로그는 관리도구가 사이트마다 `/var/log/nginx/sites/<도메인>.access.log`·`.error.log`로 남기고 [로그 화면](11-logs.md)에서 보므로 따로 넣지 않아도 됩니다(`access_log off;`로 끄는 것은 담당자도 씁니다).
 
-- 서버의 파일 경로를 쓰는 지시어: `root`, `alias`, `include`, `access_log`, `error_log`, `ssl_certificate`, 이름이 `_path`, `_file`, `_certificate`, `_certificate_key`로 끝나는 지시어 등
-- 다른 사이트의 포트·도메인을 가로챌 수 있는 지시어: `listen`, `server_name`
-- 코드를 돌리는 지시어: `perl`, `js_`, `lua`로 시작하는 지시어 등
+관리자만 넣는 것은 서버에 파일을 만들거나 쓰는 지시어와 다른 설정·코드를 불러오는 지시어뿐입니다.
+
+- 파일을 쓰는 지시어: `access_log`·`error_log`(경로를 바꿀 때), 이름이 `_temp_path`·`_cache_path`로 끝나는 지시어, `proxy_store` 같은 `*_store`, unix 소켓 `listen`
+- 설정·코드를 불러오는 지시어: `include`, `load_module`, `perl`·`js_`·`lua`로 시작하는 지시어
+
+멤버가 이런 지시어를 새로 적어 저장하면 저장되지 않고 칸 아래에 어떤 지시어가 막혔는지 나옵니다. 관리자가 이미 넣어 둔 지시어는 멤버가 다른 줄을 고쳐 저장해도 그대로 둘 수 있습니다.
 
 막혔을 때 **관리자에게 요청**을 누르면 칸에 적은 내용 그대로 관리자에게 요청이 갑니다(새 사이트는 먼저 저장한 뒤 사이트 화면에서 요청합니다). 요청은 감사 로그에 남고, [알림 채널](12-admin.md#알림-설정)이 있으면 관리자에게 알림이 갑니다. 관리자는 사이트 목록 위의 **검토할 추가 지시어 요청**이나 사이트 화면의 **추가 지시어 요청** 카드에서 내용을 보고 **반영**하거나 **거절**합니다. 반영하면 추가 지시어가 요청 내용으로 바뀐 초안이 생기므로, 적용 화면에서 diff를 보고 적용합니다. 사이트마다 검토할 요청은 하나이고, 다시 요청하면 앞 요청을 바꿉니다.
 

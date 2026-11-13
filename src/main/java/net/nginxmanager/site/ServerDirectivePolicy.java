@@ -8,8 +8,10 @@ import java.util.Set;
 
 /**
  * 추가 지시어(032) 가운데 담당 멤버가 넣을 수 있는 것과 관리자만 넣는 것을 가른다(035).
- * 서버의 파일을 읽거나 쓰는 지시어, 다른 사이트의 도메인·포트를 가로챌 수 있는 지시어, 코드를 돌리는 지시어는
- * 그 사이트 하나가 아니라 서버 전체 운영에 영향을 주므로 관리자만 넣는다. 멤버는 관리자에게 요청한다.
+ * 담당자는 자기 사이트를 등록하고 운영하는 데 필요한 지시어(root, alias, listen, server_name, ssl_certificate, location,
+ * 헤더, 타임아웃, 버퍼 등)를 넣는다. 서버에 파일을 만들거나 쓰는 지시어(로그, 임시·캐시 경로, *_store), 다른 설정이나
+ * 코드를 불러오는 지시어(include, load_module, perl·js·lua), 메인 컨텍스트 지시어만 관리자가 넣고, 멤버는 요청한다.
+ * listen·server_name이 다른 사이트의 도메인이나 스트림 포트와 겹치는지는 저장할 때 {@link SiteService}가 본다.
  */
 public final class ServerDirectivePolicy {
 
@@ -17,12 +19,12 @@ public final class ServerDirectivePolicy {
     public static final String UNREADABLE = "?";
 
     private static final Set<String> ADMIN_ONLY = Set.of(
-            "root", "alias", "include", "load_module", "access_log", "error_log", "listen", "server_name",
+            "include", "load_module", "access_log", "error_log",
             "proxy_store", "fastcgi_store", "uwsgi_store", "scgi_store", "user", "pid", "env", "daemon",
             "master_process", "working_directory", "lock_file", "ssl_engine");
 
     private static final List<String> ADMIN_ONLY_SUFFIXES = List.of(
-            "_path", "_file", "_certificate", "_certificate_key", "_crl", "_dhparam", "_ticket_key");
+            "_temp_path", "_cache_path");
 
     private static final List<String> ADMIN_ONLY_PREFIXES = List.of("perl", "js_", "lua", "njs", "wasm", "worker_");
 
@@ -42,12 +44,15 @@ public final class ServerDirectivePolicy {
             new Example("serverTokens", "server_tokens off;"),
             new Example("charset", "charset utf-8;"),
             new Example("rewrite", "rewrite ^/old/(.*)$ /new/$1 permanent;"),
+            new Example("alias", "location /files/ { alias /srv/files/; }"),
+            new Example("addHeader", "add_header X-Frame-Options SAMEORIGIN always;"),
+            new Example("errorPage", "error_page 404 /404.html;"),
             new Example("healthz", "location = /healthz { return 200 'ok'; }"),
             new Example("denyPath", "location ^~ /internal/ { deny all; }"));
 
     /** 도움말에 보이는 관리자 전용 지시어(접미사·접두사 규칙은 문구로 설명한다). */
     public static final List<String> ADMIN_ONLY_SHOWN = List.of(
-            "root", "alias", "include", "listen", "server_name", "access_log", "error_log", "ssl_certificate");
+            "include", "access_log", "error_log", "proxy_temp_path", "js_content");
 
     private ServerDirectivePolicy() {
     }
@@ -101,9 +106,63 @@ public final class ServerDirectivePolicy {
         return List.copyOf(names);
     }
 
+    /** server 블록에 바로 적힌 server_name의 이름들(035). 다른 사이트의 도메인과 겹치면 저장하지 않는다. */
+    public static List<String> serverNames(String directives) {
+        List<String> names = new ArrayList<>();
+        for (NginxConf.Directive d : topLevel(directives)) {
+            if (d.name().equalsIgnoreCase("server_name")) {
+                for (String name : d.args()) {
+                    if (!name.isEmpty() && !name.equals("_") && !name.startsWith("~") && !name.contains("*")) {
+                        names.add(name.toLowerCase(Locale.ROOT));
+                    }
+                }
+            }
+        }
+        return names;
+    }
+
+    /** server 블록에 바로 적힌 listen의 TCP 포트들(035). 스트림이 쓰는 포트면 저장하지 않는다. */
+    public static List<Integer> listenPorts(String directives) {
+        List<Integer> ports = new ArrayList<>();
+        for (NginxConf.Directive d : topLevel(directives)) {
+            String address = d.name().equalsIgnoreCase("listen") ? d.arg(0) : null;
+            if (address == null || address.startsWith("unix:")) {
+                continue;
+            }
+            String port = address.substring(address.lastIndexOf(':') + 1);
+            if (port.matches("\\d{1,5}")) {
+                ports.add(Integer.parseInt(port));
+            }
+        }
+        return ports;
+    }
+
+    private static List<NginxConf.Directive> topLevel(String directives) {
+        if (directives == null || directives.isBlank()) {
+            return List.of();
+        }
+        try {
+            return NginxConf.parse(directives);
+        } catch (IllegalArgumentException e) {
+            return List.of();
+        }
+    }
+
+    private static boolean adminOnly(NginxConf.Directive d) {
+        // 로그 끄기는 파일을 만들지 않는다
+        if (d.name().equalsIgnoreCase("access_log") && d.args().size() == 1 && d.args().getFirst().equals("off")) {
+            return false;
+        }
+        if (d.name().equalsIgnoreCase("listen")) {
+            String address = d.arg(0);
+            return address != null && address.startsWith("unix:");
+        }
+        return isAdminOnly(d.name());
+    }
+
     private static void collect(List<NginxConf.Directive> directives, Set<String> found) {
         for (NginxConf.Directive d : directives) {
-            if (isAdminOnly(d.name())) {
+            if (adminOnly(d)) {
                 found.add(d.args().isEmpty() ? d.name() : d.name() + " " + String.join(" ", d.args()));
             }
             if (d.isBlock()) {

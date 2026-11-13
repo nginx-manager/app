@@ -105,17 +105,17 @@ class SiteDirectivesWebTest extends ConfigRootTest {
                 "alice", alice.getId());
 
         mvc.perform(update(site, "alice", "MEMBER")
-                        .param("options.serverDirectives", "client_body_timeout 30s;\nlocation /x { alias /etc/; }"))
+                        .param("options.serverDirectives", "client_body_timeout 30s;\nlocation /x { access_log /etc/x.log; }"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("관리자만 넣는 지시어입니다: alias")))
+                .andExpect(content().string(containsString("관리자만 넣습니다: access_log")))
                 .andExpect(content().string(containsString("관리자에게 요청")));
         assertThat(reload(site).getOptions().serverDirectives()).isNull();
 
         mvc.perform(post("/sites/new").with(csrf()).with(user("alice").roles("MEMBER"))
                         .param("primaryDomain", "new.local").param("type", "STATIC").param("listenHttpPort", "80")
-                        .param("staticRoot", "/srv/www/new").param("options.serverDirectives", "server_name other.example;"))
+                        .param("staticRoot", "/srv/www/new").param("options.serverDirectives", "include /etc/nginx/x.conf;"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("server_name")))
+                .andExpect(content().string(containsString("include")))
                 .andExpect(content().string(containsString("사이트를 먼저 저장한 뒤")));
         assertThat(siteRepository.findByPrimaryDomain("new.local")).isEmpty();
     }
@@ -123,21 +123,21 @@ class SiteDirectivesWebTest extends ConfigRootTest {
     @Test
     void membersKeepDirectivesAnAdminAdded() throws Exception {
         Site site = siteService.create(new SiteForm("docs.local", "", SiteType.STATIC, 80, "/srv/www/docs", null, null)
-                .withOptions(SiteModuleOptionsTest.options("serverDirectives", "location /files/ { alias /srv/files/; }")),
+                .withOptions(SiteModuleOptionsTest.options("serverDirectives", "location /files/ { access_log /var/log/files.log; }")),
                 "alice", alice.getId());
 
         mvc.perform(update(site, "alice", "MEMBER").param("options.serverDirectives",
-                        "location /files/ { alias /srv/files/; }\nclient_body_timeout 60s;"))
+                        "location /files/ { access_log /var/log/files.log; }\nclient_body_timeout 60s;"))
                 .andExpect(status().is3xxRedirection());
         assertThat(reload(site).getOptions().serverDirectives())
-                .isEqualTo("location /files/ { alias /srv/files/; }\nclient_body_timeout 60s;");
+                .isEqualTo("location /files/ { access_log /var/log/files.log; }\nclient_body_timeout 60s;");
     }
 
     @Test
     void membersAskAdminsForServerWideDirectives() throws Exception {
         Site site = siteService.create(new SiteForm("docs.local", "", SiteType.STATIC, 80, "/srv/www/docs", null, null),
                 "alice", alice.getId());
-        String wanted = "location /files/ { alias /srv/files/; }";
+        String wanted = "location /files/ { proxy_store on; }";
 
         mvc.perform(post("/sites/" + site.getId() + "/directive-request").with(csrf()).with(user("alice").roles("MEMBER"))
                         .param("options.serverDirectives", wanted))
@@ -146,7 +146,7 @@ class SiteDirectivesWebTest extends ConfigRootTest {
                 .extracting(DirectiveRequest::getRequestedBy, DirectiveRequest::getDirectives)
                 .containsExactly("alice", wanted);
         assertThat(auditLogRepository.findAll()).anyMatch(l -> l.getAction() == AuditAction.DIRECTIVE_REQUEST
-                && "requested: alias".equals(l.getDetail()));
+                && "requested: proxy_store".equals(l.getDetail()));
 
         mvc.perform(get("/sites/" + site.getId()).with(user("alice").roles("MEMBER")))
                 .andExpect(content().string(containsString("관리자가 검토하고 있습니다")));
@@ -168,7 +168,7 @@ class SiteDirectivesWebTest extends ConfigRootTest {
         Site site = siteService.create(new SiteForm("docs.local", "", SiteType.STATIC, 80, "/srv/www/docs", null, null),
                 "alice", alice.getId());
         mvc.perform(post("/sites/" + site.getId() + "/directive-request").with(csrf()).with(user("alice").roles("MEMBER"))
-                        .param("options.serverDirectives", "root /etc;"))
+                        .param("options.serverDirectives", "include /etc/x.conf;"))
                 .andExpect(status().is3xxRedirection());
         mvc.perform(post("/sites/" + site.getId() + "/directive-request/reject").with(csrf())
                         .with(user("admin").roles("ADMIN")))
@@ -189,6 +189,24 @@ class SiteDirectivesWebTest extends ConfigRootTest {
         mvc.perform(get("/sites/" + site.getId()).with(user("alice").roles("MEMBER")))
                 .andExpect(content().string(containsString("쓸 수 있는 지시어")))
                 .andExpect(content().string(containsString("data-insert-directive=\"proxy_request_buffering off;\"")));
+    }
+
+    @Test
+    void ownersRunTheirSiteWithListenServerNameAndRoot() throws Exception {
+        siteService.create(new SiteForm("other.local", "", SiteType.STATIC, 80, "/srv/www/other", null, null), "admin");
+        Site site = siteService.create(new SiteForm("docs.local", "", SiteType.STATIC, 80, "/srv/www/docs", null, null),
+                "alice", alice.getId());
+        String mine = "server_name www.docs.local;\nlisten 8080;\nlocation /files/ { alias /srv/files/; }";
+        mvc.perform(update(site, "alice", "MEMBER").param("options.serverDirectives", mine))
+                .andExpect(status().is3xxRedirection());
+        site = reload(site);
+        assertThat(site.getOptions().serverDirectives()).isEqualTo(mine);
+
+        // 다른 사이트의 도메인은 가로채지 못한다
+        mvc.perform(update(site, "alice", "MEMBER").param("options.serverDirectives", "server_name other.local;"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("other.local")));
+        assertThat(reload(site).getOptions().serverDirectives()).isEqualTo(mine);
     }
 
     @Test
