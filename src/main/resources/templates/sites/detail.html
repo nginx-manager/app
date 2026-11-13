@@ -54,6 +54,24 @@
         </label>
         <button type="submit" class="secondary" th:text="#{sites.owner.save}">담당자 저장</button>
     </form>
+    <!-- 추가 지시어 요청(035): 관리자는 반영·거절하고, 담당 멤버는 검토 중인 요청을 본다 -->
+    <section class="card directive-request" id="directive-request" th:if="${directiveRequest != null}">
+        <h2 th:text="#{sites.directiveRequest.title}">추가 지시어 요청</h2>
+        <p class="hint" th:text="#{sites.directiveRequest.by(${directiveRequest.requestedBy}, ${#temporals.format(directiveRequest.updatedAt, 'yyyy-MM-dd HH:mm')})}">alice가 요청</p>
+        <p class="hint"><th:block th:text="#{sites.directiveRequest.adminOnly}">관리자 전용 지시어</th:block>:
+            <code th:each="d, s : ${directiveRequest.adminOnly}" th:text="${d} + (${s.last} ? '' : ',')">root /srv;</code></p>
+        <pre class="code" th:text="${directiveRequest.directives}">client_body_timeout 30s;</pre>
+        <div class="row-form" th:if="${currentUser.isAdmin()}">
+            <form th:action="@{/sites/{id}/directive-request/approve(id=${site.id})}" method="post">
+                <button type="submit" th:text="#{sites.directiveRequest.approve}">반영</button>
+            </form>
+            <form th:action="@{/sites/{id}/directive-request/reject(id=${site.id})}" method="post">
+                <button type="submit" class="secondary" th:text="#{sites.directiveRequest.reject}">거절</button>
+            </form>
+        </div>
+        <p class="hint" th:if="${currentUser.isAdmin()}" th:text="#{sites.directiveRequest.approveHint}">반영하면 추가 지시어가 이 값으로 바뀐 초안이 생깁니다.</p>
+        <p class="hint" th:unless="${currentUser.isAdmin()}" th:text="#{sites.directiveRequest.waiting}">관리자가 검토하고 있습니다.</p>
+    </section>
     <p class="notice" th:if="${param.saved}"><th:block th:text="#{sites.detail.saved.before}">초안을 저장했습니다.</th:block> <a th:href="@{/apply}" th:text="#{sites.detail.saved.link}">적용 화면</a><th:block th:text="#{sites.detail.saved.after}">에서 반영하세요.</th:block></p>
 
     <div class="columns">

@@ -64,10 +64,13 @@ public abstract class ConfigRootTest {
     protected AcmeSettingsRepository acmeSettingsRepository;
     @Autowired
     protected StreamProxyRepository streamProxyRepository;
+    @Autowired
+    protected net.nginxmanager.site.DirectiveRequestRepository directiveRequestRepository;
 
     @BeforeEach
     void resetState() throws IOException {
         nginx.reset();
+        directiveRequestRepository.deleteAll();
         siteRepository.deleteAll();
         streamProxyRepository.deleteAll();
         certificateRepository.deleteAll();

@@ -88,6 +88,7 @@ public class SiteService {
         }
         requireUnusedDomains(null, form.certificateDomains(domain));
         requireFreePort(form.listenHttpPort());
+        requireDirectivesFree(null, form);
         ConfigFile file = configFileRepository.save(new ConfigFile(path, true));
         Site site = new Site(domain, form.type(), file);
         site.assignOwner(ownerId);
@@ -114,6 +115,7 @@ public class SiteService {
         if (form.listenHttpPort() != site.getListenHttpPort()) {
             requireFreePort(form.listenHttpPort());
         }
+        requireDirectivesFree(site.getId(), form);
         stageHtpasswd(site, form);
         site.applyForm(form);
         site.linkCertificate(certificateFor(site.getPrimaryDomain(), form));
@@ -138,6 +140,23 @@ public class SiteService {
                 return false;
             }
             doUpdate(siteId, rendering.formOf(site).withOptions(options.withMaintenance(on)), actor);
+            return true;
+        });
+    }
+
+    /** 추가 지시어만 바꾼다(035, 관리자가 요청을 반영할 때). 같은 값이면 초안을 만들지 않는다. */
+    public boolean setServerDirectives(long siteId, String directives, String actor) {
+        return locked(() -> {
+            Site site = load(siteId);
+            if (site.getType() == SiteType.RAW) {
+                throw new RawSiteFormException();
+            }
+            SiteOptions options = site.getOptions();
+            SiteOptions changed = options.withServerDirectives(directives);
+            if (java.util.Objects.equals(options.serverDirectives(), changed.serverDirectives())) {
+                return false;
+            }
+            doUpdate(siteId, rendering.formOf(site).withOptions(changed), actor);
             return true;
         });
     }
@@ -776,6 +795,23 @@ public class SiteService {
         for (String domain : domains) {
             if (taken.contains(domain.toLowerCase(Locale.ROOT))) {
                 throw new DuplicateSiteException(domain);
+            }
+        }
+    }
+
+    /**
+     * 추가 지시어의 server_name·listen(035)도 폼의 도메인·포트처럼 다른 사이트의 도메인, 스트림 포트와 겹치지 않아야 한다.
+     * 80·443과 이 사이트의 HTTP 포트는 여러 사이트가 함께 쓰는 포트라 보지 않는다.
+     */
+    private void requireDirectivesFree(Long siteId, SiteForm form) {
+        String directives = form.options() == null ? null : form.options().serverDirectives();
+        if (directives == null) {
+            return;
+        }
+        requireUnusedDomains(siteId, ServerDirectivePolicy.serverNames(directives));
+        for (int port : ServerDirectivePolicy.listenPorts(directives)) {
+            if (port != 80 && port != 443 && port != form.listenHttpPort()) {
+                requireFreePort(port);
             }
         }
     }

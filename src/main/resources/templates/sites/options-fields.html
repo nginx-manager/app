@@ -166,15 +166,40 @@
         <p class="hint" th:text="#{sites.opt.autoindex.hint}">설명</p>
     </details>
     <details class="site-options" th:open="${form?.options?.serverDirectives != null}">
-        <summary th:text="#{sites.opt.directives.title}">추가 지시어 (관리자)</summary>
+        <summary th:text="#{sites.opt.directives.title}">추가 지시어</summary>
         <label><th:block th:text="#{sites.opt.directives}">server 블록에 덧붙일 지시어</th:block>
             <span class="hint" th:text="#{sites.opt.directives.hint}">설명</span>
             <textarea th:field="*{options.serverDirectives}" rows="5" maxlength="4000" spellcheck="false"
                       placeholder="client_body_timeout 30s;&#10;location = /healthz { return 200; }"
-                      th:readonly="${!currentUser.isAdmin()}" th:disabled="${!editable}"></textarea>
-            <span class="hint" th:unless="${currentUser.isAdmin()}" th:text="#{sites.opt.directives.adminOnly}">관리자만 바꿀 수 있습니다.</span>
+                      th:disabled="${!editable}"></textarea>
             <span class="error" th:errors="*{options.serverDirectivesValid}"></span>
+            <span class="error" th:errors="*{options.serverDirectives}"></span>
         </label>
+        <!-- 관리자 전용 지시어가 막혔을 때(035): 저장된 사이트면 관리자에게 요청한다. 칸의 값을 그대로 보낸다 -->
+        <div class="directive-blocked" th:if="${directivesBlocked}">
+            <p class="hint" th:text="#{sites.opt.directives.requestHint}">관리자 전용 지시어는 관리자에게 요청하세요.</p>
+            <button type="submit" class="secondary" th:if="${site != null}" formnovalidate
+                    th:formaction="@{/sites/{id}/directive-request(id=${site.id})}" th:text="#{sites.opt.directives.request}">관리자에게 요청</button>
+            <p class="hint" th:if="${site == null}" th:text="#{sites.opt.directives.requestAfterSave}">사이트를 먼저 저장한 뒤 요청할 수 있습니다.</p>
+        </div>
+        <details class="directive-help">
+            <summary th:text="#{sites.opt.directives.help.title}">쓸 수 있는 지시어</summary>
+            <p class="hint" th:text="#{sites.opt.directives.help.intro}">설명</p>
+            <table>
+                <thead><tr><th th:text="#{sites.opt.directives.help.col.directive}">지시어</th><th th:text="#{sites.opt.directives.help.col.desc}">설명</th><th></th></tr></thead>
+                <tbody>
+                <tr th:each="ex : ${directiveExamples}">
+                    <td><code th:text="${ex.code}">client_body_timeout 60s;</code></td>
+                    <td th:text="#{|sites.opt.directives.help.${ex.key}|}">설명</td>
+                    <td><button type="button" class="secondary small" th:if="${editable}" th:attr="data-insert-directive=${ex.code}"
+                                th:text="#{sites.opt.directives.help.insert}">넣기</button></td>
+                </tr>
+                </tbody>
+            </table>
+            <p class="hint"><th:block th:text="#{sites.opt.directives.help.adminOnly}">관리자만</th:block>
+                <code th:each="name, s : ${directiveAdminOnly}" th:text="${name} + (${s.last} ? '' : ',')">root</code></p>
+            <p class="hint" th:text="#{sites.opt.directives.help.adminOnlyRule}">규칙</p>
+        </details>
     </details>
 </th:block>
 </body>

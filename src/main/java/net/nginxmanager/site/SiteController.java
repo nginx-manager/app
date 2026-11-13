@@ -25,7 +25,6 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.List;
 import java.util.Locale;
-import java.util.Objects;
 
 @Controller
 @RequestMapping("/sites")
@@ -41,12 +40,15 @@ public class SiteController {
     private final SiteAccess access;
     private final UserRepository userRepository;
     private final Messages messages;
+    private final DirectiveRequestService directiveRequests;
 
     public SiteController(SiteService siteService, SiteQueryRepository siteQueryRepository,
                           SiteRendering rendering, ConfigFileStore store,
                           TlsCertificateRepository certificateRepository, CertificateService certificateService,
-                          ImportFiles importFiles, SiteAccess access, UserRepository userRepository, Messages messages) {
+                          ImportFiles importFiles, SiteAccess access, UserRepository userRepository, Messages messages,
+                          DirectiveRequestService directiveRequests) {
         this.messages = messages;
+        this.directiveRequests = directiveRequests;
         this.access = access;
         this.userRepository = userRepository;
         this.importFiles = importFiles;
@@ -62,6 +64,38 @@ public class SiteController {
     @ModelAttribute("uploadedCertificates")
     public java.util.List<TlsCertificate> uploadedCertificates() {
         return certificateRepository.findBySourceOrderByNameAsc(CertificateSource.UPLOADED);
+    }
+
+    /** 추가 지시어 칸 아래 도움말(035): 자주 쓰는 지시어와 관리자 전용 지시어. */
+    @ModelAttribute("directiveExamples")
+    public List<ServerDirectivePolicy.Example> directiveExamples() {
+        return ServerDirectivePolicy.EXAMPLES;
+    }
+
+    @ModelAttribute("directiveAdminOnly")
+    public List<String> directiveAdminOnly() {
+        return ServerDirectivePolicy.ADMIN_ONLY_SHOWN;
+    }
+
+    /**
+     * 멤버가 관리자 전용 추가 지시어(035)를 새로 넣으려 하면 저장하지 않고 칸에 이유를 보인다. 관리자가 넣어 둔 것은 그대로 둘 수 있다.
+     *
+     * @return 막았는지
+     */
+    private boolean rejectAdminOnlyDirectives(SiteForm form, String current, BindingResult bindingResult,
+                                              Authentication authentication, Model model) {
+        if (SiteAccess.isAdmin(authentication) || form.options() == null) {
+            return false;
+        }
+        List<String> blocked = ServerDirectivePolicy.added(form.options().serverDirectives(), current);
+        if (blocked.isEmpty()) {
+            return false;
+        }
+        String names = String.join(", ", ServerDirectivePolicy.names(blocked));
+        bindingResult.rejectValue("options.serverDirectives", "msg.site.directivesAdminOnly", new Object[] {names},
+                "관리자만 넣을 수 있는 지시어입니다: " + names);
+        model.addAttribute("directivesBlocked", true);
+        return true;
     }
 
     /**
@@ -95,17 +129,9 @@ public class SiteController {
         if (SiteAccess.isAdmin(authentication)) {
             model.addAttribute("users", userRepository.findAllByOrderByUsernameAsc());
             model.addAttribute("ownerFilter", owner == null ? "" : owner);
+            model.addAttribute("directiveRequests", directiveRequests.pending());
         }
         return "sites/list";
-    }
-
-    /** 추가 지시어(032)는 관리자만 바꾼다. 멤버가 보낸 값은 버리고 지금 값을 그대로 둔다(새 사이트면 없음). */
-    private static SiteForm directivesGuarded(SiteForm form, String current, Authentication authentication) {
-        if (SiteAccess.isAdmin(authentication) || form.options() == null
-                || Objects.equals(form.options().serverDirectives(), current)) {
-            return form;
-        }
-        return form.withOptions(form.options().withServerDirectives(current));
     }
 
     private static SiteQueryRepository.OwnerFilter adminFilter(String owner) {
@@ -140,13 +166,13 @@ public class SiteController {
 
     @PostMapping("/new")
     public String create(@Valid @ModelAttribute("form") SiteForm form, BindingResult bindingResult,
-                         Authentication authentication) {
-        if (bindingResult.hasErrors()) {
+                         Authentication authentication, Model model) {
+        if (bindingResult.hasErrors() || rejectAdminOnlyDirectives(form, null, bindingResult, authentication, model)) {
             return "sites/form";
         }
         try {
             // 멤버가 만든 사이트는 그 멤버가 담당한다. 관리자가 만든 사이트는 담당자 없이 시작한다
-            Site site = siteService.create(directivesGuarded(form, null, authentication), authentication.getName(),
+            Site site = siteService.create(form, authentication.getName(),
                     access.ownerOfNewSite(authentication));
             return "redirect:/sites/" + site.getId() + "?saved";
         } catch (DuplicateSiteException e) {
@@ -179,9 +205,16 @@ public class SiteController {
             addDetail(site, authentication, model);
             return "sites/detail";
         }
+        // 추가 지시어(032)도 다른 옵션처럼 이 사이트를 다룰 수 있는 사람(관리자, 담당 멤버)이 고친다(035).
+        // 단 서버 전체에 영향을 주는 지시어는 관리자만 넣고, 멤버는 관리자에게 요청한다
+        String current = siteQueryRepository.findWithFile(id).map(site -> site.getOptions().serverDirectives()).orElse(null);
+        if (rejectAdminOnlyDirectives(form, current, bindingResult, authentication, model)) {
+            Site site = siteQueryRepository.findWithFile(id).orElseThrow(() -> new NotFoundException("site " + id));
+            addDetail(site, authentication, model);
+            return "sites/detail";
+        }
         try {
-            String current = siteQueryRepository.findWithFile(id).map(site -> site.getOptions().serverDirectives()).orElse(null);
-            siteService.update(id, directivesGuarded(form, current, authentication), authentication.getName());
+            siteService.update(id, form, authentication.getName());
         } catch (DuplicateSiteException e) {
             bindingResult.rejectValue("extraDomains", "msg.site.domainTaken", new Object[] {e.getDomain()}, duplicateMessage(e));
             Site site = siteQueryRepository.findWithFile(id).orElseThrow(() -> new NotFoundException("site " + id));
@@ -202,6 +235,59 @@ public class SiteController {
             return "sites/detail";
         }
         return "redirect:/sites/" + id + "?saved";
+    }
+
+    /**
+     * 관리자 전용 지시어가 든 추가 지시어를 관리자에게 요청한다(035). 사이트 폼의 추가 지시어 칸 값을 그대로 받는다.
+     */
+    @PostMapping("/{id}/directive-request")
+    public String requestDirectives(@PathVariable long id,
+                                    @RequestParam(name = "options.serverDirectives", required = false) String directives,
+                                    Authentication authentication, RedirectAttributes redirect) {
+        Site site = access.require(id, authentication);
+        if (site.getType() == SiteType.RAW || SiteAccess.isAdmin(authentication)) {
+            return "redirect:/sites/" + id;
+        }
+        SiteOptions requested = site.getOptions().withServerDirectives(directives);
+        if (requested.serverDirectives() == null || !requested.isServerDirectivesValid()) {
+            redirect.addFlashAttribute("error", messages.get("msg.validation.serverDirectives"));
+            return "redirect:/sites/" + id;
+        }
+        if (ServerDirectivePolicy.added(requested.serverDirectives(), site.getOptions().serverDirectives()).isEmpty()) {
+            redirect.addFlashAttribute("error", messages.get("msg.site.directivesNoRequestNeeded"));
+            return "redirect:/sites/" + id;
+        }
+        directiveRequests.request(site, requested.serverDirectives(), authentication.getName());
+        redirect.addFlashAttribute("notice", messages.get("msg.site.directivesRequested"));
+        return "redirect:/sites/" + id;
+    }
+
+    /** 관리자가 추가 지시어 요청을 반영한다(035). 사이트의 추가 지시어가 요청 값으로 바뀐 초안이 생긴다. */
+    @PostMapping("/{id}/directive-request/approve")
+    public String approveDirectives(@PathVariable long id, Authentication authentication, RedirectAttributes redirect) {
+        requireAdmin(authentication);
+        try {
+            directiveRequests.approve(id, authentication.getName());
+        } catch (RawSiteFormException e) {
+            directiveRequests.reject(id, authentication.getName());
+            return "redirect:/sites/" + id + "?rawOnly";
+        }
+        redirect.addFlashAttribute("notice", messages.get("msg.site.directivesApproved"));
+        return "redirect:/sites/" + id + "?saved";
+    }
+
+    @PostMapping("/{id}/directive-request/reject")
+    public String rejectDirectives(@PathVariable long id, Authentication authentication, RedirectAttributes redirect) {
+        requireAdmin(authentication);
+        directiveRequests.reject(id, authentication.getName());
+        redirect.addFlashAttribute("notice", messages.get("msg.site.directivesRejected"));
+        return "redirect:/sites/" + id;
+    }
+
+    private static void requireAdmin(Authentication authentication) {
+        if (!SiteAccess.isAdmin(authentication)) {
+            throw new AccessDeniedException("admin only");
+        }
     }
 
     private static void rejectMissingPassword(BindingResult bindingResult, MissingPasswordException e) {
@@ -313,6 +399,7 @@ public class SiteController {
         }
         TlsCertificate certificate = certificateOf(site);
         model.addAttribute("site", site);
+        model.addAttribute("directiveRequest", directiveRequests.find(site.getId()).orElse(null));
         model.addAttribute("content", currentContent(site));
         model.addAttribute("certificate", certificate);
         model.addAttribute("certificateRunning", certificate != null && certificateService.isRunning(certificate.getId()));
