@@ -1,6 +1,11 @@
 package net.nginxmanager.common;
 
 import net.nginxmanager.support.IntegrationTest;
+import net.nginxmanager.user.Role;
+import net.nginxmanager.user.SetupState;
+import net.nginxmanager.user.User;
+import net.nginxmanager.user.UserRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
@@ -16,6 +21,19 @@ class LocaleTest {
 
     @Autowired
     MockMvc mvc;
+    @Autowired
+    UserRepository userRepository;
+    @Autowired
+    SetupState setupState;
+
+    /** 최초 설정이 끝난 상태여야 화면이 나온다. 앞선 테스트 순서에 기대지 않는다. */
+    @BeforeEach
+    void setUp() {
+        if (userRepository.findByUsername("admin").isEmpty()) {
+            userRepository.save(new User("admin", "{noop}unused-password", Role.ADMIN));
+        }
+        setupState.reset();
+    }
 
     @Test
     void koreanWhenBrowserSendsNoLanguage() throws Exception {
